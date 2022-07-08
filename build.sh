@@ -15,6 +15,7 @@ export PATH=$PATH:$HOME/clang+llvm/bin
 git clone https://github.com/AFLplusplus/AFLplusplus.git $AFL
 cd $AFL
 make -j
+export AFL_LLVM_INSTRUMENT=CLASSIC
 # Put the runtime library to llvm-isel-afl for compilation. 
 # This is dirty, but works before AIE is self-hosting.
 cp $FUZZING_HOME/$AFL/afl-compiler-rt.o $FUZZING_HOME/llvm-isel-afl

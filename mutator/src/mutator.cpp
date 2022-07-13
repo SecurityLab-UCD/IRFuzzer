@@ -21,6 +21,12 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Target/TargetMachine.h"
 
+#include <fstream>
+#include <iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <vector>
 using namespace llvm;
 
 static std::unique_ptr<IRMutator> Mutator;
@@ -49,6 +55,15 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
     M.reset(new Module("M", Context));
   else
     M = parseModule(Data, Size, Context);
+  if (!M) {
+    errs() << "Parse module error. No mutation is done. Data size: " << Size
+           << ". Given data wrote to err.bc\n";
+    std::ofstream outfile =
+        std::ofstream("err.bc", std::ios::out | std::ios::binary);
+    outfile.write((char *)Data, Size);
+    outfile.close();
+    exit(1);
+  }
 
   Mutator->mutateModule(*M, Seed, Size, MaxSize);
 

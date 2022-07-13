@@ -1,0 +1,115 @@
+diff --git a/llvm/lib/Support/ErrorHandling.cpp b/llvm/lib/Support/ErrorHandling.cpp
+index 80c0e00439a5..91a2896fb264 100644
+--- a/llvm/lib/Support/ErrorHandling.cpp
++++ b/llvm/lib/Support/ErrorHandling.cpp
+@@ -30,11 +30,11 @@
+ #include <new>
+ 
+ #if defined(HAVE_UNISTD_H)
+-# include <unistd.h>
++#include <unistd.h>
+ #endif
+ #if defined(_MSC_VER)
+-# include <io.h>
+-# include <fcntl.h>
++#include <fcntl.h>
++#include <io.h>
+ #endif
+ 
+ using namespace llvm;
+@@ -89,7 +89,8 @@ void llvm::report_fatal_error(StringRef Reason, bool GenCrashDiag) {
+ 
+ void llvm::report_fatal_error(const Twine &Reason, bool GenCrashDiag) {
+   llvm::fatal_error_handler_t handler = nullptr;
+-  void* handlerData = nullptr;
++  throw Reason.str();
++  void *handlerData = nullptr;
+   {
+     // Only acquire the mutex while reading the handler, so as not to invoke a
+     // user-supplied callback under a lock.
+@@ -176,8 +177,7 @@ void llvm::report_bad_alloc_error(const char *Reason, bool GenCrashDiag) {
+ #ifdef LLVM_ENABLE_EXCEPTIONS
+ // Do not set custom new handler if exceptions are enabled. In this case OOM
+ // errors are handled by throwing 'std::bad_alloc'.
+-void llvm::install_out_of_memory_new_handler() {
+-}
++void llvm::install_out_of_memory_new_handler() {}
+ #else
+ // Causes crash on allocation failure. It is called prior to the handler set by
+ // 'install_bad_alloc_error_handler'.
+@@ -226,9 +226,7 @@ void LLVMInstallFatalErrorHandler(LLVMFatalErrorHandler Handler) {
+                               LLVM_EXTENSION reinterpret_cast<void *>(Handler));
+ }
+ 
+-void LLVMResetFatalErrorHandler() {
+-  remove_fatal_error_handler();
+-}
++void LLVMResetFatalErrorHandler() { remove_fatal_error_handler(); }
+ 
+ #ifdef _WIN32
+ 
+diff --git a/llvm/tools/llvm-isel-fuzzer/llvm-isel-fuzzer.cpp b/llvm/tools/llvm-isel-fuzzer/llvm-isel-fuzzer.cpp
+index a6370da6e038..1096615c1ced 100644
+--- a/llvm/tools/llvm-isel-fuzzer/llvm-isel-fuzzer.cpp
++++ b/llvm/tools/llvm-isel-fuzzer/llvm-isel-fuzzer.cpp
+@@ -39,15 +39,13 @@ using namespace llvm;
+ static codegen::RegisterCodeGenFlags CGF;
+ 
+ static cl::opt<char>
+-OptLevel("O",
+-         cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
+-                  "(default = '-O2')"),
+-         cl::Prefix,
+-         cl::ZeroOrMore,
+-         cl::init(' '));
++    OptLevel("O",
++             cl::desc("Optimization level. [-O0, -O1, -O2, or -O3] "
++                      "(default = '-O2')"),
++             cl::Prefix, cl::ZeroOrMore, cl::init(' '));
+ 
+ static cl::opt<std::string>
+-TargetTriple("mtriple", cl::desc("Override target triple for module"));
++    TargetTriple("mtriple", cl::desc("Override target triple for module"));
+ 
+ static std::unique_ptr<TargetMachine> TM;
+ static std::unique_ptr<IRMutator> Mutator;
+@@ -102,7 +100,12 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
+   PM.add(new TargetLibraryInfoWrapperPass(TLII));
+   raw_null_ostream OS;
+   TM->addPassesToEmitFile(PM, OS, nullptr, CGFT_Null);
+-  PM.run(*M);
++
++  try {
++    PM.run(*M);
++  } catch (const std::string& s) {
++    // pass.
++  }
+ 
+   return 0;
+ }
+@@ -151,11 +154,20 @@ extern "C" LLVM_ATTRIBUTE_USED int LLVMFuzzerInitialize(int *argc,
+   default:
+     errs() << argv[0] << ": invalid optimization level.\n";
+     return 1;
+-  case ' ': break;
+-  case '0': OLvl = CodeGenOpt::None; break;
+-  case '1': OLvl = CodeGenOpt::Less; break;
+-  case '2': OLvl = CodeGenOpt::Default; break;
+-  case '3': OLvl = CodeGenOpt::Aggressive; break;
++  case ' ':
++    break;
++  case '0':
++    OLvl = CodeGenOpt::None;
++    break;
++  case '1':
++    OLvl = CodeGenOpt::Less;
++    break;
++  case '2':
++    OLvl = CodeGenOpt::Default;
++    break;
++  case '3':
++    OLvl = CodeGenOpt::Aggressive;
++    break;
+   }
+ 
+   TargetOptions Options = codegen::InitTargetOptionsFromCodeGenFlags(TheTriple);

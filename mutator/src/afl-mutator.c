@@ -11,7 +11,6 @@
 #define DATA_SIZE (4096)
 typedef struct custom_ir_mutator {
   afl_state_t *afl;
-  unsigned int seed;
   uint8_t *mutator_buf;
 } CustomIRMutator;
 
@@ -36,7 +35,9 @@ CustomIRMutator *afl_custom_init(afl_state_t *afl, unsigned int seed) {
   }
 
   mutator->afl = afl;
-  mutator->seed = seed;
+  // The mutator can be think of as a deterministic function where
+  // new_M = Mutate(M, seed);
+  srand(seed);
 
   if ((mutator->mutator_buf = (u8 *)malloc(MAX_FILE)) == NULL) {
 
@@ -44,7 +45,7 @@ CustomIRMutator *afl_custom_init(afl_state_t *afl, unsigned int seed) {
     perror("mutator_buf alloc");
     return NULL;
   }
-
+  createISelMutator();
   return mutator;
 }
 
@@ -70,8 +71,8 @@ size_t afl_custom_fuzz(CustomIRMutator *mutator, uint8_t *buf, size_t buf_size,
                        size_t max_size) {
 
   memcpy(mutator->mutator_buf, buf, buf_size);
-  size_t out_size = LLVMFuzzerCustomMutator(mutator->mutator_buf, buf_size,
-                                            max_size, mutator->seed);
+  size_t out_size =
+      LLVMFuzzerCustomMutator(mutator->mutator_buf, buf_size, max_size, rand());
 
   /* return size of mutated data */
   *out_buf = mutator->mutator_buf;
@@ -236,31 +237,16 @@ int32_t afl_custom_post_trim(CustomIRMutator *data, int success) {
  * @return Size of the mutated output.
  */
 /*
-size_t afl_custom_havoc_mutation(CustomIRMutator *data, u8 *buf, size_t
-buf_size, u8 **out_buf, size_t max_size) {
+size_t afl_custom_havoc_mutation(CustomIRMutator *mutator, u8 *buf,
+                                 size_t buf_size, u8 **out_buf,
+                                 size_t max_size) {
+  memcpy(mutator->mutator_buf, buf, buf_size);
+  size_t out_size = LLVMFuzzerCustomMutator(mutator->mutator_buf, buf_size,
+                                            max_size, mutator->seed);
 
-  if (buf_size == 0) {
-
-    *out_buf = maybe_grow(BUF_PARAMS(data, havoc), 1);
-    if (!*out_buf) {
-
-      perror("custom havoc: maybe_grow");
-      return 0;
-    }
-
-    **out_buf = rand() % 256;
-    buf_size = 1;
-
-  } else {
-
-    // We reuse buf here. It's legal and faster.
-    *out_buf = buf;
-  }
-
-  size_t victim = rand() % buf_size;
-  (*out_buf)[victim] += rand() % 10;
-
-  return buf_size;
+  // return size of mutated data
+  *out_buf = mutator->mutator_buf;
+  return out_size;
 }
 */
 
@@ -275,8 +261,7 @@ buf_size, u8 **out_buf, size_t max_size) {
  */
 /*
 uint8_t afl_custom_havoc_mutation_probability(CustomIRMutator *data) {
-
-  return 5; // 5 %
+  return 100; // 100 %
 }
 */
 

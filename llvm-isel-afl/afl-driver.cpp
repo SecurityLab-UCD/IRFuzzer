@@ -227,8 +227,11 @@ int main(int argc, char **argv) {
 
   maybe_duplicate_stderr();
   maybe_close_fd_mask();
-  if (LLVMFuzzerInitialize)
+  if (LLVMFuzzerInitialize) {
+    // Can't really rely on argv here since it will be used by the driver later.
+    // If `-global-isel` needs to be passed, make up your own Argc and Argv
     LLVMFuzzerInitialize(&argc, &argv);
+  }
   // Do any other expensive one-time initialization here.
 
   if (!getenv("AFL_DRIVER_DONT_DEFER"))

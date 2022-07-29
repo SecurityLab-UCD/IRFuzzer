@@ -2,3 +2,7 @@ build/
 llvm-aie/
 .vscode/
 AFLplusplus/
+O
+fuzzing_AIE
+*-w*
+tmp

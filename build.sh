@@ -38,7 +38,7 @@ fi
 
 ###### Build llvm-aie
 # Unfortunatelly we have to compile AIE twice. 
-# `build-ninja` and `build-afl` have to be built before the whole project can be built. 
+# `build-release` and `build-afl` have to be built before the whole project can be built. 
 # Since the paths to LLVM is fixed in `CMakeLists.txt`
 
 # `build-afl` is a afl-customed built with afl instrumentations so we can collect runtime info
@@ -50,10 +50,10 @@ then
     cd $AIE/build-afl
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=OFF \
-            -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_CCACHE_BUILD=OFF \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE" \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE;AArch64" \
             -DLLVM_TARGETS_TO_BUILD="X86" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
@@ -68,29 +68,28 @@ then
     ninja -j 50
     cd $FUZZING_HOME
 fi
-# Mutator depends on `build-ninja`.
+# Mutator depends on `build-release`.
 # They can't depend on `build-afl` since all AFL compiled code reference to global 
 # `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
-if [ ! -d $FUZZING_HOME/$AIE/build-ninja ]
+if [ ! -d $FUZZING_HOME/$AIE/build-release ]
 then
-    mkdir -p $AIE/build-ninja
-    cd $AIE/build-ninja
+    mkdir -p $AIE/build-release
+    cd $AIE/build-release
     cmake  -GNinja \
-            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE" \
-            -DLLVM_TARGETS_TO_BUILD="X86" \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE;Mips;RISCV" \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_BUILD_TYPE=Debug \
             -DLLVM_APPEND_VC_REV=OFF \
             -DLLVM_BUILD_EXAMPLES=OFF \
             -DLLVM_BUILD_RUNTIME=OFF \
             -DLLVM_INCLUDE_EXAMPLES=OFF \
             -DLLVM_USE_SANITIZE_COVERAGE=OFF \
             -DLLVM_USE_SANITIZER="" \
-            -DCMAKE_INSTALL_PREFIX=$FUZZING_HOME/$AIE/install-aie \
         ../llvm && \
     ninja -j 50
     cd $FUZZING_HOME
@@ -104,7 +103,7 @@ then
     git apply $FUZZING_HOME/libFuzzer.patch
     # Enable exceptions to use try-catch.
     cmake -GNinja \
-            -DBUILD_SHARED_LIBS=OFF \
+            -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_PROJECTS="mlir" \
             -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE" \
@@ -154,3 +153,12 @@ export AFL_CUSTOM_MUTATOR_ONLY=1
 # It will report a `no such process`, that's ok.
 # That process is `grep`, which is also shown in `ps`, which died before `kill` thus doesn't exist.
 # kill -9 $(ps aux | grep isel-fuzzing | awk '{print $2}')
+
+# /home/yuyangr/clang+llvm/bin/clang++ -DGTEST_HAS_RTTI=0 -D_DEBUG -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -Ilib/Target/AIE -I/home/yuyangr/llvm-aie/llvm/lib/Target/AIE -Iinclude -I/home/yuyangr/llvm-aie/llvm/include -fPIC -fvisibility-inlines-hidden -Werror=date-time -Werror=unguarded-availability-new -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wmissing-field-initializers -pedantic -Wno-long-long -Wc++98-compat-extra-semi -Wimplicit-fallthrough -Wcovered-switch-default -Wno-noexcept-type -Wnon-virtual-dtor -Wdelete-non-virtual-dtor -Wsuggest-override -Wstring-conversion -Wmisleading-indentation -fdiagnostics-color -g -fPIC  -fno-exceptions -fno-rtti -std=c++14 -MD -MT lib/Target/AIE/CMakeFiles/LLVMAIECodeGen.dir/AIEISelDAGToDAG.cpp.o -MF lib/Target/AIE/CMakeFiles/LLVMAIECodeGen.dir/AIEISelDAGToDAG.cpp.o.d -o lib/Target/AIE/CMakeFiles/LLVMAIECodeGen.dir/AIEISelDAGToDAG.cpp.o -c /home/yuyangr/llvm-aie/llvm/lib/Target/AIE/AIEISelDAGToDAG.cpp
+
+# cat fuzzing-wo-shadow*/default/fuzzer_stats | grep shadow_cvg ; cat fuzzing-w-shadow*/default/fuzzer_stats | grep shadow_cvg
+
+# AIE2        87     40
+# AIE      22600  13777
+# X86     679253  62347
+# AArch64 391383 195287

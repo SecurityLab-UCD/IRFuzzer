@@ -162,3 +162,9 @@ export AFL_CUSTOM_MUTATOR_ONLY=1
 # AIE      22600  13777
 # X86     679253  62347
 # AArch64 391383 195287
+
+# for I in {0..2}
+# do
+#     screen -S fuzzing-dagisel-$I -dm bash -c "export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/3.fuzzing.vec++/fuzzing-dagisel-$I  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
+#     screen -S fuzzing-globalisel-$I -dm bash -c "export GLOBAL_ISEL=1; export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/3.fuzzing.vec++/fuzzing-globalisel-$I  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
+# done

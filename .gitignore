@@ -6,3 +6,6 @@ O
 fuzzing_AIE
 *-w*
 tmp
+seed
+*.bc
+*.ll

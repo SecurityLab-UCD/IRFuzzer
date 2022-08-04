@@ -228,9 +228,19 @@ int main(int argc, char **argv) {
   maybe_duplicate_stderr();
   maybe_close_fd_mask();
   if (LLVMFuzzerInitialize) {
-    // Can't really rely on argv here since it will be used by the driver later.
-    // If `-global-isel` needs to be passed, make up your own Argc and Argv
-    LLVMFuzzerInitialize(&argc, &argv);
+    if (getenv("GLOBAL_ISEL")) {
+      Printf("Fuzzing GlobalISel\n");
+      int Argc = 3;
+      const char *Argv[3] = {argv[0], "-global-isel", "-mtriple=aie"};
+      char **AArgv = (char **)Argv;
+      // Can't really rely on argv here since it will be used by the driver
+      // later. If `-global-isel` needs to be passed, make up your own Argc
+      // and Argv
+      LLVMFuzzerInitialize(&Argc, &AArgv);
+    } else {
+      Printf("Fuzzing DAGISel\n");
+      LLVMFuzzerInitialize(&argc, &argv);
+    }
   }
   // Do any other expensive one-time initialization here.
 

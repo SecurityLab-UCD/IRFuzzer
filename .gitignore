@@ -9,3 +9,5 @@ tmp
 seed
 *.bc
 *.ll
+llvm-project
+fuzzing

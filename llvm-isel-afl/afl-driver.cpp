@@ -228,19 +228,24 @@ int main(int argc, char **argv) {
   maybe_duplicate_stderr();
   maybe_close_fd_mask();
   if (LLVMFuzzerInitialize) {
+    std::vector<char *> Argv({argv[0]});
     if (getenv("GLOBAL_ISEL")) {
       Printf("Fuzzing GlobalISel\n");
-      int Argc = 3;
-      const char *Argv[3] = {argv[0], "-global-isel", "-mtriple=aie"};
-      char **AArgv = (char **)Argv;
-      // Can't really rely on argv here since it will be used by the driver
-      // later. If `-global-isel` needs to be passed, make up your own Argc
-      // and Argv
-      LLVMFuzzerInitialize(&Argc, &AArgv);
+      Argv.push_back((char *)"-global-isel");
     } else {
       Printf("Fuzzing DAGISel\n");
-      LLVMFuzzerInitialize(&argc, &argv);
     }
+    if (char *triple = getenv("TRIPLE")) {
+      Printf("Fuzzing %s\n", triple);
+      char arg[256];
+      sprintf(arg, "-mtriple=%s", triple);
+      Argv.push_back(arg);
+    } else {
+      Printf("Fuzzing AArch64\n");
+    }
+    char **AArgv = Argv.data();
+    int AArgc = Argv.size();
+    LLVMFuzzerInitialize(&AArgc, &AArgv);
   }
   // Do any other expensive one-time initialization here.
 

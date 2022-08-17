@@ -6,7 +6,7 @@
 # https://askubuntu.com/questions/355565/how-do-i-install-the-latest-version-of-cmake-from-the-command-line
 
 export FUZZING_HOME=$(pwd)
-export AIE=llvm-aie
+export LLVM=llvm-project
 export AFL=AFLplusplus
 
 ###### Install llvm
@@ -30,31 +30,30 @@ then
 fi
 export AFL_LLVM_INSTRUMENT=CLASSIC
 
-###### Download llvm-aie
-if [ ! -d $FUZZING_HOME/$AIE ]
+###### Download llvm-project
+if [ ! -d $FUZZING_HOME/$LLVM ]
 then
-    git clone https://gitenterprise.xilinx.com/XRLabs/llvm-aie.git --depth=1 $FUZZING_HOME/$AIE
+    git clone https://github.com/llvm/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
 fi
 
-###### Build llvm-aie
-# Unfortunatelly we have to compile AIE twice. 
+###### Build llvm-project
+# Unfortunatelly we have to compile LLVM twice. 
 # `build-release` and `build-afl` have to be built before the whole project can be built. 
 # Since the paths to LLVM is fixed in `CMakeLists.txt`
 
 # `build-afl` is a afl-customed built with afl instrumentations so we can collect runtime info
 # and report back to afl. 
 # Driver also depends on `build-afl`
-if [ ! -d $FUZZING_HOME/$AIE/build-afl ]
+if [ ! -d $FUZZING_HOME/$LLVM/build-afl ]
 then
-    mkdir -p $AIE/build-afl
-    cd $AIE/build-afl
+    mkdir -p $LLVM/build-afl
+    cd $LLVM/build-afl
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_CCACHE_BUILD=OFF \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE;AArch64" \
-            -DLLVM_TARGETS_TO_BUILD="X86" \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -65,40 +64,31 @@ then
             -DLLVM_USE_SANITIZE_COVERAGE=OFF \
             -DLLVM_USE_SANITIZER="" \
         ../llvm && \
-    ninja -j 50
+    ninja -j $(nproc --all)
     cd $FUZZING_HOME
 fi
 # Mutator depends on `build-release`.
 # They can't depend on `build-afl` since all AFL compiled code reference to global 
 # `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
-if [ ! -d $FUZZING_HOME/$AIE/build-release ]
+if [ ! -d $FUZZING_HOME/$LLVM/build-release ]
 then
-    mkdir -p $AIE/build-release
-    cd $AIE/build-release
+    mkdir -p $LLVM/build-release
+    cd $LLVM/build-release
     cmake  -GNinja \
-            -DBUILD_SHARED_LIBS=ON \
-            -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE;Mips;RISCV" \
             -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Debug \
-            -DLLVM_APPEND_VC_REV=OFF \
-            -DLLVM_BUILD_EXAMPLES=OFF \
-            -DLLVM_BUILD_RUNTIME=OFF \
-            -DLLVM_INCLUDE_EXAMPLES=OFF \
-            -DLLVM_USE_SANITIZE_COVERAGE=OFF \
-            -DLLVM_USE_SANITIZER="" \
         ../llvm && \
-    ninja -j 50
+    ninja -j $(nproc --all)
     cd $FUZZING_HOME
 fi
 # Build libfuzzer as reference
-if [ ! -d $FUZZING_HOME/$AIE/build-libfuzzer ]
+if [ ! -d $FUZZING_HOME/$LLVM/build-libfuzzer ]
 then
-    mkdir -p $AIE/build-libfuzzer
-    cd $AIE/build-libfuzzer
+    mkdir -p $LLVM/build-libfuzzer
+    cd $LLVM/build-libfuzzer
     # Apply a patch so libfuzzer don't quit on crash
     git apply $FUZZING_HOME/libFuzzer.patch
     # Enable exceptions to use try-catch.
@@ -106,7 +96,6 @@ then
             -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE" \
             -DLLVM_TARGETS_TO_BUILD="X86" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
@@ -120,8 +109,8 @@ then
             -DLLVM_ENABLE_RTTI=ON \
             -DLLVM_ENABLE_EH=ON \
         ../llvm && \
-    ninja -j 50
-    cd $FUZZING_HOME/$AIE
+    ninja -j $(nproc --all)
+    cd $FUZZING_HOME/$LLVM
     git checkout llvm/lib/Support/ llvm/tools
     cd $FUZZING_HOME
 fi
@@ -154,17 +143,13 @@ export AFL_CUSTOM_MUTATOR_ONLY=1
 # That process is `grep`, which is also shown in `ps`, which died before `kill` thus doesn't exist.
 # kill -9 $(ps aux | grep isel-fuzzing | awk '{print $2}')
 
-# /home/yuyangr/clang+llvm/bin/clang++ -DGTEST_HAS_RTTI=0 -D_DEBUG -D_GNU_SOURCE -D__STDC_CONSTANT_MACROS -D__STDC_FORMAT_MACROS -D__STDC_LIMIT_MACROS -Ilib/Target/AIE -I/home/yuyangr/llvm-aie/llvm/lib/Target/AIE -Iinclude -I/home/yuyangr/llvm-aie/llvm/include -fPIC -fvisibility-inlines-hidden -Werror=date-time -Werror=unguarded-availability-new -Wall -Wextra -Wno-unused-parameter -Wwrite-strings -Wcast-qual -Wmissing-field-initializers -pedantic -Wno-long-long -Wc++98-compat-extra-semi -Wimplicit-fallthrough -Wcovered-switch-default -Wno-noexcept-type -Wnon-virtual-dtor -Wdelete-non-virtual-dtor -Wsuggest-override -Wstring-conversion -Wmisleading-indentation -fdiagnostics-color -g -fPIC  -fno-exceptions -fno-rtti -std=c++14 -MD -MT lib/Target/AIE/CMakeFiles/LLVMAIECodeGen.dir/AIEISelDAGToDAG.cpp.o -MF lib/Target/AIE/CMakeFiles/LLVMAIECodeGen.dir/AIEISelDAGToDAG.cpp.o.d -o lib/Target/AIE/CMakeFiles/LLVMAIECodeGen.dir/AIEISelDAGToDAG.cpp.o -c /home/yuyangr/llvm-aie/llvm/lib/Target/AIE/AIEISelDAGToDAG.cpp
-
 # cat fuzzing-wo-shadow*/default/fuzzer_stats | grep shadow_cvg ; cat fuzzing-w-shadow*/default/fuzzer_stats | grep shadow_cvg
 
-# AIE2        87     40
-# AIE      22600  13777
-# X86     679253  62347
-# AArch64 391383 195287
+# X86     681890  62855
+# AArch64 449570 195746
 
 # for I in {0..2}
 # do
-#     screen -S fuzzing-dagisel-$I -dm bash -c "export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/3.fuzzing.vec++/fuzzing-dagisel-$I  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
-#     screen -S fuzzing-globalisel-$I -dm bash -c "export GLOBAL_ISEL=1; export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/3.fuzzing.vec++/fuzzing-globalisel-$I  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
+#     screen -S fuzzing-dagisel-$I -dm bash -c "export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_LLVM/seeds/ -o ~/fuzzing_LLVM/3.fuzzing.vec++/fuzzing-dagisel-$I  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
+#     screen -S fuzzing-globalisel-$I -dm bash -c "export GLOBAL_ISEL=1; export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_LLVM/seeds/ -o ~/fuzzing_LLVM/3.fuzzing.vec++/fuzzing-globalisel-$I  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
 # done

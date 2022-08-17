@@ -1,6 +1,8 @@
 #include "mutator.h"
 
 #include "llvm/FuzzMutate/FuzzerCLI.h"
+#include "llvm/FuzzMutate/IRMutator.h"
+#include "llvm/FuzzMutate/Operations.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/raw_ostream.h"

@@ -50,7 +50,7 @@ static cl::opt<char>
 
 static cl::opt<std::string>
     TargetTriple("mtriple", cl::desc("Override target triple for module"),
-                 cl::init("aie"));
+                 cl::init("aarch64"));
 
 static std::unique_ptr<TargetMachine> TM;
 
@@ -90,7 +90,7 @@ extern "C" LLVM_ATTRIBUTE_USED int LLVMFuzzerInitialize(int *argc,
   InitializeAllAsmPrinters();
   InitializeAllAsmParsers();
 
-  handleExecNameEncodedBEOpts(*argv[0]);
+  // handleExecNameEncodedBEOpts(*argv[0]);
   cl::ParseCommandLineOptions(*argc, *argv);
 
   if (TargetTriple.empty()) {

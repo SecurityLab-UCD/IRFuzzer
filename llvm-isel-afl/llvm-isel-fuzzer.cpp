@@ -49,8 +49,7 @@ static cl::opt<char>
              cl::Prefix, cl::ZeroOrMore, cl::init('2'));
 
 static cl::opt<std::string>
-    TargetTriple("mtriple", cl::desc("Override target triple for module"),
-                 cl::init("aarch64"));
+    TargetTriple("mtriple", cl::desc("Override target triple for module"));
 
 static std::unique_ptr<TargetMachine> TM;
 

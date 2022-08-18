@@ -236,12 +236,13 @@ int main(int argc, char **argv) {
       Printf("Fuzzing DAGISel\n");
     }
     if (char *triple = getenv("TRIPLE")) {
+      static char arg[256];
+      memset(arg, 0, 256);
       Printf("Fuzzing %s\n", triple);
-      char arg[256];
       sprintf(arg, "-mtriple=%s", triple);
       Argv.push_back(arg);
     } else {
-      Printf("Fuzzing AArch64\n");
+      Printf("TRIPLE not set\n");
     }
     char **AArgv = Argv.data();
     int AArgc = Argv.size();

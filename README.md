@@ -9,11 +9,18 @@ You should be able to prepare everything by running `./build.sh`. It should comp
 Necessary env var will be exported, but you may want to leave these in your `.bashrc` for further fuzzing:
 
 ```sh
+# Path to this directory
 export FUZZING_HOME=$(pwd)
-export LLVM=llvm-project
+# The LLVM you want to fuzz
+export LLVM=llvm-aie
+# The LLVM that contains our mutator change. Currently it is a fork, hopefully it will be merged
+export MUTATOR_LLVM=llvm-project
+# AFL
 export AFL=AFLplusplus
-export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so
+# Tell AFL++ to only use our mutator
 export AFL_CUSTOM_MUTATOR_ONLY=1
+# Tell AFL++ Where our mutator is
+export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so
 ```
 
 ## Run
@@ -136,7 +143,7 @@ TODO: Add new scheduling mutator to this repo and include usage.
 - AIE1 GlobalIsel lacks vector support.
 - AIE1 SelectionDAG has bugs in memory store.
 - AIE1 SelectionDAG has trunction errors. [Fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/161/)
-- AIE1 `vst.spil` generates two stores to the same address. [PoC](https://gitenterprise.xilinx.com/XRLabs/peano_usage/pull/15)
+- AIE1 `vst.spil` generates two stores to the same address. [PoC](https://gitenterprise.xilinx.com/XRLabs/peano_usage/pull/15) [Fixed](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/203)
 - SelectionDAG may cause infinite recursion. [Issues sent to LLVM community](https://github.com/llvm/llvm-project/issues/57251)
 - Double free in AArch64 GlobalIsel. [Issues sent to LLVM community](https://github.com/llvm/llvm-project/issues/57282)
 - Assertion failure in X64 SelectionDag. [Issues sent to LLVM community](https://github.com/llvm/llvm-project/issues/57283)

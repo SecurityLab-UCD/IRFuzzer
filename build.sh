@@ -5,8 +5,12 @@
 # In case you need more updated cmake:
 # https://askubuntu.com/questions/355565/how-do-i-install-the-latest-version-of-cmake-from-the-command-line
 
+# Path to this directory
 export FUZZING_HOME=$(pwd)
-export LLVM=llvm-project
+# The LLVM you want to fuzz
+export LLVM=llvm-aie
+# The LLVM that contains our mutator change. Currently it is a fork, hopefully it will be merged
+export MUTATOR_LLVM=llvm-project
 export AFL=AFLplusplus
 
 ###### Install llvm
@@ -33,13 +37,14 @@ export AFL_LLVM_INSTRUMENT=CLASSIC
 ###### Download llvm-project
 if [ ! -d $FUZZING_HOME/$LLVM ]
 then
-    git clone https://github.com/llvm/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
+    git clone https://gitenterprise.xilinx.com/XRLabs/llvm-aie.git --depth=1 $FUZZING_HOME/$LLVM
 fi
 
-###### Build llvm-project
+###### Build LLVM & AIE
 # Unfortunatelly we have to compile LLVM twice. 
-# `build-release` and `build-afl` have to be built before the whole project can be built. 
-# Since the paths to LLVM is fixed in `CMakeLists.txt`
+# `build-afl` is the build to be fuzzed.
+# `build-release` is the dependency of mutator
+# The paths to both LLVM is fixed in `CMakeLists.txt`
 
 # `build-afl` is a afl-customed built with afl instrumentations so we can collect runtime info
 # and report back to afl. 
@@ -68,13 +73,16 @@ then
     ninja -j $(nproc --all)
     cd $FUZZING_HOME
 fi
-# Mutator depends on `build-release`.
-# They can't depend on `build-afl` since all AFL compiled code reference to global 
-# `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
-if [ ! -d $FUZZING_HOME/$LLVM/build-release ]
+
+if [ ! -d $FUZZING_HOME/$MUTATOR_LLVM ]
 then
-    mkdir -p $LLVM/build-release
-    cd $LLVM/build-release
+    git clone git@github.com:DataCorrupted/llvm-project.git --branch=fuzzing --depth=1 $FUZZING_HOME/$MUTATOR_LLVM
+fi
+# Mutator depends on `build-release`.
+if [ ! -d $FUZZING_HOME/$MUTATOR_LLVM/build-release ]
+then
+    mkdir -p $MUTATOR_LLVM/build-release
+    cd $MUTATOR_LLVM/build-release
     cmake  -GNinja \
             -DLLVM_ENABLE_PROJECTS="mlir" \
             -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE" \
@@ -104,8 +112,10 @@ cd mutator/build
 cmake -GNinja .. && ninja -j 4
 cd $FUZZING_HOME
 
-export AFL_CUSTOM_MUTATOR_LIBRARY=$(pwd)/mutator/build/libAFLCustomIRMutator.so
+# Tell AFL++ to only use our mutator
 export AFL_CUSTOM_MUTATOR_ONLY=1
+# Tell AFL++ Where our mutator is
+export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so
 
 # Run afl
 # $FUZZING_HOME/$AFL/afl-fuzz -i <input> -o <output> $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing

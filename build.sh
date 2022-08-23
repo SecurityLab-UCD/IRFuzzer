@@ -1,3 +1,6 @@
+# Quit on any error.
+set -e
+
 ###### For dockers
 #
 # apt install ninja-build python3-dev cmake clang git wget ccache -y
@@ -5,12 +8,14 @@
 # In case you need more updated cmake:
 # https://askubuntu.com/questions/355565/how-do-i-install-the-latest-version-of-cmake-from-the-command-line
 
+# This is just to make sure we use correct cmake and ninja.
+cmake() { /group/xrlabs/tools/x86_64_Ubuntu18/bin/cmake $@; }
+ninja() { /group/xrlabs/tools/x86_64_Ubuntu18/bin/ninja $@; }
+
 # Path to this directory
 export FUZZING_HOME=$(pwd)
 # The LLVM you want to fuzz
 export LLVM=llvm-aie
-# The LLVM that contains our mutator change. Currently it is a fork, hopefully it will be merged
-export MUTATOR_LLVM=llvm-project
 export AFL=AFLplusplus
 
 ###### Install llvm
@@ -27,7 +32,7 @@ export PATH=$PATH:$HOME/clang+llvm/bin
 ###### Download and compile AFLplusplus
 if [ ! -d $FUZZING_HOME/$AFL ]
 then
-    git clone https://github.com/AFLplusplus/AFLplusplus.git --depth=1 $FUZZING_HOME/$AFL
+    git clone git@github.com:DataCorrupted/AFLplusplus.git --branch=isel --depth=1 $FUZZING_HOME/$AFL
     cd $AFL
     make -j
     cd $FUZZING_HOME
@@ -49,7 +54,7 @@ fi
 # `build-afl` is a afl-customed built with afl instrumentations so we can collect runtime info
 # and report back to afl. 
 # Driver also depends on `build-afl`
-if [ ! -d $FUZZING_HOME/$LLVM/build-afl ]
+if [ ! -f $FUZZING_HOME/$LLVM/build-afl/build.ninja ]
 then
     mkdir -p $LLVM/build-afl
     cd $LLVM/build-afl
@@ -69,20 +74,16 @@ then
             -DLLVM_INCLUDE_EXAMPLES=OFF \
             -DLLVM_USE_SANITIZE_COVERAGE=OFF \
             -DLLVM_USE_SANITIZER="" \
-        ../llvm && \
-    ninja -j $(nproc --all)
+        ../llvm 
     cd $FUZZING_HOME
 fi
+cd $LLVM/build-afl; ninja -j $(nproc --all); cd ../..
 
-if [ ! -d $FUZZING_HOME/$MUTATOR_LLVM ]
-then
-    git clone git@github.com:DataCorrupted/llvm-project.git --branch=fuzzing --depth=1 $FUZZING_HOME/$MUTATOR_LLVM
-fi
 # Mutator depends on `build-release`.
-if [ ! -d $FUZZING_HOME/$MUTATOR_LLVM/build-release ]
+if [ ! -f $FUZZING_HOME/$LLVM/build-release/build.ninja ]
 then
-    mkdir -p $MUTATOR_LLVM/build-release
-    cd $MUTATOR_LLVM/build-release
+    mkdir -p $LLVM/build-release
+    cd $LLVM/build-release
     cmake  -GNinja \
             -DLLVM_ENABLE_PROJECTS="mlir" \
             -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE" \
@@ -90,10 +91,10 @@ then
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
-        ../llvm && \
-    ninja -j $(nproc --all)
+        ../llvm 
     cd $FUZZING_HOME
 fi
+cd $LLVM/build-release; ninja -j $(nproc --all); cd ../..
 
 ###### Compile driver.
 # Driver has to be compiled by `afl-clang-fast`, so the `afl_init` is inserted before `main`

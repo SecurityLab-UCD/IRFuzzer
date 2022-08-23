@@ -55,11 +55,7 @@ void createISelMutator() {
 
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
-  /*
-  std::vector<fuzzerop::OpDescriptor> Ops(
-      {llvm::fuzzerop::binOpDescriptor(100, Instruction::Add),
-       llvm::fuzzerop::selectDescriptor(1)});
-  */
+
   Strategies.emplace_back(new InjectorIRStrategy(std::move(Ops)));
   Strategies.emplace_back(new InstDeleterIRStrategy());
 

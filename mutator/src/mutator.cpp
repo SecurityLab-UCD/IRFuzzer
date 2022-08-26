@@ -51,7 +51,8 @@ void createISelMutator() {
   std::vector<TypeGetter> Types{
       Type::getInt1Ty,  Type::getInt8Ty,  Type::getInt16Ty, Type::getInt32Ty,
       Type::getInt64Ty, Type::getFloatTy, Type::getDoubleTy};
-  addVectorTypeGetters(Types);
+  if (!getenv("NO_VEC"))
+    addVectorTypeGetters(Types);
 
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();

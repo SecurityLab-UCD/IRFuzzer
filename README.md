@@ -90,8 +90,8 @@ TODO: This will eventually evolve into Sec 3. Design in our paper. So the descri
 In traditional fuzzing scenarios, it is believed control flow changes can be used to monitor program behaviors.
 However, instruction selection has table methods. 
 In SelectionDAG and GlobalIsel, the selection process can be described as a loop with a switch inside.
-Whenever an SDNode/MLIR needs to be selected, we would start from the head of the table.
-The loop will take an "Opcode" out of the table in every iteration. Based on the "Opcode," the switch goes to different branches and may consume more entries in the table to decide if a particular pattern fits the current SDNode/MLIR.
+Whenever an SDNode/MachineInstr needs to be selected, we would start from the head of the table.
+The loop will take an "Opcode" out of the table in every iteration. Based on the "Opcode," the switch goes to different branches and may consume more entries in the table to decide if a particular pattern fits the current SDNode/MachineInstr.
 If the pattern doesn't match, the loop continues to next pattern by taking another "Opcode" out. Otherwise, the loop quits.
 
 In other words, the loop can be treated as a "virtual machine" that "executes" the matcher table.
@@ -138,14 +138,15 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 (I think I will attach more links to keep track of these later)
 
 - AIE1 GlobalIsel lacks floating point support
-    - [G_FCONSTANT fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/194)
+    - G_FCONSTANT [fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/194)
 - AIE1 GlobalIsel lacks vector support.
 - AIE1 SelectionDAG has bugs in the memory store.
 - AIE1 SelectionDAG has truncation errors. [Fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/161/)
-- AIE1 `vst.spil` generates two stores to the same address. [PoC](https://gitenterprise.xilinx.com/XRLabs/peano_usage/pull/15) [Fixed](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/203)
-- SelectionDAG may cause infinite recursion. [Issues sent to LLVM community](https://github.com/llvm/llvm-project/issues/57251)
-- Double free in AArch64 GlobalIsel. [Issues sent to LLVM community](https://github.com/llvm/llvm-project/issues/57282)
-- Assertion failure in X64 SelectionDag. [Issues sent to LLVM community](https://github.com/llvm/llvm-project/issues/57283)
+- AIE1 `vst.spil` generates two stores to the same address. [PoC](https://gitenterprise.xilinx.com/XRLabs/peano_usage/pull/15) [Fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/203)
+- SelectionDAG may cause infinite recursion on AArch64 and AIE. [Issue sent](https://github.com/llvm/llvm-project/issues/57251)
+- Double free in AArch64 GlobalIsel. [Issue sent](https://github.com/llvm/llvm-project/issues/57282)
+- X86_64 SelectionDAG assertion failure on shift. [Fixed.](https://github.com/llvm/llvm-project/issues/57283)
+- AArch64 SelectionDAG uses uninitialized array and have OOB Write given long `shuffelvector` mask. [Issue sent](https://github.com/llvm/llvm-project/issues/57326)
 
 # FAQ
 
@@ -160,6 +161,12 @@ __Why fuzz a fork of AIE that is not up-to-date?__
 
 Mainly because mutator also needs to understand the architecture we are fuzzing, although it only generates mid-end IR.
 Therefore, until we merge mutator's code into AIE, all you can do is keep merging the code you want to test to mutator branch and compile everything.
+
+__Are we fuzzing AIE2?__
+
+Currently we are only fuzzing AIE1 since it is more complete than AIE2. 
+But you can fuzz AIE2 if you want to. In principle fuzzing AIE1 is no different than AIE2. 
+All you need to do is set `TRIPLE=aie2` and set `MATCHER_TABLE_SIZE` correctly.
 
 __AIE compilation hangs__
 

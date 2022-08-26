@@ -9,13 +9,13 @@ set -e
 # https://askubuntu.com/questions/355565/how-do-i-install-the-latest-version-of-cmake-from-the-command-line
 
 # This is just to make sure we use correct cmake and ninja.
-cmake() { /group/xrlabs/tools/x86_64_Ubuntu18/bin/cmake $@; }
-ninja() { /group/xrlabs/tools/x86_64_Ubuntu18/bin/ninja $@; }
+# cmake() { /group/xrlabs/tools/x86_64_Ubuntu18/bin/cmake $@; }
+# ninja() { /group/xrlabs/tools/x86_64_Ubuntu18/bin/ninja $@; }
 
 # Path to this directory
 export FUZZING_HOME=$(pwd)
 # The LLVM you want to fuzz
-export LLVM=llvm-aie
+export LLVM=llvm-project
 export AFL=AFLplusplus
 
 ###### Install llvm
@@ -33,16 +33,14 @@ export PATH=$PATH:$HOME/clang+llvm/bin
 if [ ! -d $FUZZING_HOME/$AFL ]
 then
     git clone git@github.com:DataCorrupted/AFLplusplus.git --branch=isel --depth=1 $FUZZING_HOME/$AFL
-    cd $AFL
-    make -j
-    cd $FUZZING_HOME
+    cd $AFL; make -j; cd $FUZZING_HOME
 fi
 export AFL_LLVM_INSTRUMENT=CLASSIC
 
 ###### Download llvm-project
 if [ ! -d $FUZZING_HOME/$LLVM ]
 then
-    git clone https://gitenterprise.xilinx.com/XRLabs/llvm-aie.git --depth=1 $FUZZING_HOME/$LLVM
+    git clone git@github.com:DataCorrupted/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
 fi
 
 ###### Build LLVM & AIE
@@ -54,7 +52,7 @@ fi
 # `build-afl` is a afl-customed built with afl instrumentations so we can collect runtime info
 # and report back to afl. 
 # Driver also depends on `build-afl`
-if [ ! -f $FUZZING_HOME/$LLVM/build-afl/build.ninja ]
+if [ ! -d $FUZZING_HOME/$LLVM/build-afl ]
 then
     mkdir -p $LLVM/build-afl
     cd $LLVM/build-afl
@@ -63,8 +61,7 @@ then
             -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_CCACHE_BUILD=OFF \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE" \
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly;AMDGPU;RISCV" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -74,27 +71,47 @@ then
             -DLLVM_INCLUDE_EXAMPLES=OFF \
             -DLLVM_USE_SANITIZE_COVERAGE=OFF \
             -DLLVM_USE_SANITIZER="" \
-        ../llvm 
+        ../llvm && \
+    ninja -j $(nproc --all)
     cd $FUZZING_HOME
 fi
-cd $LLVM/build-afl; ninja -j $(nproc --all); cd ../..
-
 # Mutator depends on `build-release`.
-if [ ! -f $FUZZING_HOME/$LLVM/build-release/build.ninja ]
+# They can't depend on `build-afl` since all AFL compiled code reference to global 
+# `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
+if [ ! -d $FUZZING_HOME/$LLVM/build-release ]
 then
     mkdir -p $LLVM/build-release
     cd $LLVM/build-release
     cmake  -GNinja \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE" \
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64" \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly;AMDGPU;RISCV" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
-        ../llvm 
+        ../llvm && \
+    ninja -j $(nproc --all)
     cd $FUZZING_HOME
 fi
 cd $LLVM/build-release; ninja -j $(nproc --all); cd ../..
+# Mutator depends on `build-release`.
+# They can't depend on `build-afl` since all AFL compiled code reference to global 
+# `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
+if [ ! -d $FUZZING_HOME/$LLVM/build-debug ]
+then
+    mkdir -p $LLVM/build-debug
+    cd $LLVM/build-debug
+    cmake  -GNinja \
+            -DLLVM_ENABLE_PROJECTS="mlir" \
+            -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly;AMDGPU;RISCV" \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Debug \
+        ../llvm && \
+    ninja -j $(nproc --all)
+    cd $FUZZING_HOME
+fi
+cd $LLVM/build-debug; ninja -j $(nproc --all); cd ../..
+
 
 ###### Compile driver.
 # Driver has to be compiled by `afl-clang-fast`, so the `afl_init` is inserted before `main`

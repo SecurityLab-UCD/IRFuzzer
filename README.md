@@ -81,6 +81,18 @@ GLOBAL_ISEL=1 TRIPLE=aie MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -
 
 Fuzzing can take weeks, if not days. We recommend using [`screen`](https://www.gnu.org/software/screen/) to run the fuzzing in the background.
 
+### Archs and table size
+
+Commit e723c69b94
+         DAG    Global   Triple
+X86      681890  62855   x86_64
+AArch64  450060 195976   aarch64
+WebAssm   61347          wasm32/wasm64
+AMDGPU   475949 293433   amdgcn
+R600      37786          r600
+RISCV   2015687 157581   riscv32/riscv64
+NVPTX    184663          nvptx
+
 # How do we fuzz
 
 TODO: This will eventually evolve into Sec 3. Design in our paper. So the description is not perfect yet. It's just a brain dump.

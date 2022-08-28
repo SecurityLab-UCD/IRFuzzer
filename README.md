@@ -149,16 +149,33 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 
 (I think I will attach more links to keep track of these later)
 
+## AI Engine
 - AIE1 GlobalIsel lacks floating point support
     - G_FCONSTANT [fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/194)
 - AIE1 GlobalIsel lacks vector support.
 - AIE1 SelectionDAG has bugs in the memory store.
 - AIE1 SelectionDAG has truncation errors. [Fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/161/)
 - AIE1 `vst.spil` generates two stores to the same address. [PoC](https://gitenterprise.xilinx.com/XRLabs/peano_usage/pull/15) [Fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/203)
+
+## Open sourced architecture
+
+**LLVM**
 - SelectionDAG may cause infinite recursion on AArch64 and AIE. [Issue sent](https://github.com/llvm/llvm-project/issues/57251)
+
+**AArch64**
 - Double free in AArch64 GlobalIsel. [Issue sent](https://github.com/llvm/llvm-project/issues/57282)
-- X86_64 SelectionDAG assertion failure on shift. [Fixed.](https://github.com/llvm/llvm-project/issues/57283)
 - AArch64 SelectionDAG uses uninitialized array and have OOB Write given long `shuffelvector` mask. [Issue sent](https://github.com/llvm/llvm-project/issues/57326)
+
+**X86_64**
+- X86_64 SelectionDAG assertion failure on shift. [Fixed.](https://github.com/llvm/llvm-project/issues/57283)
+
+**NVPTX**
+- DAG->DAG Pattern Instruction Selection crashes on mul i1. [Issue sent](https://github.com/llvm/llvm-project/issues/57404)
+- DAG->DAG Pattern Instruction Selection crashes on setcc. [Issue sent](https://github.com/llvm/llvm-project/issues/57405)
+
+**AMDGPU**
+- GlobalIsel AMDGPUPreLegalizerCombiner double frees on release build, OOB on debug build. [Issue sent](https://github.com/llvm/llvm-project/issues/57406)
+- GlobalIsel GlobalIsel crashes when extractelement index is invalid. [Issue sent](https://github.com/llvm/llvm-project/issues/57408)
 
 # FAQ
 

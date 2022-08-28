@@ -10,4 +10,6 @@ seed
 *.bc
 *.ll
 llvm-project
+llvm-fix
 fuzzing
+analysis

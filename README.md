@@ -155,27 +155,30 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 - AIE1 GlobalIsel lacks vector support.
 - AIE1 SelectionDAG has bugs in the memory store.
 - AIE1 SelectionDAG has truncation errors. [Fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/161/)
-- AIE1 `vst.spil` generates two stores to the same address. [PoC](https://gitenterprise.xilinx.com/XRLabs/peano_usage/pull/15) [Fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/203)
+- AIE1 `vst.spil` generates two stores to the same address. [PoC.](https://gitenterprise.xilinx.com/XRLabs/peano_usage/pull/15) [Fixed.](https://gitenterprise.xilinx.com/XRLabs/llvm-aie/pull/203)
 
 ## Open sourced architecture
 
 **LLVM**
-- SelectionDAG may cause infinite recursion on AArch64 and AIE. [Issue sent](https://github.com/llvm/llvm-project/issues/57251)
+- SelectionDAG may cause infinite recursion on AArch64 and AIE. [Issue sent.](https://github.com/llvm/llvm-project/issues/57251)
+- IRTranslator sign extends index value for G_EXTRACT_VECTOR_ELT, translating `i1 true` into `i32 -1`. [Issue sent.](https://github.com/llvm/llvm-project/issues/57452)
+- Infinite recursion in DAGCombiner. [Issume sent.](https://github.com/llvm/llvm-project/issues/57658) [Fixing.](https://reviews.llvm.org/D133602)
 
 **AArch64**
-- Double free in AArch64 GlobalIsel. [Issue sent](https://github.com/llvm/llvm-project/issues/57282)
-- AArch64 SelectionDAG uses uninitialized array and have OOB Write given long `shuffelvector` mask. [Issue sent](https://github.com/llvm/llvm-project/issues/57326)
+- Double free in AArch64 GlobalIsel. [Issue sent.](https://github.com/llvm/llvm-project/issues/57282)
+- AArch64 SelectionDAG uses uninitialized array and have OOB Write given long `shuffelvector` mask. [Issue sent.](https://github.com/llvm/llvm-project/issues/57326) [Fixing.](https://reviews.llvm.org/D132634)
 
 **X86_64**
 - X86_64 SelectionDAG assertion failure on shift. [Fixed.](https://github.com/llvm/llvm-project/issues/57283)
 
 **NVPTX**
-- DAG->DAG Pattern Instruction Selection crashes on mul i1. [Issue sent](https://github.com/llvm/llvm-project/issues/57404)
-- DAG->DAG Pattern Instruction Selection crashes on setcc. [Issue sent](https://github.com/llvm/llvm-project/issues/57405)
+- SelectionDAG Cannot select dynamic_stackalloc. [Issue sent.](https://github.com/llvm/llvm-project/issues/57398)
+- DAG->DAG Pattern Instruction Selection crashes on mul i1. [Issue sent.](https://github.com/llvm/llvm-project/issues/57404)
+- DAG->DAG Pattern Instruction Selection crashes on setcc. [Issue sent.](https://github.com/llvm/llvm-project/issues/57405)
 
 **AMDGPU**
-- GlobalIsel AMDGPUPreLegalizerCombiner double frees on release build, OOB on debug build. [Issue sent](https://github.com/llvm/llvm-project/issues/57406)
-- GlobalIsel GlobalIsel crashes when extractelement index is invalid. [Issue sent](https://github.com/llvm/llvm-project/issues/57408)
+- GlobalIsel AMDGPUPreLegalizerCombiner double frees on release build, OOB on debug build. [Issue sent.](https://github.com/llvm/llvm-project/issues/57406)
+- GlobalIsel GlobalIsel crashes when extractelement index is invalid. [Issue sent.](https://github.com/llvm/llvm-project/issues/57408) [Fixing.](https://reviews.llvm.org/D132938)
 
 # FAQ
 

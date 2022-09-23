@@ -1,8 +1,9 @@
-# python3 scripts/classify.py  --cmd "./llvm-project/build-release/bin/llc -mtriple=r600 /home/peter/aflplusplus-isel/fuzzing/r600/default/crashes/id:004631,sig:06,src:031628+004260,time:323922854,execs:53657883,op:libAFLCustomIRMutator.so,pos:0" --input a
 import argparse
 from inspect import _void
 import subprocess
 import os
+from tqdm import tqdm
+import shutil
 
 
 class StackTrace:
@@ -77,10 +78,6 @@ class Report:
         return hash(self.stack_trace) ^ hash(self.error_head.err)
 
 
-def run_with_file(path):
-    pass
-
-
 def main() -> None:
     parser = argparse.ArgumentParser(
         description='Run all crashed cases and classify them')
@@ -90,19 +87,25 @@ def main() -> None:
                         help='The directory to store all files')
     parser.add_argument('--output', type=str, required=False, default="output",
                         help="The directory to store all organized output")
-    parser.add_argument(
-        '-f', type=bool, help="force delete the output directory if it already exists.")
+    parser.add_argument('-f', '--force', action='store_true',
+                        help="force delete the output directory if it already exists.")
     args = parser.parse_args()
 
     args.output = os.path.abspath(args.output)
     args.input = os.path.abspath(args.input)
 
-    # TODO: Verify output exists. if so -f to remove it.
+    if os.path.exists(args.output):
+        if args.force:
+            shutil.rmtree(args.output)
+        else:
+            print(f"{args.output} already exists, use -f to remove it. Abort.")
+            exit(1)
     os.mkdir(args.output)
 
     cmd = args.cmd.split(' ')
     classes = []
-    for f in os.listdir(args.input):
+    # TODO: Parallel the for loop.
+    for f in tqdm(os.listdir(args.input)):
         if f == "README.md":
             continue
         path = os.path.join(args.input, f)

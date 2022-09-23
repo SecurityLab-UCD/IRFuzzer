@@ -106,7 +106,7 @@ def main() -> None:
     classes = []
     # TODO: Parallel the for loop.
     for f in tqdm(os.listdir(args.input)):
-        if f == "README.md":
+        if f.endswith('.md') or f.endswith('.txt') or f.endswith('.s'):
             continue
         path = os.path.join(args.input, f)
         result = subprocess.run(

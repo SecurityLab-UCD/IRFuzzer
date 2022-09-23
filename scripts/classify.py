@@ -14,6 +14,7 @@ class StackTrace:
             function = " ".join(words[2:-1])
             location = words[-1]
             self.trace.append((function, location))
+        self.trace = tuple(self.trace)
 
     def __str__(self) -> str:
         ret = ""
@@ -23,6 +24,12 @@ class StackTrace:
 
     def __len__(self) -> int:
         return len(self.trace)
+
+    def __eq__(self, other) -> bool:
+        return self.trace == other.trace
+
+    def __hash__(self):
+        return hash(self.trace)
 
 
 class ErrorHead:
@@ -63,6 +70,12 @@ class Report:
     def __str__(self) -> str:
         return f"Return code: {self.returncode}\nError head: {self.error_head.err}\nTrace:\n {self.stack_trace}"
 
+    def __eq__(self, other) -> bool:
+        return self.error_head.err == other.error_head.err and self.stack_trace == other.stack_trace
+
+    def __hash__(self):
+        return hash(self.stack_trace) ^ hash(self.error_head.err)
+
 
 def run_with_file(path):
     pass
@@ -75,7 +88,17 @@ def main() -> None:
                         help='The command to run all the files')
     parser.add_argument('--input', type=str, required=True,
                         help='The directory to store all files')
+    parser.add_argument('--output', type=str, required=False, default="output",
+                        help="The directory to store all organized output")
+    parser.add_argument(
+        '-f', type=bool, help="force delete the output directory if it already exists.")
     args = parser.parse_args()
+
+    args.output = os.path.abspath(args.output)
+    args.input = os.path.abspath(args.input)
+
+    # TODO: Verify output exists. if so -f to remove it.
+    os.mkdir(args.output)
 
     cmd = args.cmd.split(' ')
     classes = []
@@ -90,9 +113,15 @@ def main() -> None:
             result.returncode
         )
 
+        folder_name = report.get_folder_name()
+        folder_path = os.path.join(args.output, folder_name)
         if report not in classes:
             classes.append(report)
-            print(report.get_folder_name())
+            os.mkdir(folder_path)
+            with open(os.path.join(args.output, folder_name+".txt"), "w+") as report_path:
+                print(report, file=report_path)
+            print("New crash:", folder_name)
+        os.symlink(path, os.path.join(folder_path, f))
 
 
 main()

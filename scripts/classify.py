@@ -1,10 +1,9 @@
 import argparse
-from inspect import _void
 import subprocess
 import os
+from typing import Set
 from tqdm import tqdm
 import shutil
-
 
 class StackTrace:
     def __init__(self, trace):
@@ -53,8 +52,7 @@ class Report:
         head = []
         trace = []
         is_head = True
-        for i in range(len(lines)):
-            line = lines[i]
+        for line in lines:
             if "PLEASE submit a bug report to" in line:
                 is_head = False
                 continue
@@ -76,7 +74,6 @@ class Report:
 
     def __hash__(self):
         return hash(self.stack_trace) ^ hash(self.error_head.err)
-
 
 def main() -> None:
     parser = argparse.ArgumentParser(
@@ -104,16 +101,13 @@ def main() -> None:
 
     cmd = args.cmd.split(' ')
     classes = []
-    # TODO: Parallel the for loop.
-    for f in tqdm(os.listdir(args.input)):
-        if f == "README.md":
-            continue
-        path = os.path.join(args.input, f)
-        result = subprocess.run(
-            cmd + [path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    processes: Set[subprocess.Popen] = set()
+    max_processes = 64
+
+    def on_process_exit(p: subprocess.Popen) -> None:
         report = Report(
-            result.stderr.decode("utf-8").split("\n"),
-            result.returncode
+            (line.decode("utf-8") for line in p.stderr.readlines()),
+            p.returncode
         )
 
         folder_name = report.get_folder_name()
@@ -124,7 +118,29 @@ def main() -> None:
             with open(os.path.join(args.output, folder_name+".txt"), "w+") as report_path:
                 print(report, file=report_path)
             print("New crash:", folder_name)
-        os.symlink(path, os.path.join(folder_path, f))
+        ir_bc_path = p.args[-1]
+        os.symlink(ir_bc_path, os.path.join(folder_path, os.path.basename(ir_bc_path)))
 
+    for f in tqdm(os.listdir(args.input)):
+        if f.endswith('.md') or f.endswith('.txt') or f.endswith('.s'):
+            continue
+
+        path = os.path.join(args.input, f)
+        processes.add(subprocess.Popen(
+            cmd + [path], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+        ))
+
+        if len(processes) >= max_processes:
+            # wait for a child process to exit
+            os.wait()
+            exited_processes = [p for p in processes if p.poll() is not None]
+            for p in exited_processes:
+                processes.remove(p)
+                on_process_exit(p)
+
+    # wait for remaining processes to exit
+    for p in processes:
+        p.wait()
+        on_process_exit(p)
 
 main()

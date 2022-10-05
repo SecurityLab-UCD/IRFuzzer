@@ -1,136 +1,184 @@
 import argparse
 import subprocess
 import os
-from typing import Set
+import re
+from typing import Iterable, Iterator, List, Optional, Set, Tuple
 from tqdm import tqdm
 import shutil
+from pathlib import Path
+import tempfile
+
+MAX_SUBPROCESSES = 64
 
 class StackTrace:
-    def __init__(self, trace):
-        self.trace = []
-        for line in trace:
-            removed_hash_line = line.split("#")[1]
-            words = removed_hash_line.split(" ")
+    # using tuple instead of list for easier equality check
+    stack_frames: Tuple[Tuple[str, str], ...]
+
+    def __init__(self, stacktrace: Iterable[str]):
+        stack_frames: List[Tuple[str, str]] = []
+
+        for line in stacktrace:
+            words = line.strip().split(" ")
+            assert words[0].startswith('#')
             function = " ".join(words[2:-1])
             location = words[-1]
-            self.trace.append((function, location))
-        self.trace = tuple(self.trace)
+            stack_frames.append((function, location))
+
+        self.stack_frames = tuple(stack_frames)
 
     def __str__(self) -> str:
         ret = ""
-        for (f, l) in self.trace:
+        for (f, l) in self.stack_frames:
             ret += f"\t{f} {l}\n"
         return ret
 
     def __len__(self) -> int:
-        return len(self.trace)
+        return len(self.stack_frames)
 
     def __eq__(self, other) -> bool:
-        return self.trace == other.trace
+        return self.stack_frames == other.stack_frames
 
-    def __hash__(self):
-        return hash(self.trace)
+    def __hash__(self) -> int:
+        return hash(self.stack_frames)
 
 
-class ErrorHead:
-    def __init__(self, lines):
-        self.msg = ""
-        if len(lines) == 0:
-            self.err = ""
+class CrashError:
+    return_code: int
+    failed_pass: Optional[str]
+    message_raw: str
+    message_minimized: str
+    type: str
+    subtype: Optional[str]
+    stack_trace: StackTrace
+
+    def __init__(self, args: List[str], return_code: int, stderr_iter: Iterator[str]):
+        self.return_code = return_code
+
+        # extract and minimize error message
+        message_lines = []
+        while (curr_line := next(stderr_iter, None)) and curr_line != 'PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace.\n':
+            message_lines.append(curr_line)
+        self.message_raw = ''.join(message_lines)
+
+        self.message_minimized = re.sub(r'%[0-9]+', '%_', self.message_raw) \
+            .replace(args[0], os.path.basename(args[0])) \
+            .replace(args[-1], 'ir.bc')
+
+        # extract failed pass and stack trace
+        self.failed_pass = None
+        if (curr_line := next(stderr_iter, None)) and curr_line == 'Stack dump:\n':
+            # extract failed pass
+            while (curr_line := next(stderr_iter, None)) and 'llvm::sys::PrintStackTrace' not in curr_line:
+                if (match := re.match(r' *[0-9]+\.\tRunning pass \'([A-Za-z0-9 ]+)\'', curr_line)) is not None:
+                    self.failed_pass = match.group(1)
+
+            # extract stack trace
+            self.stack_trace = StackTrace(stderr_iter)
         else:
-            self.err = lines[0]
-            if "Cannot select" in self.err:
-                self.err = "LLVM ERROR: Cannot select: " + \
-                    lines[0].split(" = ")[1][:6]
-            if len(lines) != 1:
-                self.msg = lines[1:]
+            self.stack_trace = StackTrace([])
 
-
-class Report:
-    def __init__(self, lines, returncode):
-        self.returncode = returncode
-        head = []
-        trace = []
-        is_head = True
-        for line in lines:
-            if "PLEASE submit a bug report to" in line:
-                is_head = False
-                continue
-            if is_head:
-                head.append(line)
-            elif '#' in line:
-                trace.append(line)
-        self.error_head = ErrorHead(head)
-        self.stack_trace = StackTrace(trace)
-
-    def get_folder_name(self) -> str:
-        return f"tracedepth_{len(self.stack_trace)}__hash_0x{hash(self):08x}"
+        # determine error type
+        if self.message_raw.startswith('LLVM ERROR: unable to legalize instruction:'):
+            self.type = 'instruction-legalization'
+            matches = re.findall('G_[A-Z_]+', self.message_raw)
+            assert len(matches) == 1
+            self.subtype = matches[0]
+        elif self.message_raw.startswith('LLVM ERROR: cannot select:'):
+            self.type = 'instruction-selection'
+            matches = re.findall('G_[A-Z_]+', self.message_raw)
+            self.subtype = '-'.join(matches)
+        else:
+            if self.failed_pass is None:
+                self.type = 'other'
+            else:
+                self.type = self.failed_pass.lower().replace(' ', '-')
+            self.subtype = None
 
     def __str__(self) -> str:
-        return f"Return code: {self.returncode}\nError head: {self.error_head.err}\nTrace:\n {self.stack_trace}"
+        return '\n'.join([
+            f'Return Code: {self.return_code}',
+            f'Error Type: {self.type}',
+            f'Failed Pass: {self.failed_pass}',
+            'Minimized Message:',
+            self.message_minimized,
+            'Stack Trace:',
+            str(self.stack_trace)
+        ])
 
-    def __eq__(self, other) -> bool:
-        return self.error_head.err == other.error_head.err and self.stack_trace == other.stack_trace
-
-    def __hash__(self):
-        return hash(self.stack_trace) ^ hash(self.error_head.err)
-
-def main() -> None:
-    parser = argparse.ArgumentParser(
-        description='Run all crashed cases and classify them')
-    parser.add_argument('--cmd', type=str, required=True,
-                        help='The command to run all the files')
-    parser.add_argument('--input', type=str, required=True,
-                        help='The directory to store all files')
-    parser.add_argument('--output', type=str, required=False, default="output",
-                        help="The directory to store all organized output")
-    parser.add_argument('-f', '--force', action='store_true',
-                        help="force delete the output directory if it already exists.")
-    args = parser.parse_args()
-
-    args.output = os.path.abspath(args.output)
-    args.input = os.path.abspath(args.input)
-
-    if os.path.exists(args.output):
-        if args.force:
-            shutil.rmtree(args.output)
-        else:
-            print(f"{args.output} already exists, use -f to remove it. Abort.")
-            exit(1)
-    os.mkdir(args.output)
-
-    cmd = args.cmd.split(' ')
-    classes = []
-    processes: Set[subprocess.Popen] = set()
-    max_processes = 64
-
-    def on_process_exit(p: subprocess.Popen) -> None:
-        report = Report(
-            (line.decode("utf-8") for line in p.stderr.readlines()),
-            p.returncode
+    def get_folder_name(self) -> str:
+        return os.path.join(
+            self.type,
+            self.subtype if self.subtype is not None else '',
+            f"tracedepth_{len(self.stack_trace)}__hash_0x{hash(self):08x}"
         )
 
-        folder_name = report.get_folder_name()
-        folder_path = os.path.join(args.output, folder_name)
-        if report not in classes:
-            classes.append(report)
-            os.mkdir(folder_path)
-            with open(os.path.join(args.output, folder_name+".txt"), "w+") as report_path:
-                print(report, file=report_path)
-            print("New crash:", folder_name)
-        ir_bc_path = p.args[-1]
-        os.symlink(ir_bc_path, os.path.join(folder_path, os.path.basename(ir_bc_path)))
+    def __hash__(self):
+        return hash(self.stack_trace) ^ hash(self.message_minimized)
 
-    for f in tqdm(os.listdir(args.input)):
-        if f.endswith('.md') or f.endswith('.txt') or f.endswith('.s'):
+
+def classify(cmd: List[str], input_dir: str, output_dir: str, force: bool, verbose: bool = False) -> None:
+    output_dir = os.path.abspath(output_dir)
+    input_dir = os.path.abspath(input_dir)
+    temp_dir = tempfile.gettempdir()
+
+    if os.path.exists(output_dir):
+        if force:
+            shutil.rmtree(output_dir)
+        else:
+            print(f"{output_dir} already exists, use -f to remove it. Abort.")
+            exit(1)
+
+    Path(output_dir).mkdir(parents=True)
+
+    crash_hashes: Set[int] = set()
+    processes: Set[subprocess.Popen] = set()
+
+    def on_process_exit(p: subprocess.Popen) -> None:
+        if p.returncode == 0:
+            return
+
+        ir_bc_path: str = p.args[-1]  # type: ignore
+        file_name = os.path.basename(ir_bc_path)
+        stderr_dump_path = os.path.join(temp_dir, file_name + '.stderr')
+        stderr_dump_file = open(stderr_dump_path)
+
+        crash = CrashError(
+            p.args,  # type: ignore
+            p.returncode,
+            stderr_dump_file
+        )
+
+        stderr_dump_file.close()
+        os.remove(stderr_dump_path)
+
+        folder_name = crash.get_folder_name()
+        folder_path = os.path.join(output_dir, folder_name)
+        if hash(crash) not in crash_hashes:
+            crash_hashes.add(hash(crash))
+            Path(folder_path).mkdir(parents=True)
+            with open(os.path.join(output_dir, folder_name + ".log"), "w+") as report_path:
+                print(crash, file=report_path)
+            
+            if verbose:
+                print("New crash type:", folder_name)
+
+        os.symlink(
+            ir_bc_path,
+            os.path.join(folder_path, os.path.basename(ir_bc_path) + '.bc')
+        )
+
+    for file_name in tqdm(os.listdir(input_dir)):
+        if file_name.endswith('.md') or file_name.endswith('.txt') or file_name.endswith('.s'):
             continue
 
-        path = os.path.join(args.input, f)
+        file_path = os.path.join(input_dir, file_name)
         processes.add(subprocess.Popen(
-            cmd + [path], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            cmd + [file_path],
+            stdout=None,
+            stderr=open(os.path.join(temp_dir, file_name + '.stderr'), 'w')
         ))
 
-        if len(processes) >= max_processes:
+        if len(processes) >= MAX_SUBPROCESSES:
             # wait for a child process to exit
             os.wait()
             exited_processes = [p for p in processes if p.poll() is not None]
@@ -140,7 +188,25 @@ def main() -> None:
 
     # wait for remaining processes to exit
     for p in processes:
+        if verbose:
+            print('waiting for',  os.path.basename(p.args[-1]))  # type: ignore
         p.wait()
         on_process_exit(p)
 
-main()
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description='Run all crashed cases and classify them')
+    parser.add_argument('--cmd', type=str, required=True,
+                        help='The command to run on all files in the input dir')
+    parser.add_argument('--input', type=str, required=True,
+                        help='The directory containing input files')
+    parser.add_argument('--output', type=str, required=False, default="output",
+                        help="The directory to store all organized output")
+    parser.add_argument('-f', '--force', action='store_true',
+                        help="force delete the output directory if it already exists.")
+    args = parser.parse_args()
+    classify(args.cmd.split(' '), args.input, args.output, args.force, verbose=True)
+
+if __name__ == "__main__":
+    main()

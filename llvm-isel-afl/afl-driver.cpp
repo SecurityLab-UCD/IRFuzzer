@@ -229,20 +229,43 @@ int main(int argc, char **argv) {
   maybe_close_fd_mask();
   if (LLVMFuzzerInitialize) {
     std::vector<char *> Argv({argv[0]});
+    int is_gisel = 0;
     if (getenv("GLOBAL_ISEL")) {
       Printf("Fuzzing GlobalISel\n");
+      is_gisel = 1;
       Argv.push_back((char *)"-global-isel");
     } else {
       Printf("Fuzzing DAGISel\n");
+      is_gisel = 0;
     }
-    if (char *triple = getenv("TRIPLE")) {
+    char *triple = getenv("TRIPLE");
+    if (triple) {
       static char arg[256];
       memset(arg, 0, 256);
       Printf("Fuzzing %s\n", triple);
       sprintf(arg, "-mtriple=%s", triple);
       Argv.push_back(arg);
     } else {
-      Printf("TRIPLE not set\n");
+      Printf("TRIPLE not set, abort.\n");
+      exit(1);
+    }
+    char *tbl_size;
+    if (tbl_size = getenv("MATCHER_TABLE_SIZE")) {
+      Printf("MATCHER_TABLE_SIZE set to %s", tbl_size);
+    } else {
+      char tbl_name[255];
+      memset(tbl_name, 0, 255);
+      strcat(tbl_name, triple);
+      strcat(tbl_name, is_gisel ? "_GISEL_" : "_DAG_");
+      strcat(tbl_name, "MATCHER_TABLE_SIZE");
+      Printf("MATCHER_TABLE_SIZE not set, looking for %s\n", tbl_name);
+      if (tbl_size = getenv(tbl_name)) {
+        Printf("MATCHER_TABLE_SIZE found, set to %s\n", tbl_size);
+        setenv("MATCHER_TABLE_SIZE", tbl_size, 1);
+      } else {
+        Printf("MATCHER_TABLE_SIZE not found, abort.\n");
+        exit(1);
+      }
     }
     char **AArgv = Argv.data();
     int AArgc = Argv.size();

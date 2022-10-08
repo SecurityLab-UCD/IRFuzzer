@@ -61,7 +61,6 @@ then
             -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_CCACHE_BUILD=OFF \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly;AMDGPU;RISCV;NVPTX" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -84,7 +83,6 @@ then
     cd $LLVM/build-release
     cmake  -GNinja \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly;AMDGPU;RISCV;NVPTX" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -102,7 +100,6 @@ then
     cd $LLVM/build-debug
     cmake  -GNinja \
             -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DLLVM_TARGETS_TO_BUILD="X86;AArch64;WebAssembly;AMDGPU;RISCV;NVPTX" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Debug \

@@ -164,9 +164,16 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 - IRTranslator sign extends index value for G_EXTRACT_VECTOR_ELT, translating `i1 true` into `i32 -1`. [Issue sent.](https://github.com/llvm/llvm-project/issues/57452)
 - Infinite recursion in DAGCombiner. [Issume sent.](https://github.com/llvm/llvm-project/issues/57658) [Fixing.](https://reviews.llvm.org/D133602)
 
+**RISCV64**
+- [Storing a float vector of size 1 after float arithmetic and branching causes assertion error `Invalid ANY_EXTEND`!](https://github.com/llvm/llvm-project/issues/58025) (Fixed)
+- [Cannot scavenge register without an emergency spill slot](https://github.com/llvm/llvm-project/issues/58027) (Reported)
+
 **AArch64**
 - Double free in AArch64 GlobalIsel. [Issue sent.](https://github.com/llvm/llvm-project/issues/57282)
 - AArch64 SelectionDAG uses uninitialized array and have OOB Write given long `shuffelvector` mask. [Issue sent.](https://github.com/llvm/llvm-project/issues/57326) [Fixing.](https://reviews.llvm.org/D132634)
+- [[AArch64/GlobalISel] `fcmp true` / `fcmp false` used in `and` / `or` branching condition causes crash `Unknown FP condition!`](https://github.com/llvm/llvm-project/issues/58050) (Reported)
+- [[AArch64/GlobalIsel] unable to legalize vectorized binaryop(G_ADD, G_SUB, ...)](https://github.com/llvm/llvm-project/issues/58156) (Reported)
+- [[AArch64/GlobalISel] Unable to Translate `ret` with v1i8 / v1i16](https://github.com/llvm/llvm-project/issues/58211) (Reported)
 
 **X86_64**
 - X86_64 SelectionDAG assertion failure on shift. [Fixed.](https://github.com/llvm/llvm-project/issues/57283)
@@ -179,6 +186,8 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 **AMDGPU**
 - GlobalIsel AMDGPUPreLegalizerCombiner double frees on release build, OOB on debug build. [Issue sent.](https://github.com/llvm/llvm-project/issues/57406)
 - GlobalIsel GlobalIsel crashes when extractelement index is invalid. [Issue sent.](https://github.com/llvm/llvm-project/issues/57408) [Fixing.](https://reviews.llvm.org/D132938)
+- [[R600] Allocating Large Number of i1's on Stack Crashes with Error "Register number out of range"](https://github.com/llvm/llvm-project/issues/58171) (Reported)
+- [[AMDGPU] No registers from class available to allocate for R600 / Cannot select for AMDGCN](https://github.com/llvm/llvm-project/issues/58210) (Reported)
 
 # FAQ
 

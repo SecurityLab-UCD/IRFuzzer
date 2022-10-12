@@ -1,54 +1,128 @@
-from typing import Iterable, Iterator, List, Optional, Set, Tuple
+from typing import Iterable, Callable, Set, TypeVar, Optional, Dict
 import os
 import subprocess
 import logging
 from tqdm import tqdm
 
-MATCHER_TABLE_SIZE_DAGISEL = {"AVR": 2840, "ARM": 200565, "BPF": 3586, "AArch64": 451325, "AMDGPU":  477347, "R600": 37786, "Hexagon": 174365, "Lanai": 2337, "MSP430": 9103,
-                              "Mips": 54044, "NVPTX": 184663, "PPC": 190777, "RISCV": 2079553, "Sparc": 6238, "SystemZ": 53206, "WebAssembly": 61756, "VE": 71557, "X86": 681963, "XCore": 3864}
-MATCHER_TABLE_SIZE_GISEL = {"ARM": 129520, "AArch64": 196445, "AMDGPU": 292004,
-                            "Mips": 60445, "PPC": 28499, "X86": 62855, "RISCV": 152490}
+MATCHER_TABLE_SIZE_DAGISEL = {
+    "AArch64": 451325,
+    "AMDGPU":  479297,
+    "ARM": 200565,
+    "AVR": 2840,
+    "BPF": 3586,
+    "Hexagon": 174265,
+    "Lanai": 2337,
+    "MSP430": 9103,
+    "Mips": 54044,
+    "NVPTX": 184663,
+    "PPC": 190777,
+    "R600": 37786,
+    "RISCV": 2079599,
+    "Sparc": 6238,
+    "SystemZ": 53211,
+    "VE": 71557,
+    "WebAssembly": 61756,
+    "X86": 681963,
+    "XCore": 3864,
+}
+MATCHER_TABLE_SIZE_GISEL = {
+    "AArch64": 196445,
+    "AMDGPU": 292004,
+    "ARM": 129520,
+    "Mips": 60445,
+    "PPC": 28499,
+    "RISCV": 152490,
+    "X86": 62855,
+}
 
-TRIPLE_ARCH_MAP = {"aarch64": "AArch64",
-                   "aarch64_32": "AArch64",
-                   "aarch64_be": "AArch64",
-                   "amdgcn": "AMDGPU",
-                   "arm": "ARM",
-                   "arm64": "ARM",
-                   "arm64_32": "ARM",
-                   "armeb": "ARM",
-                   "avr": "AVR",
-                   "bpf": "BPF",
-                   "bpfeb": "BPF",
-                   "bpfel": "BPF",
-                   "hexagon": "Hexagon",
-                   "lanai": "Lanai",
-                   "mips": "Mips",
-                   "mips64": "Mips",
-                   "mips64el": "Mips",
-                   "mipsel": "Mips",
-                   "msp430": "MSP430",
-                   "nvptx": "NVPTX",
-                   "nvptx64": "NVPTX",
-                   "ppc32": "PPC",
-                   "ppc32le": "PPC",
-                   "ppc64": "PPC",
-                   "ppc64le": "PPC",
-                   "r600": "R600",
-                   "riscv32": "RISCV",
-                   "riscv64": "RISCV",
-                   "sparc": "Sparc",
-                   "sparcel": "Sparc",
-                   "sparcv9": "Sparc",
-                   "systemz": "SystemZ",
-                   "thumb": "ARM",
-                   "thumbeb": "ARM",
-                   "ve": "VE",
-                   "wasm32": "WebAssembly",
-                   "wasm64": "WebAssembly",
-                   "x86": "X86",
-                   "x86-64": "X86",
-                   "xcore": "XCore"}
+TRIPLE_ARCH_MAP = {
+    "aarch64": "AArch64",
+    "aarch64_32": "AArch64",
+    "aarch64_be": "AArch64",
+    "amdgcn": "AMDGPU",
+    "arm": "ARM",
+    "arm64": "ARM",
+    "arm64_32": "ARM",
+    "armeb": "ARM",
+    "avr": "AVR",
+    "bpf": "BPF",
+    "bpfeb": "BPF",
+    "bpfel": "BPF",
+    "hexagon": "Hexagon",
+    "lanai": "Lanai",
+    "mips": "Mips",
+    "mips64": "Mips",
+    "mips64el": "Mips",
+    "mipsel": "Mips",
+    "msp430": "MSP430",
+    "nvptx": "NVPTX",
+    "nvptx64": "NVPTX",
+    "ppc32": "PPC",
+    "ppc32le": "PPC",
+    "ppc64": "PPC",
+    "ppc64le": "PPC",
+    "r600": "R600",
+    "riscv32": "RISCV",
+    "riscv64": "RISCV",
+    "sparc": "Sparc",
+    "sparcel": "Sparc",
+    "sparcv9": "Sparc",
+    "systemz": "SystemZ",
+    "thumb": "ARM",
+    "thumbeb": "ARM",
+    "ve": "VE",
+    "wasm32": "WebAssembly",
+    "wasm64": "WebAssembly",
+    "x86": "X86",
+    "x86-64": "X86",
+    "xcore": "XCore",
+}
+
+TRIPLE_ARCH_MAP_TIER_1 = {
+    "aarch64": "AArch64",
+    "aarch64_32": "AArch64",
+    "amdgcn": "AMDGPU",
+    "arm64": "ARM",
+    "bpf": "BPF",
+    "hexagon": "Hexagon",
+    "mips64": "Mips",
+    "nvptx64": "NVPTX",
+    "ppc64": "PPC",
+    "riscv64": "RISCV",
+    "thumb": "ARM",
+    "ve": "VE",
+    "wasm64": "WebAssembly",
+    "x86": "X86",
+    "x86-64": "X86",
+}
+
+TRIPLE_ARCH_MAP_TIER_2 = {
+    "aarch64_be": "AArch64",
+    "arm": "ARM",
+    "arm64_32": "ARM",
+    "armeb": "ARM",
+    "avr": "AVR",
+    "bpfeb": "BPF",
+    "bpfel": "BPF",
+    "lanai": "Lanai",
+    "mips": "Mips",
+    "mips64el": "Mips",
+    "mipsel": "Mips",
+    "msp430": "MSP430",
+    "nvptx": "NVPTX",
+    "ppc32": "PPC",
+    "ppc32le": "PPC",
+    "ppc64le": "PPC",
+    "r600": "R600",
+    "riscv32": "RISCV",
+    "sparc": "Sparc",
+    "sparcel": "Sparc",
+    "sparcv9": "Sparc",
+    "systemz": "SystemZ",
+    "thumbeb": "ARM",
+    "wasm32": "WebAssembly",
+    "xcore": "XCore"
+}
 
 LLVM_COMMIT = 66046e6
 
@@ -70,19 +144,33 @@ def __verify():
 
 __verify()
 
+__T = TypeVar('__T')
+__R = TypeVar('__R')
+
 
 # Creates subprocesses in parallel.
-def parallel_subprocess(iter: Iterable, jobs: int, subprocess_creator, on_exit=None):
+def parallel_subprocess(
+        iter: Iterable[__T],
+        jobs: int,
+        subprocess_creator: Callable[[__T], subprocess.Popen],
+        on_exit: Optional[Callable[[subprocess.Popen], __R]] = None
+) -> Dict[__T, __R]:
     ret = {}
-    processes: Set[subprocess.Popen] = set()
-    for i in tqdm(iter):
-        processes.add(subprocess_creator(i))
+    processes: Set[(subprocess.Popen, __T)] = set()
+    for input in tqdm(iter):
+        processes.add((subprocess_creator(input), input))
         if len(processes) >= jobs:
             # wait for a child process to exit
             os.wait()
-            exited_processes = [p for p in processes if p.poll() is not None]
-            for p in exited_processes:
-                processes.remove(p)
+            exited_processes = [
+                (p, i) for p, i in processes if p.poll() is not None]
+            for p, i in exited_processes:
+                processes.remove((p, i))
                 if on_exit is not None:
                     ret[i] = on_exit(p)
+    # wait for remaining processes to exit
+    for p, i in processes:
+        p.wait()
+        if on_exit is not None:
+            ret[i] = on_exit(p)
     return ret

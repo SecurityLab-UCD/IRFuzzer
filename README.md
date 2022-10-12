@@ -174,6 +174,7 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 - [[AArch64/GlobalISel] `fcmp true` / `fcmp false` used in `and` / `or` branching condition causes crash `Unknown FP condition!`](https://github.com/llvm/llvm-project/issues/58050) (Reported)
 - [[AArch64/GlobalIsel] unable to legalize vectorized binaryop(G_ADD, G_SUB, ...)](https://github.com/llvm/llvm-project/issues/58156) (Reported)
 - [[AArch64/GlobalISel] Unable to Translate `ret` with v1i8 / v1i16](https://github.com/llvm/llvm-project/issues/58211) (Reported)
+- [[AArch64/GlobalISel] Cannot select `G_ZEXT` / `G_SEXT` / `G_ANYEXT` with v2i16](https://github.com/llvm/llvm-project/issues/58274) (Reported)
 
 **X86_64**
 - X86_64 SelectionDAG assertion failure on shift. [Fixed.](https://github.com/llvm/llvm-project/issues/57283)
@@ -182,12 +183,24 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 - SelectionDAG Cannot select dynamic_stackalloc. [Issue sent.](https://github.com/llvm/llvm-project/issues/57398)
 - DAG->DAG Pattern Instruction Selection crashes on mul i1. [Issue sent.](https://github.com/llvm/llvm-project/issues/57404)
 - DAG->DAG Pattern Instruction Selection crashes on setcc. [Issue sent.](https://github.com/llvm/llvm-project/issues/57405)
+- [[NVPTX] Assertion `CastInst::castIsValid(opc, C, Ty) && "Invalid constantexpr cast!"` failed](https://github.com/llvm/llvm-project/issues/58305) (Reported)
 
 **AMDGPU**
 - GlobalIsel AMDGPUPreLegalizerCombiner double frees on release build, OOB on debug build. [Issue sent.](https://github.com/llvm/llvm-project/issues/57406)
 - GlobalIsel GlobalIsel crashes when extractelement index is invalid. [Issue sent.](https://github.com/llvm/llvm-project/issues/57408) [Fixing.](https://reviews.llvm.org/D132938)
 - [[R600] Allocating Large Number of i1's on Stack Crashes with Error "Register number out of range"](https://github.com/llvm/llvm-project/issues/58171) (Reported)
 - [[AMDGPU] No registers from class available to allocate for R600 / Cannot select for AMDGCN](https://github.com/llvm/llvm-project/issues/58210) (Reported)
+- [[AMDGPU] mul used with v1i8 / v1i16 causes crash during IR optimizations due to type mismatch](https://github.com/llvm/llvm-project/issues/58331) (Fixed - Pending Merge)
+
+
+The following code crashes `amdgcn` backend but is not reported.
+```
+define i32 @f(ptr %0) {
+BB:
+  %R = load i32, ptr %0
+  ret i32 %R
+}
+```
 
 # FAQ
 

@@ -89,6 +89,7 @@ TRIPLE_ARCH_MAP_TIER_1 = {
     "nvptx64": "NVPTX",
     "ppc64": "PPC",
     "riscv64": "RISCV",
+    "systemz": "SystemZ",
     "thumb": "ARM",
     "ve": "VE",
     "wasm64": "WebAssembly",
@@ -118,7 +119,6 @@ TRIPLE_ARCH_MAP_TIER_2 = {
     "sparc": "Sparc",
     "sparcel": "Sparc",
     "sparcv9": "Sparc",
-    "systemz": "SystemZ",
     "thumbeb": "ARM",
     "wasm32": "WebAssembly",
     "xcore": "XCore"

@@ -33,29 +33,21 @@ static std::unique_ptr<IRMutator> Mutator;
 
 extern "C" {
 
-void addVectorTypeGetters(std::vector<TypeGetter> &Types) {
-  int VectorLength[] = {1, 2, 4, 8, 16, 32, 64};
-  std::vector<TypeGetter> BasicTypeGetters(Types);
-  for (auto typeGetter : BasicTypeGetters) {
-    for (int length : VectorLength) {
-      Types.push_back([typeGetter, length](LLVMContext &C) {
-        return VectorType::get(typeGetter(C), length, false);
-      });
-    }
-  }
-}
-/// TODO:
-/// Type* getStructType(Context& C);
-
+// Original IRMutator setting.
 void createISelMutator() {
   std::vector<TypeGetter> Types{
       Type::getInt1Ty,  Type::getInt8Ty,  Type::getInt16Ty, Type::getInt32Ty,
       Type::getInt64Ty, Type::getFloatTy, Type::getDoubleTy};
-  if (!getenv("NO_VEC"))
-    addVectorTypeGetters(Types);
 
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
-  std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
+  std::vector<fuzzerop::OpDescriptor> Ops;
+
+  describeFuzzerIntOps(Ops);
+  describeFuzzerFloatOps(Ops);
+  describeFuzzerControlFlowOps(Ops);
+  describeFuzzerPointerOps(Ops);
+  describeFuzzerAggregateOps(Ops);
+  describeFuzzerVectorOps(Ops);
 
   Strategies.emplace_back(new InjectorIRStrategy(std::move(Ops)));
   Strategies.emplace_back(new InstDeleterIRStrategy());

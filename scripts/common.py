@@ -73,8 +73,8 @@ TRIPLE_ARCH_MAP = {
     "ve": "VE",
     "wasm32": "WebAssembly",
     "wasm64": "WebAssembly",
-    "x86": "X86",
-    "x86-64": "X86",
+    "i686": "X86",
+    "x86_64": "X86",
     "xcore": "XCore",
 }
 
@@ -93,8 +93,8 @@ TRIPLE_ARCH_MAP_TIER_1 = {
     "thumb": "ARM",
     "ve": "VE",
     "wasm64": "WebAssembly",
-    "x86": "X86",
-    "x86-64": "X86",
+    "i686": "X86",
+    "x86_64": "X86",
 }
 
 TRIPLE_ARCH_MAP_TIER_2 = {

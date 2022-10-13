@@ -33,7 +33,7 @@ export PATH=$PATH:$HOME/clang+llvm/bin
 ###### Download and compile AFLplusplus
 if [ ! -d $FUZZING_HOME/$AFL ]
 then
-    git clone git@github.com:DataCorrupted/AFLplusplus.git --branch=isel --depth=1 $FUZZING_HOME/$AFL
+    git clone https://github.com/DataCorrupted/AFLplusplus.git --branch=isel --depth=1 $FUZZING_HOME/$AFL
     cd $AFL; make -j; cd $FUZZING_HOME
 fi
 export AFL_LLVM_INSTRUMENT=CLASSIC
@@ -41,7 +41,7 @@ export AFL_LLVM_INSTRUMENT=CLASSIC
 ###### Download llvm-project
 if [ ! -d $FUZZING_HOME/$LLVM ]
 then
-    git clone git@github.com:DataCorrupted/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
+    git clone https://github.com/DataCorrupted/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
 fi
 
 ###### Build LLVM & AIE

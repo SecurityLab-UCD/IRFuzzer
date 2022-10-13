@@ -1,4 +1,4 @@
-from typing import Iterable, Callable, Set, TypeVar, Optional, Dict
+from typing import Iterable, Callable, Set, Tuple, TypeVar, Optional, Dict
 import os
 import subprocess
 import logging
@@ -132,11 +132,13 @@ def __verify():
     if FUZZING_HOME == None:
         logging.error(
             "$FUZZING_HOME not set, why am I running? Did you install correctly?")
+        return
     if os.getcwd() != FUZZING_HOME:
         logging.warning("I am not in $FUZZING_HOME now.")
     LLVM = os.getenv("LLVM")
     if LLVM == None:
         logging.warn("$LLVM not set, using llvm-project as default.")
+        LLVM = 'llvm-project'
     LLVM = os.path.join(FUZZING_HOME, LLVM)
 
     # TODO: Verify that current commit in LLVM is COMMIT.
@@ -164,7 +166,7 @@ def parallel_subprocess(
     User has to guarantee elements in `iter` is unique, or the output may be incorrect.
     '''
     ret = {}
-    processes: Set[(subprocess.Popen, __T)] = set()
+    processes: Set[Tuple[subprocess.Popen, __T]] = set()
     for input in tqdm(iter):
         processes.add((subprocess_creator(input), input))
         if len(processes) >= jobs:

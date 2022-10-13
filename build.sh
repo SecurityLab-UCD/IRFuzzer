@@ -92,24 +92,27 @@ then
     cd $FUZZING_HOME
 fi
 cd $LLVM/build-release; ninja -j $(nproc --all); cd ../..
-# Mutator depends on `build-release`.
-# They can't depend on `build-afl` since all AFL compiled code reference to global 
-# `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
-if [ ! -d $FUZZING_HOME/$LLVM/build-debug ]
-then
-    mkdir -p $LLVM/build-debug
-    cd $LLVM/build-debug
-    cmake  -GNinja \
-            -DLLVM_ENABLE_PROJECTS="mlir" \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_BUILD_TYPE=Debug \
-        ../llvm && \
-    ninja -j $(nproc --all)
-    cd $FUZZING_HOME
-fi
-cd $LLVM/build-debug; ninja -j $(nproc --all); cd ../..
 
+# Don't build debug build in docker.
+if [ ! -f /.dockerenv ]; then
+    # Mutator depends on `build-release`.
+    # They can't depend on `build-afl` since all AFL compiled code reference to global 
+    # `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
+    if [ ! -d $FUZZING_HOME/$LLVM/build-debug ]
+    then
+        mkdir -p $LLVM/build-debug
+        cd $LLVM/build-debug
+        cmake  -GNinja \
+                -DLLVM_ENABLE_PROJECTS="mlir" \
+                -DCMAKE_C_COMPILER=clang \
+                -DCMAKE_CXX_COMPILER=clang++ \
+                -DCMAKE_BUILD_TYPE=Debug \
+            ../llvm && \
+        ninja -j $(nproc --all)
+        cd $FUZZING_HOME
+    fi
+    cd $LLVM/build-debug; ninja -j $(nproc --all); cd ../..
+fi
 
 ###### Compile driver.
 # Driver has to be compiled by `afl-clang-fast`, so the `afl_init` is inserted before `main`

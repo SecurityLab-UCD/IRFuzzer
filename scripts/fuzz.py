@@ -7,6 +7,7 @@ from typing import List
 
 
 def fuzz(argv):
+    argv.output = os.path.abspath(argv.output)
     if os.path.exists(argv.output):
         if argv.force:
             logging.info(f"{argv.output} already exists, will force remove")
@@ -31,12 +32,12 @@ def fuzz(argv):
         triple_arch_map = common.TRIPLE_ARCH_MAP_TIER_1
     elif argv.tier == 2:
         triple_arch_map = common.TRIPLE_ARCH_MAP_TIER_2
-    else:
-        logging.fatal("UNREACHABLE")
-    if argv.set is not None:
+    elif argv.set is not None:
         triple_arch_map = {}
-        for triple in argv.set:
+        for triple in argv.set.split(" "):
             triple_arch_map[triple] = common.TRIPLE_ARCH_MAP[triple]
+    else:
+        logging.fatal("UNREACHABLE, both tier and set is not specified.")
 
     isel = "dagisel" if global_isel == 0 else "gisel"
     tuples = []
@@ -56,19 +57,22 @@ def fuzz(argv):
         verbose_name = f"{argv.fuzzer}-{isel}-{triple}-{r}"
         proj_dir = f"{argv.output}/{argv.fuzzer}/{isel}/{triple}/{name}"
 
-        fuzz_cmd = f"$FUZZING_HOME/$AFL/afl-fuzz -i $FUZZING_HOME/seeds/ -o {proj_dir} $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing"
+        fuzz_cmd = f"timeout --signal=2 --foreground {argv.time} $FUZZING_HOME/$AFL/afl-fuzz -i $FUZZING_HOME/seeds/ -o $OUTPUT $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing"
 
         if argv.fuzzer == "aflplusplus":
+            dockerimage = "aflplusplus"
             fuzzer_specific = f'''
             export AFL_CUSTOM_MUTATOR_ONLY=0
             export AFL_CUSTOM_MUTATOR_LIBRARY="";
             '''
         elif argv.fuzzer == "libfuzzer":
+            dockerimage = "libfuzzer"
             fuzzer_specific = f'''
             export AFL_CUSTOM_MUTATOR_ONLY=1
             export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLFuzzMutate.so;
             '''
         elif argv.fuzzer == "aflisel":
+            dockerimage = "aflplusplus-isel"
             fuzzer_specific = f'''
             export AFL_CUSTOM_MUTATOR_ONLY=1
             export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so;
@@ -87,7 +91,7 @@ def fuzz(argv):
 
         config_file = f"{proj_dir}/config"
         config_logging = f'''
-            mkdir -p {proj_dir}/{name}
+            mkdir -p {proj_dir}
             echo "Fuzzing instruction selection." > {config_file}
             echo "FUZZER: {argv.fuzzer}" >> {config_file}
             echo "FORCE_REMOVAL: {argv.force}" >> {config_file}
@@ -98,22 +102,46 @@ def fuzz(argv):
             echo "CMD: {fuzz_cmd}" >> {config_file}
             echo "TIMEOUT: {argv.time}" >> {config_file}
         '''
-        command = f'''
+        if argv.type == 'screen':
+            command = f'''
             {env_exporting}
+            export OUTPUT={proj_dir}
 
             {config_logging}
 
             echo "START_TIME: $(date)" >> {config_file}
-            screen -S {verbose_name} -dm bash -c "timeout {argv.time} {fuzz_cmd}"
+            screen -S {verbose_name} -dm bash -c "{fuzz_cmd}"
             echo "END_TIME: $(date)" >> {config_file}
 
-            sleep {argv.time}
+            sleep {argv.time+60}
             exit
-        '''.encode()
+            '''.encode()
+        elif argv.type == 'docker':
+            command = f'''
+            export FUZZING_HOME=/AFLplusplus-isel
+            export OUTPUT=$FUZZING_HOME/fuzzing
+
+            {config_logging}
+
+            ID=`docker run --cpus=1 --name={verbose_name} --rm --mount type=tmpfs,tmpfs-size=1G,dst=$OUTPUT --env OUTPUT=$OUTPUT -v {proj_dir}:/output {dockerimage} bash -c "
+                {env_exporting}
+                {fuzz_cmd}
+                mv $OUTPUT/* /output/
+            "`
+            # Keep track of this container before it quits.
+            while [[ ! -z $(docker ps | grep $ID) ]]
+            do
+                sleep 1000
+            done
+            exit
+            '''.encode()
+            print(command.decode())
+        else:
+            logging.fatal("UNREACHABLE, type not set")
         process = subprocess.Popen(
             ['/bin/bash', '-c', command], stdout=subprocess.PIPE, stdin=subprocess.PIPE)
         # Sleep for 100ms so aflplusplus has time to bind core. Otherwise two fuzzers may bind to the same core.
-        subprocess.run(["sleep", "0.1"])
+        subprocess.run(["sleep", "1"])
         return process
 
     common.parallel_subprocess(tuples, argv.jobs, process_creator, None)
@@ -140,7 +168,9 @@ def main() -> None:
     parser.add_argument('--tier', type=int, choices=[0, 1, 2],
                         help="The set of triples to test. 0 corresponds to everything, 1 and 2 corresponds to Tier 1 and Tier 2, see common.py for more. Will be overriden by `--set`")
     parser.add_argument(
-        '--set', type=List[str], help="Select the triples to run.")
+        '--set', type=str, help="Select the triples to run.")
+    parser.add_argument('--type', type=str, required=True,
+                        choices=['screen', 'docker'], help="The method to start fuzzing cluster.")
     args = parser.parse_args()
 
     def convert_to_seconds(s: str) -> int:

@@ -25,7 +25,8 @@ then
     CLANG_LLVM=clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04
     wget https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/$CLANG_LLVM.tar.xz
     tar -xvf $CLANG_LLVM.tar.xz
-    ln -s $CLANG_LLVM clang+llvm
+    mv $CLANG_LLVM clang+llvm14
+    ln -s clang+llvm14 clang+llvm
 fi
 export PATH=$PATH:$HOME/clang+llvm/bin
 

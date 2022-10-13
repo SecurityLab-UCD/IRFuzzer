@@ -230,7 +230,8 @@ int main(int argc, char **argv) {
   if (LLVMFuzzerInitialize) {
     std::vector<char *> Argv({argv[0]});
     int is_gisel = 0;
-    if (getenv("GLOBAL_ISEL")) {
+    char *g = getenv("GLOBAL_ISEL");
+    if (g && g[0] == '1') {
       Printf("Fuzzing GlobalISel\n");
       is_gisel = 1;
       Argv.push_back((char *)"-global-isel");

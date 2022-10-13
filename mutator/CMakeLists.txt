@@ -44,6 +44,15 @@ target_link_libraries(AFLCustomIRMutator
     ${LLVM_LIBS}
 )
 
+add_library(AFLFuzzMutate SHARED
+    src/afl-mutator.c
+    src/fuzzmutate.cpp
+)
+target_link_libraries(AFLFuzzMutate
+    ${LLVM_LIBS}
+)
+
+
 add_executable(AFLCustomIRMutatorDummyMain
     src/main.cpp
 )

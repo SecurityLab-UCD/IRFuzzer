@@ -148,13 +148,21 @@ __T = TypeVar('__T')
 __R = TypeVar('__R')
 
 
-# Creates subprocesses in parallel.
 def parallel_subprocess(
         iter: Iterable[__T],
         jobs: int,
         subprocess_creator: Callable[[__T], subprocess.Popen],
         on_exit: Optional[Callable[[subprocess.Popen], __R]] = None
 ) -> Dict[__T, __R]:
+    '''
+    Creates `jobs` subprocesses that run in parallel.
+    `iter` contains input that is send to each subprocess.
+    `subprocess_creator` creates the subprocess and returns a `Popen`.
+    After each subprocess ends, `on_exit` will go collect user defined input and return.
+    The return valus is a dictionary of inputs and outputs.
+
+    User has to guarantee elements in `iter` is unique, or the output may be incorrect.
+    '''
     ret = {}
     processes: Set[(subprocess.Popen, __T)] = set()
     for input in tqdm(iter):

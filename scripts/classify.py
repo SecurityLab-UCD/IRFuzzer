@@ -7,8 +7,10 @@ from tqdm import tqdm
 import shutil
 from pathlib import Path
 import tempfile
+from common import parallel_subprocess
 
 MAX_SUBPROCESSES = 64
+
 
 class StackTrace:
     # using tuple instead of list for easier equality check
@@ -131,7 +133,6 @@ def classify(cmd: List[str], input_dir: str, output_dir: str, force: bool, verbo
     Path(output_dir).mkdir(parents=True)
 
     crash_hashes: Set[int] = set()
-    processes: Set[subprocess.Popen] = set()
 
     def on_process_exit(p: subprocess.Popen) -> None:
         if p.returncode == 0:
@@ -158,7 +159,7 @@ def classify(cmd: List[str], input_dir: str, output_dir: str, force: bool, verbo
             Path(folder_path).mkdir(parents=True)
             with open(os.path.join(output_dir, folder_name + ".log"), "w+") as report_path:
                 print(crash, file=report_path)
-            
+
             if verbose:
                 print("New crash type:", folder_name)
 
@@ -167,31 +168,19 @@ def classify(cmd: List[str], input_dir: str, output_dir: str, force: bool, verbo
             os.path.join(folder_path, os.path.basename(ir_bc_path) + '.bc')
         )
 
-    for file_name in tqdm(os.listdir(input_dir)):
-        if file_name.endswith('.md') or file_name.endswith('.txt') or file_name.endswith('.s'):
-            continue
-
-        file_path = os.path.join(input_dir, file_name)
-        processes.add(subprocess.Popen(
-            cmd + [file_path],
+    parallel_subprocess(
+        iter=list(filter(
+            lambda file_name: file_name.split('.')[-1] not in ['md', 'txt', 's'],
+            os.listdir(input_dir)
+        )),
+        jobs=MAX_SUBPROCESSES,
+        subprocess_creator=lambda file_name: subprocess.Popen(
+            cmd + [os.path.join(input_dir, file_name)],
             stdout=None,
             stderr=open(os.path.join(temp_dir, file_name + '.stderr'), 'w')
-        ))
-
-        if len(processes) >= MAX_SUBPROCESSES:
-            # wait for a child process to exit
-            os.wait()
-            exited_processes = [p for p in processes if p.poll() is not None]
-            for p in exited_processes:
-                processes.remove(p)
-                on_process_exit(p)
-
-    # wait for remaining processes to exit
-    for p in processes:
-        if verbose:
-            print('waiting for',  os.path.basename(p.args[-1]))  # type: ignore
-        p.wait()
-        on_process_exit(p)
+        ),
+        on_exit=on_process_exit
+    )
 
 
 def main() -> None:
@@ -207,6 +196,7 @@ def main() -> None:
                         help="force delete the output directory if it already exists.")
     args = parser.parse_args()
     classify(args.cmd.split(' '), args.input, args.output, args.force, verbose=True)
+
 
 if __name__ == "__main__":
     main()

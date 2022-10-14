@@ -35,7 +35,11 @@ def fuzz(argv):
     elif argv.set is not None:
         triple_arch_map = {}
         for triple in argv.set.split(" "):
-            triple_arch_map[triple] = common.TRIPLE_ARCH_MAP[triple]
+            try:
+                triple_arch_map[triple] = common.TRIPLE_ARCH_MAP[triple]
+            except KeyError:
+                logging.fatal(f"No such triple: {triple}, abort.")
+                return 0
     else:
         logging.fatal("UNREACHABLE, both tier and set is not specified.")
 
@@ -123,19 +127,18 @@ def fuzz(argv):
 
             {config_logging}
 
-            ID=`docker run --cpus=1 --name={verbose_name} --rm --mount type=tmpfs,tmpfs-size=1G,dst=$OUTPUT --env OUTPUT=$OUTPUT -v {proj_dir}:/output {dockerimage} bash -c "
+            docker run --cpus=1 --name={verbose_name} --rm --mount type=tmpfs,tmpfs-size=1G,dst=$OUTPUT --env OUTPUT=$OUTPUT -v {proj_dir}:/output {dockerimage} bash -c "
                 {env_exporting}
                 {fuzz_cmd}
-                mv $OUTPUT/* /output/
-            "`
+                mv $OUTPUT/default /output/default
+            "
             # Keep track of this container before it quits.
-            while [[ ! -z $(docker ps | grep $ID) ]]
+            while [[ ! -z $(docker ps | grep {verbose_name}) ]]
             do
                 sleep 1000
             done
             exit
             '''.encode()
-            print(command.decode())
         else:
             logging.fatal("UNREACHABLE, type not set")
         process = subprocess.Popen(
@@ -156,7 +159,7 @@ def main() -> None:
     parser.add_argument('--force', action='store_true',
                         help="force delete the output directory if it already exists.")
     parser.add_argument('--fuzzer', choices=['aflplusplus', 'libfuzzer', 'aflisel'],
-                        default='aflplusplus', help="The fuzzer we are using for fuzzing.")
+                        required=True, help="The fuzzer we are using for fuzzing.")
     parser.add_argument('-j', '--jobs', type=int, default=80,
                         help="Max number of jobs parallel, default 40.")
     parser.add_argument('-r', '--repeat', type=int, default=3,

@@ -66,6 +66,8 @@ class CrashError:
             .replace(args[0], os.path.basename(args[0])) \
             .replace(args[-1], 'ir.bc')
 
+        self.message_minimized = re.sub(r'0x[0-9a-f]+', '0x_', self.message_minimized)
+
         # extract failed pass and stack trace
         self.failed_pass = None
         if (curr_line := next(stderr_iter, None)) and curr_line == 'Stack dump:\n':
@@ -82,13 +84,19 @@ class CrashError:
         # determine error type
         if self.message_raw.startswith('LLVM ERROR: unable to legalize instruction:'):
             self.type = 'instruction-legalization'
-            matches = re.findall('G_[A-Z_]+', self.message_raw)
+            matches = re.findall('G_[A-Z_]+', message_lines[0])
             assert len(matches) == 1
             self.subtype = matches[0]
         elif self.message_raw.startswith('LLVM ERROR: cannot select:'):
-            self.type = 'instruction-selection'
-            matches = re.findall('G_[A-Z_]+', self.message_raw)
-            self.subtype = '-'.join(matches)
+            self.type = 'global-instruction-selection'
+            matches = re.findall('G_[A-Z_]+', message_lines[0])
+            assert len(matches) == 1
+            self.subtype = matches[0]
+        elif self.message_raw.startswith('LLVM ERROR: Cannot select:'):
+            self.type = 'dag-instruction-selection'
+            match = re.match(r'LLVM ERROR: Cannot select:.+ = ([a-z_]+(<.+>)?) ', message_lines[0])
+            assert match is not None
+            self.subtype = match.group(1).split('<')[0]
         else:
             if self.failed_pass is None:
                 self.type = 'other'

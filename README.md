@@ -50,7 +50,7 @@ $ ninja
 [6/27] Building CXX object lib/Target/AIE/CMakeFiles/LLVMAIECodeGen.dir/AIEISelDAGToDAG.cpp.o
 [+] MatcherTable size: 22660
 ```
-3. You can also find this data in `build.sh:120`. It may not be 100% accurate as the code gets updated. 
+3. You can also find this data in [`scripts/common.py`](./scripts/common.py). It may not be 100% accurate as the code gets updated. 
 
  
 
@@ -153,16 +153,16 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 
 **LLVM**
 - SelectionDAG may cause infinite recursion on AArch64 and AIE. [Issue sent.](https://github.com/llvm/llvm-project/issues/57251)
-- IRTranslator sign extends index value for G_EXTRACT_VECTOR_ELT, translating `i1 true` into `i32 -1`. [Issue sent.](https://github.com/llvm/llvm-project/issues/57452)
-- Infinite recursion in DAGCombiner. [Issume sent.](https://github.com/llvm/llvm-project/issues/57658) [Fixing.](https://reviews.llvm.org/D133602)
+- [IRTranslator sign extends index value for G_EXTRACT_VECTOR_ELT, translating `i1 true` into `i32 -1`.](https://github.com/llvm/llvm-project/issues/57452) ([Fixed.](https://reviews.llvm.org/D132978))
+- [Infinite recursion in DAGCombiner.](https://github.com/llvm/llvm-project/issues/57658) ([Fixed.](https://reviews.llvm.org/D133602))
 
 **RISCV64**
-- [Storing a float vector of size 1 after float arithmetic and branching causes assertion error `Invalid ANY_EXTEND`!](https://github.com/llvm/llvm-project/issues/58025) (Fixed)
+- [Storing a float vector of size 1 after float arithmetic and branching causes assertion error `Invalid ANY_EXTEND`!](https://github.com/llvm/llvm-project/issues/58025) ([Fixed.](https://reviews.llvm.org/D134758))
 - [Cannot scavenge register without an emergency spill slot](https://github.com/llvm/llvm-project/issues/58027) (Reported)
 
 **AArch64**
 - [Double free in AArch64 GlobalIsel](https://github.com/llvm/llvm-project/issues/57282) ([Fixed](https://reviews.llvm.org/D133309))
-- [AArch64 SelectionDAG uses uninitialized array and have OOB Write given long `shuffelvector` mask](https://github.com/llvm/llvm-project/issues/57326) ([Fixed](https://reviews.llvm.org/D132634))
+- [[AArch64/SelectionDAG] uses uninitialized array and have OOB Write given long `shuffelvector` mask](https://github.com/llvm/llvm-project/issues/57326) ([Fixed](https://reviews.llvm.org/D132634))
 - [[AArch64/GlobalISel] `fcmp true` / `fcmp false` used in `and` / `or` branching condition causes crash `Unknown FP condition!`](https://github.com/llvm/llvm-project/issues/58050) (Reported)
 - [[AArch64/GlobalIsel] unable to legalize vectorized binaryop(G_ADD, G_SUB, ...)](https://github.com/llvm/llvm-project/issues/58156) (Reported)
 - [[AArch64/GlobalISel] Unable to Translate `ret` with v1i8 / v1i16](https://github.com/llvm/llvm-project/issues/58211) (Reported)

@@ -170,13 +170,15 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 - [[AArch64/SelectionDAG] Storing a v1f32 along with a f32 crashes backend with assertion error "Extract subvector index must be a constant"](https://github.com/llvm/llvm-project/issues/58350) ([Fixed](https://reviews.llvm.org/D135954))
 
 **X86_64**
-- X86_64 SelectionDAG assertion failure on shift. [Fixed.](https://github.com/llvm/llvm-project/issues/57283)
+- [X86_64 SelectionDAG assertion failure on shift](https://github.com/llvm/llvm-project/issues/57283) ([Fixed](https://github.com/llvm/llvm-project-release-prs/pull/127))
+- [[x86/SelectionDAG] Assertion `LRegs.size() == 1 && "Can't handle this yet!"` failed when scheduling](https://github.com/llvm/llvm-project/issues/58455) (Reported)
 
 **NVPTX**
-- SelectionDAG Cannot select dynamic_stackalloc. [Issue sent.](https://github.com/llvm/llvm-project/issues/57398)
-- DAG->DAG Pattern Instruction Selection crashes on mul i1. [Issue sent.](https://github.com/llvm/llvm-project/issues/57404)
-- DAG->DAG Pattern Instruction Selection crashes on setcc. [Issue sent.](https://github.com/llvm/llvm-project/issues/57405)
+- [SelectionDAG Cannot select dynamic_stackalloc](https://github.com/llvm/llvm-project/issues/57398) (Reported)
+- [DAG->DAG Pattern Instruction Selection crashes on mul i1](https://github.com/llvm/llvm-project/issues/57404) (Reported)
+- [DAG->DAG Pattern Instruction Selection crashes on setcc](https://github.com/llvm/llvm-project/issues/57405) (Reported)
 - [[NVPTX] Assertion `CastInst::castIsValid(opc, C, Ty) && "Invalid constantexpr cast!"` failed](https://github.com/llvm/llvm-project/issues/58305) (Reported)
+- [[NVPTX] `icmp i1` used as branching condition crashes backend](https://github.com/llvm/llvm-project/issues/58428) (Reported)
 
 **AMDGPU**
 - [GlobalIsel AMDGPUPreLegalizerCombiner double frees on release build, OOB on debug build](https://github.com/llvm/llvm-project/issues/57406) ([Fixed](https://reviews.llvm.org/D132938))

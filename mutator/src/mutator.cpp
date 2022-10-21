@@ -27,6 +27,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
+
+#ifdef DEBUG
+#include "llvm/IR/Verifier.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#endif
 using namespace llvm;
 
 static std::unique_ptr<IRMutator> Mutator;
@@ -58,7 +63,10 @@ void createISelMutator() {
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
 
   Strategies.emplace_back(new InjectorIRStrategy(std::move(Ops)));
+  Strategies.emplace_back(new CFGIRStrategy());
   Strategies.emplace_back(new InstDeleterIRStrategy());
+  Strategies.emplace_back(new InsertPHItrategy());
+  Strategies.emplace_back(new OperandMutatorstrategy());
 
   Mutator =
       std::make_unique<IRMutator>(std::move(Types), std::move(Strategies));
@@ -80,11 +88,62 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
         std::ofstream("err.bc", std::ios::out | std::ios::binary);
     outfile.write((char *)Data, Size);
     outfile.close();
+#ifdef DEBUG
     exit(1);
+#else
+    // We don't do any change.
+    return Size;
+#endif
+  }
+#ifdef DEBUG
+  std::unique_ptr<Module> OldM = CloneModule(*M);
+#endif
+
+  srand(Seed);
+  for (int i = 0; i < 4; i++) {
+    Mutator->mutateModule(*M, rand(), Size, MaxSize);
   }
 
-  Mutator->mutateModule(*M, Seed, Size, MaxSize);
+#ifdef DEBUG
+  uint8_t *OldData = Data;
+  uint8_t NewData[MaxSize];
+  size_t OldSize = Size;
+  size_t NewSize = writeModule(*M, NewData, MaxSize);
+  LLVMContext NewC;
+  auto NewM = parseModule(NewData, NewSize, NewC);
+  if (NewM == nullptr) {
+    std::ofstream oldoutfile =
+        std::ofstream("old.bc", std::ios::out | std::ios::binary);
+    oldoutfile.write((char *)OldData, OldSize);
+    oldoutfile.close();
+    std::ofstream newoutfile =
+        std::ofstream("new.bc", std::ios::out | std::ios::binary);
+    newoutfile.write((char *)NewData, NewSize);
+    newoutfile.close();
 
+    errs() << "Parse module error after mutation. Seed: " << Seed << "\n";
+    if (verifyModule(*OldM, &errs(), nullptr)) {
+      errs() << "Old Module incorrect.\n";
+    } else {
+      errs() << "Old Module correct.\n";
+    }
+    errs() << "OldM, Size: " << OldSize << " \n";
+    errs() << *OldM;
+    if (verifyModule(*M, &errs(), nullptr)) {
+      errs() << "New Module incorrect.\n";
+    } else {
+      errs() << "New Module correct.\n";
+    }
+    errs() << "NewM, Size: " << NewSize << " \n";
+    errs() << *M;
+    exit(1);
+  } else {
+    memset(OldData, 0, MaxSize);
+    memcpy(OldData, NewData, NewSize);
+    return NewSize;
+  }
+#else
   return writeModule(*M, Data, MaxSize);
+#endif
 }
 }

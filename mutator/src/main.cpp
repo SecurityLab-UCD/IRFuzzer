@@ -64,13 +64,18 @@ int main(int argc, char **argv) {
     if (argc > 2) {
       Seed = atoi(argv[2]);
     }
-    llvm::errs() << "Seed: " << Seed << "\n";
+    bool dontWrite = false;
+    if (argc > 3 && argv[3][1] == 'd') {
+      dontWrite = true;
+    }
     size_t newSize =
         LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, 2048, Seed);
-    std::ofstream outbc =
-        std::ofstream("out.bc", std::ios::out | std::ios::binary);
-    outbc.write(buffer.data(), newSize);
-    outbc.close();
+    if (!dontWrite) {
+      std::ofstream outbc =
+          std::ofstream("out.bc", std::ios::out | std::ios::binary);
+      outbc.write(buffer.data(), newSize);
+      outbc.close();
+    }
     llvm::LLVMContext Context;
     std::unique_ptr<llvm::Module> M =
         llvm::parseModule((uint8_t *)buffer.data(), newSize, Context);
@@ -79,12 +84,12 @@ int main(int argc, char **argv) {
     llvm::raw_fd_ostream outll("out.ll", EC);
     M->print(outll, nullptr);
     */
-    llvm::errs() << "Verifing Module...";
+    // llvm::errs() << "Verifing Module...";
     if (verifyModule(*M, &llvm::errs(), nullptr)) {
-      llvm::errs() << "Verifier failed.\n";
-      llvm::errs() << *M << "\n";
+      llvm::errs() << "Verifier failed. Seed: " << Seed << "\n";
+      // llvm::errs() << *M << "\n";
     } else {
-      llvm::errs() << "Good.\n";
+      // llvm::errs() << "Good.\n";
     }
   } else {
     fprintf(stderr, "I can't read the file.");

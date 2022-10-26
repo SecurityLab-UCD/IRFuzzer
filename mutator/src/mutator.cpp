@@ -112,6 +112,7 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
   LLVMContext NewC;
   auto NewM = parseModule(NewData, NewSize, NewC);
   if (NewM == nullptr) {
+    errs() << "Parse module error after mutation. Seed: " << Seed << "\n";
     std::ofstream oldoutfile =
         std::ofstream("old.bc", std::ios::out | std::ios::binary);
     oldoutfile.write((char *)OldData, OldSize);

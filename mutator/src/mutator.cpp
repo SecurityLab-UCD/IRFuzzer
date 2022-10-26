@@ -112,32 +112,16 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
   LLVMContext NewC;
   auto NewM = parseModule(NewData, NewSize, NewC);
   if (NewM == nullptr) {
-    errs() << "Parse module error after mutation. Seed: " << Seed << "\n";
+    time_t seconds = time(NULL);
+    errs() << "Verification failed, seed: " << Seed << "\n";
+    char filename[256];
+    memset(filename, 0, 256);
+    sprintf(filename, "%u-%zu", Seed, seconds);
     std::ofstream oldoutfile =
-        std::ofstream("old.bc", std::ios::out | std::ios::binary);
+        std::ofstream(filename, std::ios::out | std::ios::binary);
     oldoutfile.write((char *)OldData, OldSize);
     oldoutfile.close();
-    std::ofstream newoutfile =
-        std::ofstream("new.bc", std::ios::out | std::ios::binary);
-    newoutfile.write((char *)NewData, NewSize);
-    newoutfile.close();
-
-    errs() << "Parse module error after mutation. Seed: " << Seed << "\n";
-    if (verifyModule(*OldM, &errs(), nullptr)) {
-      errs() << "Old Module incorrect.\n";
-    } else {
-      errs() << "Old Module correct.\n";
-    }
-    errs() << "OldM, Size: " << OldSize << " \n";
-    errs() << *OldM;
-    if (verifyModule(*M, &errs(), nullptr)) {
-      errs() << "New Module incorrect.\n";
-    } else {
-      errs() << "New Module correct.\n";
-    }
-    errs() << "NewM, Size: " << NewSize << " \n";
-    errs() << *M;
-    exit(1);
+    return OldSize;
   } else {
     memset(OldData, 0, MaxSize);
     memcpy(OldData, NewData, NewSize);

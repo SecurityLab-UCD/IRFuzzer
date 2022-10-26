@@ -53,10 +53,10 @@ target_link_libraries(AFLFuzzMutate
 )
 
 
-add_executable(AFLCustomIRMutatorDummyMain
+add_executable(MutatorDriver
     src/main.cpp
 )
-target_link_libraries(AFLCustomIRMutatorDummyMain
+target_link_libraries(MutatorDriver
     AFLCustomIRMutator
     ${LLVM_LIBS}
 )

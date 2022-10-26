@@ -64,13 +64,15 @@ int main(int argc, char **argv) {
     if (argc > 2) {
       Seed = atoi(argv[2]);
     }
-    bool dontWrite = false;
-    if (argc > 3 && argv[3][1] == 'd') {
-      dontWrite = true;
+    bool validateMode = false;
+    if (argc > 3 && argv[3][1] == 'v') {
+      validateMode = true;
+    } else {
+      llvm::errs() << "Seed: " << Seed << "\n";
     }
     size_t newSize =
         LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, 2048, Seed);
-    if (!dontWrite) {
+    if (!validateMode) {
       std::ofstream outbc =
           std::ofstream("out.bc", std::ios::out | std::ios::binary);
       outbc.write(buffer.data(), newSize);
@@ -79,6 +81,8 @@ int main(int argc, char **argv) {
     llvm::LLVMContext Context;
     std::unique_ptr<llvm::Module> M =
         llvm::parseModule((uint8_t *)buffer.data(), newSize, Context);
+    if (!validateMode)
+      M->dump();
     /*
     std::error_code EC;
     llvm::raw_fd_ostream outll("out.ll", EC);

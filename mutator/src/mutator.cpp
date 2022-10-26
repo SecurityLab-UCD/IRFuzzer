@@ -38,6 +38,19 @@ static std::unique_ptr<IRMutator> Mutator;
 
 extern "C" {
 
+void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
+                   size_t MaxSize) {
+  time_t seconds = time(NULL);
+  errs() << "Mutation failed, seed: " << Seed << "\n";
+  char oldname[256];
+  memset(oldname, 0, 256);
+  sprintf(oldname, "%u-%zu-%zu.old.bc", Seed, MaxSize, seconds);
+  std::ofstream oldoutfile =
+      std::ofstream(oldname, std::ios::out | std::ios::binary);
+  oldoutfile.write((char *)Data, Size);
+  oldoutfile.close();
+}
+
 void addVectorTypeGetters(std::vector<TypeGetter> &Types) {
   int VectorLength[] = {1, 2, 4, 8, 16, 32, 64};
   std::vector<TypeGetter> BasicTypeGetters(Types);
@@ -99,32 +112,31 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
   std::unique_ptr<Module> OldM = CloneModule(*M);
 #endif
 
-  srand(Seed);
-  for (int i = 0; i < 4; i++) {
-    Mutator->mutateModule(*M, rand(), Size, MaxSize);
+#ifdef DEBUG
+  try {
+#endif
+    srand(Seed);
+    for (int i = 0; i < 4; i++) {
+      Mutator->mutateModule(*M, rand(), Size, MaxSize);
+    }
+#ifdef DEBUG
+  } catch (...) {
+    dumpOnFailure(Seed, Data, Size, MaxSize);
+    return Size;
   }
+#endif
 
 #ifdef DEBUG
-  uint8_t *OldData = Data;
   uint8_t NewData[MaxSize];
-  size_t OldSize = Size;
   size_t NewSize = writeModule(*M, NewData, MaxSize);
   LLVMContext NewC;
   auto NewM = parseModule(NewData, NewSize, NewC);
   if (NewM == nullptr) {
-    time_t seconds = time(NULL);
-    errs() << "Verification failed, seed: " << Seed << "\n";
-    char filename[256];
-    memset(filename, 0, 256);
-    sprintf(filename, "%u-%zu", Seed, seconds);
-    std::ofstream oldoutfile =
-        std::ofstream(filename, std::ios::out | std::ios::binary);
-    oldoutfile.write((char *)OldData, OldSize);
-    oldoutfile.close();
-    return OldSize;
+    dumpOnFailure(Seed, Data, Size, MaxSize);
+    return Size;
   } else {
-    memset(OldData, 0, MaxSize);
-    memcpy(OldData, NewData, NewSize);
+    memset(Data, 0, MaxSize);
+    memcpy(Data, NewData, NewSize);
     return NewSize;
   }
 #else

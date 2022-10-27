@@ -71,7 +71,7 @@ int main(int argc, char **argv) {
       llvm::errs() << "Seed: " << Seed << "\n";
     }
     size_t newSize =
-        LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, 2048, Seed);
+        LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, 1048576, Seed);
     if (!validateMode) {
       std::ofstream outbc =
           std::ofstream("out.bc", std::ios::out | std::ios::binary);

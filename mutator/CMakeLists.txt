@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.4)
 project(afl-ir-custom-mutator)
 
-find_package(LLVM REQUIRED PATHS $ENV{FUZZING_HOME}/$ENV{LLVM}/build-release/lib/cmake/llvm NO_DEFAULT_PATH)
+find_package(LLVM REQUIRED PATHS $ENV{FUZZING_HOME}/$ENV{LLVM}/build-debug/lib/cmake/llvm NO_DEFAULT_PATH)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
@@ -53,10 +53,10 @@ target_link_libraries(AFLFuzzMutate
 )
 
 
-add_executable(AFLCustomIRMutatorDummyMain
+add_executable(MutatorDriver
     src/main.cpp
 )
-target_link_libraries(AFLCustomIRMutatorDummyMain
+target_link_libraries(MutatorDriver
     AFLCustomIRMutator
     ${LLVM_LIBS}
 )

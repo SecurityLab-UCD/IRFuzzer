@@ -27,11 +27,29 @@
 #include <stdlib.h>
 #include <string.h>
 #include <vector>
+
+#ifdef DEBUG
+#include "llvm/IR/Verifier.h"
+#include "llvm/Transforms/Utils/Cloning.h"
+#endif
 using namespace llvm;
 
 static std::unique_ptr<IRMutator> Mutator;
 
 extern "C" {
+
+void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
+                   size_t MaxSize) {
+  time_t seconds = time(NULL);
+  errs() << "Mutation failed, seed: " << Seed << "\n";
+  char oldname[256];
+  memset(oldname, 0, 256);
+  sprintf(oldname, "%u-%zu-%zu.old.bc", Seed, MaxSize, seconds);
+  std::ofstream oldoutfile =
+      std::ofstream(oldname, std::ios::out | std::ios::binary);
+  oldoutfile.write((char *)Data, Size);
+  oldoutfile.close();
+}
 
 void addVectorTypeGetters(std::vector<TypeGetter> &Types) {
   int VectorLength[] = {1, 2, 4, 8, 16, 32, 64};
@@ -58,7 +76,10 @@ void createISelMutator() {
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
 
   Strategies.emplace_back(new InjectorIRStrategy(std::move(Ops)));
+  Strategies.emplace_back(new CFGIRStrategy());
   Strategies.emplace_back(new InstDeleterIRStrategy());
+  Strategies.emplace_back(new InsertPHItrategy());
+  Strategies.emplace_back(new OperandMutatorstrategy());
 
   Mutator =
       std::make_unique<IRMutator>(std::move(Types), std::move(Strategies));
@@ -80,11 +101,46 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
         std::ofstream("err.bc", std::ios::out | std::ios::binary);
     outfile.write((char *)Data, Size);
     outfile.close();
+#ifdef DEBUG
     exit(1);
+#else
+    // We don't do any change.
+    return Size;
+#endif
   }
+#ifdef DEBUG
+  std::unique_ptr<Module> OldM = CloneModule(*M);
+#endif
 
-  Mutator->mutateModule(*M, Seed, Size, MaxSize);
+#ifdef DEBUG
+  try {
+#endif
+    srand(Seed);
+    for (int i = 0; i < 4; i++) {
+      Mutator->mutateModule(*M, rand(), Size, MaxSize);
+    }
+#ifdef DEBUG
+  } catch (...) {
+    dumpOnFailure(Seed, Data, Size, MaxSize);
+    return Size;
+  }
+#endif
 
+#ifdef DEBUG
+  uint8_t NewData[MaxSize];
+  size_t NewSize = writeModule(*M, NewData, MaxSize);
+  LLVMContext NewC;
+  auto NewM = parseModule(NewData, NewSize, NewC);
+  if (NewM == nullptr) {
+    dumpOnFailure(Seed, Data, Size, MaxSize);
+    return Size;
+  } else {
+    memset(Data, 0, MaxSize);
+    memcpy(Data, NewData, NewSize);
+    return NewSize;
+  }
+#else
   return writeModule(*M, Data, MaxSize);
+#endif
 }
 }

@@ -50,7 +50,7 @@ $ ninja
 [6/27] Building CXX object lib/Target/AIE/CMakeFiles/LLVMAIECodeGen.dir/AIEISelDAGToDAG.cpp.o
 [+] MatcherTable size: 22660
 ```
-3. You can also find this data in `build.sh:120`. It may not be 100% accurate as the code gets updated. 
+3. You can also find this data in [`scripts/common.py`](./scripts/common.py). It may not be 100% accurate as the code gets updated. 
 
  
 
@@ -151,51 +151,7 @@ TODO: Add a new scheduling mutator to this repo and include usage.
 
 ## Open sourced architecture
 
-**LLVM**
-- SelectionDAG may cause infinite recursion on AArch64 and AIE. [Issue sent.](https://github.com/llvm/llvm-project/issues/57251)
-- IRTranslator sign extends index value for G_EXTRACT_VECTOR_ELT, translating `i1 true` into `i32 -1`. [Issue sent.](https://github.com/llvm/llvm-project/issues/57452)
-- Infinite recursion in DAGCombiner. [Issume sent.](https://github.com/llvm/llvm-project/issues/57658) [Fixing.](https://reviews.llvm.org/D133602)
-
-**RISCV64**
-- [Storing a float vector of size 1 after float arithmetic and branching causes assertion error `Invalid ANY_EXTEND`!](https://github.com/llvm/llvm-project/issues/58025) ([Fixed](https://reviews.llvm.org/D134758))
-- [Cannot scavenge register without an emergency spill slot](https://github.com/llvm/llvm-project/issues/58027) (Reported)
-
-**AArch64**
-- [Double free in AArch64 GlobalIsel](https://github.com/llvm/llvm-project/issues/57282) ([Fixed](https://reviews.llvm.org/D133309))
-- [AArch64 SelectionDAG uses uninitialized array and have OOB Write given long `shuffelvector` mask](https://github.com/llvm/llvm-project/issues/57326) ([Fixed](https://reviews.llvm.org/D132634))
-- [[AArch64/GlobalISel] `fcmp true` / `fcmp false` used in `and` / `or` branching condition causes crash `Unknown FP condition!`](https://github.com/llvm/llvm-project/issues/58050) (Reported)
-- [[AArch64/GlobalIsel] unable to legalize vectorized binaryop(G_ADD, G_SUB, ...)](https://github.com/llvm/llvm-project/issues/58156) (Reported)
-- [[AArch64/GlobalISel] Unable to Translate `ret` with v1i8 / v1i16](https://github.com/llvm/llvm-project/issues/58211) (Reported)
-- [[AArch64/GlobalISel] Cannot select `G_ZEXT` / `G_SEXT` / `G_ANYEXT` with v2i16](https://github.com/llvm/llvm-project/issues/58274) (Reported)
-- [[AArch64/SelectionDAG] Storing a v1f32 along with a f32 crashes backend with assertion error "Extract subvector index must be a constant"](https://github.com/llvm/llvm-project/issues/58350) ([Fixed](https://reviews.llvm.org/D135954))
-
-**X86_64**
-- [X86_64 SelectionDAG assertion failure on shift](https://github.com/llvm/llvm-project/issues/57283) ([Fixed](https://github.com/llvm/llvm-project-release-prs/pull/127))
-- [[x86/SelectionDAG] Assertion `LRegs.size() == 1 && "Can't handle this yet!"` failed when scheduling](https://github.com/llvm/llvm-project/issues/58455) (Reported)
-
-**NVPTX**
-- [SelectionDAG Cannot select dynamic_stackalloc](https://github.com/llvm/llvm-project/issues/57398) (Reported)
-- [DAG->DAG Pattern Instruction Selection crashes on mul i1](https://github.com/llvm/llvm-project/issues/57404) (Reported)
-- [DAG->DAG Pattern Instruction Selection crashes on setcc](https://github.com/llvm/llvm-project/issues/57405) (Reported)
-- [[NVPTX] Assertion `CastInst::castIsValid(opc, C, Ty) && "Invalid constantexpr cast!"` failed](https://github.com/llvm/llvm-project/issues/58305) (Reported)
-- [[NVPTX] `icmp i1` used as branching condition crashes backend](https://github.com/llvm/llvm-project/issues/58428) (Reported)
-
-**AMDGPU**
-- [GlobalIsel AMDGPUPreLegalizerCombiner double frees on release build, OOB on debug build](https://github.com/llvm/llvm-project/issues/57406) ([Fixed](https://reviews.llvm.org/D132938))
-- [GlobalIsel crashes when extractelement index is invalid](https://github.com/llvm/llvm-project/issues/57408) ([Fixed](https://reviews.llvm.org/D132938))
-- [[R600] Allocating Large Number of i1's on Stack Crashes with Error "Register number out of range"](https://github.com/llvm/llvm-project/issues/58171) (Reported)
-- [[AMDGPU] No registers from class available to allocate for R600 / Cannot select for AMDGCN](https://github.com/llvm/llvm-project/issues/58210) (Reported)
-- [[AMDGPU] mul used with v1i8 / v1i16 causes crash during IR optimizations due to type mismatch](https://github.com/llvm/llvm-project/issues/58331) ([Fixed](https://reviews.llvm.org/D135821))
-
-
-The following code crashes `amdgcn` backend but is not reported.
-```
-define i32 @f(ptr %0) {
-BB:
-  %R = load i32, ptr %0
-  ret i32 %R
-}
-```
+See our [trophies repo](https://github.com/DataCorrupted/LLVM-fuzzing-trophies).
 
 # FAQ
 

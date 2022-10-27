@@ -9,6 +9,7 @@
 #include "llvm/FuzzMutate/IRMutator.h"
 #include "llvm/FuzzMutate/Operations.h"
 #include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/LegacyPassManager.h"
 #include "llvm/IR/Module.h"
@@ -52,7 +53,7 @@ void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
 }
 
 void addVectorTypeGetters(std::vector<TypeGetter> &Types) {
-  int VectorLength[] = {1, 2, 4, 8, 16, 32, 64};
+  int VectorLength[] = {1, 2, 3, 7, 23, 37, 57};
   std::vector<TypeGetter> BasicTypeGetters(Types);
   for (auto typeGetter : BasicTypeGetters) {
     for (int length : VectorLength) {
@@ -69,8 +70,20 @@ void createISelMutator() {
   std::vector<TypeGetter> Types{
       Type::getInt1Ty,  Type::getInt8Ty,  Type::getInt16Ty, Type::getInt32Ty,
       Type::getInt64Ty, Type::getFloatTy, Type::getDoubleTy};
+  std::vector<TypeGetter> AuxTypes = Types;
   if (!getenv("NO_VEC"))
     addVectorTypeGetters(Types);
+  TypeGetter Int20Getter = [](LLVMContext &C) {
+    return IntegerType::get(C, 20);
+  };
+  TypeGetter Int128Getter = [](LLVMContext &C) {
+    return IntegerType::get(C, 128);
+  };
+  // Copy scalar types to change distribution.
+  Types.insert(Types.end(), AuxTypes.begin(), AuxTypes.end());
+  AuxTypes.push_back(Int20Getter);
+  AuxTypes.push_back(Int128Getter);
+  Types.insert(Types.end(), AuxTypes.begin(), AuxTypes.end());
 
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
@@ -116,9 +129,10 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
   try {
 #endif
     srand(Seed);
-    for (int i = 0; i < 4; i++) {
-      Mutator->mutateModule(*M, rand(), Size, MaxSize);
-    }
+    Seed = rand();
+    // for (int i = 0; i < 4; i++) {
+    Mutator->mutateModule(*M, Seed, Size, MaxSize);
+    // }
 #ifdef DEBUG
   } catch (...) {
     dumpOnFailure(Seed, Data, Size, MaxSize);

@@ -16,6 +16,8 @@
 #include <unistd.h>
 #include <vector>
 
+#define MAX_SIZE 1048576
+
 // https://stackoverflow.com/questions/322938/recommended-way-to-initialize-srand
 unsigned long mix(unsigned long a, unsigned long b, unsigned long c) {
   a = a - b;
@@ -56,7 +58,7 @@ int main(int argc, char **argv) {
   std::streamsize size = infile.tellg();
   infile.seekg(0, std::ios::beg);
 
-  std::vector<char> buffer(size + 2048);
+  std::vector<char> buffer(MAX_SIZE);
   if (infile.read(buffer.data(), size)) {
     srand(mix(clock(), time(NULL), getpid()));
     createISelMutator();
@@ -71,7 +73,7 @@ int main(int argc, char **argv) {
       llvm::errs() << "Seed: " << Seed << "\n";
     }
     size_t newSize =
-        LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, 1048576, Seed);
+        LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, MAX_SIZE, Seed);
     if (!validateMode) {
       std::ofstream outbc =
           std::ofstream("out.bc", std::ios::out | std::ios::binary);

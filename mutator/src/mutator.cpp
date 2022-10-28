@@ -67,28 +67,34 @@ void addVectorTypeGetters(std::vector<TypeGetter> &Types) {
 /// Type* getStructType(Context& C);
 
 void createISelMutator() {
-  std::vector<TypeGetter> Types{
-      Type::getInt1Ty,  Type::getInt8Ty,  Type::getInt16Ty, Type::getInt32Ty,
-      Type::getInt64Ty, Type::getFloatTy, Type::getDoubleTy};
-  std::vector<TypeGetter> AuxTypes = Types;
-  if (!getenv("NO_VEC"))
-    addVectorTypeGetters(Types);
   TypeGetter Int20Getter = [](LLVMContext &C) {
     return IntegerType::get(C, 20);
   };
   TypeGetter Int128Getter = [](LLVMContext &C) {
     return IntegerType::get(C, 128);
   };
+  std::vector<TypeGetter> Types{
+      Type::getInt1Ty,   Type::getInt8Ty,  Type::getInt16Ty,
+      Type::getInt32Ty,  Type::getInt64Ty, Type::getFloatTy,
+      Type::getDoubleTy, Int20Getter,      Int128Getter};
+  std::vector<TypeGetter> ScalarTypes = Types;
+
+  addVectorTypeGetters(Types);
+
+  TypeGetter OpaquePtrGetter = [](LLVMContext &C) {
+    return PointerType::get(Type::getInt32Ty(C), 0);
+  };
+  Types.push_back(OpaquePtrGetter);
+
   // Copy scalar types to change distribution.
-  Types.insert(Types.end(), AuxTypes.begin(), AuxTypes.end());
-  AuxTypes.push_back(Int20Getter);
-  AuxTypes.push_back(Int128Getter);
-  Types.insert(Types.end(), AuxTypes.begin(), AuxTypes.end());
+  for (int i = 0; i < 3; i++)
+    Types.insert(Types.end(), ScalarTypes.begin(), ScalarTypes.end());
 
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
 
   Strategies.emplace_back(new InjectorIRStrategy(std::move(Ops)));
+  Strategies.emplace_back(new FunctionIRStrategy());
   Strategies.emplace_back(new CFGIRStrategy());
   Strategies.emplace_back(new InstDeleterIRStrategy());
   Strategies.emplace_back(new InsertPHItrategy());

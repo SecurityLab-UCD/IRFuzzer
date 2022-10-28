@@ -97,8 +97,8 @@ void createISelMutator() {
   Strategies.emplace_back(new FunctionIRStrategy());
   Strategies.emplace_back(new CFGIRStrategy());
   Strategies.emplace_back(new InstDeleterIRStrategy());
-  Strategies.emplace_back(new InsertPHItrategy());
-  Strategies.emplace_back(new OperandMutatorstrategy());
+  Strategies.emplace_back(new InsertPHIStrategy());
+  Strategies.emplace_back(new OperandMutatorStrategy());
 
   Mutator =
       std::make_unique<IRMutator>(std::move(Types), std::move(Strategies));

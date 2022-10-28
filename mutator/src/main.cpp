@@ -83,8 +83,10 @@ int main(int argc, char **argv) {
     llvm::LLVMContext Context;
     std::unique_ptr<llvm::Module> M =
         llvm::parseModule((uint8_t *)buffer.data(), newSize, Context);
+#ifdef DEBUG
     if (!validateMode)
       M->dump();
+#endif
     /*
     std::error_code EC;
     llvm::raw_fd_ostream outll("out.ll", EC);

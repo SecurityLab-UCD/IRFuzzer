@@ -53,7 +53,7 @@ void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
 }
 
 void addVectorTypeGetters(std::vector<TypeGetter> &Types) {
-  int VectorLength[] = {1, 2, 3, 7, 23, 37, 57};
+  int VectorLength[] = {1, 2, 3, 4, 7, 8, 16, 23, 37, 57};
   std::vector<TypeGetter> BasicTypeGetters(Types);
   for (auto typeGetter : BasicTypeGetters) {
     for (int length : VectorLength) {
@@ -87,7 +87,7 @@ void createISelMutator() {
   Types.push_back(OpaquePtrGetter);
 
   // Copy scalar types to change distribution.
-  for (int i = 0; i < 3; i++)
+  for (int i = 0; i < 5; i++)
     Types.insert(Types.end(), ScalarTypes.begin(), ScalarTypes.end());
 
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;

@@ -69,8 +69,6 @@ int main(int argc, char **argv) {
     bool validateMode = false;
     if (argc > 3 && argv[3][1] == 'v') {
       validateMode = true;
-    } else {
-      llvm::errs() << "Seed: " << Seed << "\n";
     }
     size_t newSize =
         LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, MAX_SIZE, Seed);

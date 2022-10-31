@@ -1,4 +1,4 @@
-from typing import Iterable, Callable, Set, Tuple, TypeVar, Optional, Dict
+from typing import Iterable, Callable, Iterator, Set, Tuple, TypeVar, Optional, Dict
 import os
 import subprocess
 import logging
@@ -184,3 +184,7 @@ def parallel_subprocess(
         if on_exit is not None:
             ret[i] = on_exit(p)
     return ret
+
+
+def subdirs_of(dir: str) -> Iterator[os.DirEntry]:
+    return (f for f in os.scandir(dir) if f.is_dir())

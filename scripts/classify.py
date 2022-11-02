@@ -66,7 +66,8 @@ class CrashError:
             .replace(args[0], os.path.basename(args[0])) \
             .replace(args[-1], 'ir.bc')
 
-        self.message_minimized = re.sub(r'0x[0-9a-f]+', '0x_', self.message_minimized)
+        self.message_minimized = re.sub(
+            r'0x[0-9a-f]+', '0x_', self.message_minimized)
 
         # extract failed pass and stack trace
         self.failed_pass = None
@@ -94,7 +95,8 @@ class CrashError:
             self.subtype = matches[0]
         elif self.message_raw.startswith('LLVM ERROR: Cannot select:'):
             self.type = 'dag-instruction-selection'
-            match = re.match(r'LLVM ERROR: Cannot select:.+ = ([a-z_]+(<.+>)?) ', message_lines[0])
+            match = re.match(
+                r'LLVM ERROR: Cannot select:.+ = ([a-zA_Z_]+(<.+>)?) ', message_lines[0])
             assert match is not None
             self.subtype = match.group(1).split('<')[0]
         else:
@@ -178,7 +180,8 @@ def classify(cmd: List[str], input_dir: str, output_dir: str, force: bool, verbo
 
     parallel_subprocess(
         iter=list(filter(
-            lambda file_name: file_name.split('.')[-1] not in ['md', 'txt', 's'],
+            lambda file_name: file_name.split(
+                '.')[-1] not in ['md', 'txt', 's'],
             os.listdir(input_dir)
         )),
         jobs=MAX_SUBPROCESSES,
@@ -203,7 +206,8 @@ def main() -> None:
     parser.add_argument('-f', '--force', action='store_true',
                         help="force delete the output directory if it already exists.")
     args = parser.parse_args()
-    classify(args.cmd.split(' '), args.input, args.output, args.force, verbose=True)
+    classify(args.cmd.split(' '), args.input,
+             args.output, args.force, verbose=True)
 
 
 if __name__ == "__main__":

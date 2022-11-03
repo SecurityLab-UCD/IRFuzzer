@@ -14,25 +14,29 @@ def merge_subdirs_by_symlink(src: str, dest: str) -> None:
 
                     os.makedirs(symlink_dest_dir, exist_ok=True)
 
-                    i = max([
-                        -1,
-                        *(
-                            int(dir_entry.name)
-                            for dir_entry in subdirs_of(symlink_dest_dir)
-                        )
-                    ])
+                    i = max(
+                        [
+                            -1,
+                            *(
+                                int(dir_entry.name)
+                                for dir_entry in subdirs_of(symlink_dest_dir)
+                            ),
+                        ]
+                    )
 
-                    for inner_dir in sorted(subdirs_of(arch_dir.path), key=lambda dir: int(dir.name)):
+                    for inner_dir in sorted(
+                        subdirs_of(arch_dir.path), key=lambda dir: int(dir.name)
+                    ):
                         i += 1
-                        symlink_src = os.path.join(
-                            '../../../..', inner_dir.path
-                        )
-                        symlink_dest = os.path.join(
-                            symlink_dest_dir, str(i)
-                        )
+                        symlink_src = os.path.join("../../../..", inner_dir.path)
+                        symlink_dest = os.path.join(symlink_dest_dir, str(i))
                         print(
-                            symlink_dest, " -> ", symlink_src,
-                            sep="\t", end="\t", flush=True
+                            symlink_dest,
+                            " -> ",
+                            symlink_src,
+                            sep="\t",
+                            end="\t",
+                            flush=True,
                         )
                         os.symlink(symlink_src, symlink_dest)
                         print("DONE", flush=True)
@@ -40,7 +44,7 @@ def merge_subdirs_by_symlink(src: str, dest: str) -> None:
 
 def main() -> None:
     # make sure current working directory is archive before running this
-    merge_subdirs_by_symlink('.', './combined')
+    merge_subdirs_by_symlink(".", "./combined")
 
 
 if __name__ == "__main__":

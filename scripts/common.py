@@ -6,7 +6,7 @@ from tqdm import tqdm
 
 MATCHER_TABLE_SIZE_DAGISEL = {
     "AArch64": 451325,
-    "AMDGPU":  479297,
+    "AMDGPU": 479297,
     "ARM": 200565,
     "AVR": 2840,
     "BPF": 3586,
@@ -121,7 +121,7 @@ TRIPLE_ARCH_MAP_TIER_2 = {
     "sparcv9": "Sparc",
     "thumbeb": "ARM",
     "wasm32": "WebAssembly",
-    "xcore": "XCore"
+    "xcore": "XCore",
 }
 
 LLVM_COMMIT = 66046e6
@@ -131,14 +131,15 @@ def __verify():
     FUZZING_HOME = os.getenv("FUZZING_HOME")
     if FUZZING_HOME == None:
         logging.error(
-            "$FUZZING_HOME not set, why am I running? Did you install correctly?")
+            "$FUZZING_HOME not set, why am I running? Did you install correctly?"
+        )
         return
     if os.getcwd() != FUZZING_HOME:
         logging.warning("I am not in $FUZZING_HOME now.")
     LLVM = os.getenv("LLVM")
     if LLVM == None:
         logging.warn("$LLVM not set, using llvm-project as default.")
-        LLVM = 'llvm-project'
+        LLVM = "llvm-project"
     LLVM = os.path.join(FUZZING_HOME, LLVM)
 
     # TODO: Verify that current commit in LLVM is COMMIT.
@@ -146,17 +147,17 @@ def __verify():
 
 __verify()
 
-__T = TypeVar('__T')
-__R = TypeVar('__R')
+__T = TypeVar("__T")
+__R = TypeVar("__R")
 
 
 def parallel_subprocess(
-        iter: Iterable[__T],
-        jobs: int,
-        subprocess_creator: Callable[[__T], subprocess.Popen],
-        on_exit: Optional[Callable[[subprocess.Popen], __R]] = None
+    iter: Iterable[__T],
+    jobs: int,
+    subprocess_creator: Callable[[__T], subprocess.Popen],
+    on_exit: Optional[Callable[[subprocess.Popen], __R]] = None,
 ) -> Dict[__T, __R]:
-    '''
+    """
     Creates `jobs` subprocesses that run in parallel.
     `iter` contains input that is send to each subprocess.
     `subprocess_creator` creates the subprocess and returns a `Popen`.
@@ -164,7 +165,7 @@ def parallel_subprocess(
     The return valus is a dictionary of inputs and outputs.
 
     User has to guarantee elements in `iter` is unique, or the output may be incorrect.
-    '''
+    """
     ret = {}
     processes: Set[Tuple[subprocess.Popen, __T]] = set()
     for input in tqdm(iter):
@@ -172,8 +173,7 @@ def parallel_subprocess(
         if len(processes) >= jobs:
             # wait for a child process to exit
             os.wait()
-            exited_processes = [
-                (p, i) for p, i in processes if p.poll() is not None]
+            exited_processes = [(p, i) for p, i in processes if p.poll() is not None]
             for p, i in exited_processes:
                 processes.remove((p, i))
                 if on_exit is not None:

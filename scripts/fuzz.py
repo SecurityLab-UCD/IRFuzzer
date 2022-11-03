@@ -49,14 +49,14 @@ def fuzz(argv):
         for triple, arch in triple_arch_map.items():
             if arch not in matcher_table_size:
                 logging.info(
-                    f"Can't find {triple}({arch})s' matcher table size, not fuzzing ")
+                    f"Can't find {triple}({arch})s' matcher table size, not fuzzing "
+                )
                 continue
             tuples.append((r, triple, arch))
 
     def process_creator(t):
         r, triple, arch = t
-        logging.info(
-            f"Fuzzing {triple}({arch}) -- {r}.")
+        logging.info(f"Fuzzing {triple}({arch}) -- {r}.")
         name = f"{r}"
         verbose_name = f"{argv.fuzzer}-{isel}-{triple}-{r}"
         proj_dir = f"{argv.output}/{argv.fuzzer}/{isel}/{triple}/{name}"
@@ -65,36 +65,36 @@ def fuzz(argv):
 
         if argv.fuzzer == "aflplusplus":
             dockerimage = "aflplusplus"
-            fuzzer_specific = f'''
+            fuzzer_specific = f"""
             export AFL_CUSTOM_MUTATOR_ONLY=0
             export AFL_CUSTOM_MUTATOR_LIBRARY="";
-            '''
+            """
         elif argv.fuzzer == "libfuzzer":
             dockerimage = "libfuzzer"
-            fuzzer_specific = f'''
+            fuzzer_specific = f"""
             export AFL_CUSTOM_MUTATOR_ONLY=1
             export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLFuzzMutate.so;
-            '''
+            """
         elif argv.fuzzer == "aflisel":
             dockerimage = "aflplusplus-isel"
-            fuzzer_specific = f'''
+            fuzzer_specific = f"""
             export AFL_CUSTOM_MUTATOR_ONLY=1
             export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so;
-            '''
+            """
             fuzz_cmd = fuzz_cmd.split(" ")
             fuzz_cmd.insert(-1, "-w")
             fuzz_cmd = " ".join(fuzz_cmd)
         else:
             logging.warn("UNREACHABLE")
-        env_exporting = f'''
+        env_exporting = f"""
             {fuzzer_specific}
             export TRIPLE={triple};
             export global_isel={global_isel};
             export MATCHER_TABLE_SIZE={matcher_table_size[arch]};
-        '''
+        """
 
         config_file = f"{proj_dir}/config"
-        config_logging = f'''
+        config_logging = f"""
             mkdir -p {proj_dir}
             echo "Fuzzing instruction selection." > {config_file}
             echo "FUZZER: {argv.fuzzer}" >> {config_file}
@@ -105,9 +105,9 @@ def fuzz(argv):
             echo "TIMEOUT: {argv.time}" >> {config_file}
             echo "CMD: {fuzz_cmd}" >> {config_file}
             echo "TIMEOUT: {argv.time}" >> {config_file}
-        '''
-        if argv.type == 'screen':
-            command = f'''
+        """
+        if argv.type == "screen":
+            command = f"""
             {env_exporting}
             export OUTPUT={proj_dir}
 
@@ -119,9 +119,9 @@ def fuzz(argv):
 
             sleep {argv.time+60}
             exit
-            '''.encode()
-        elif argv.type == 'docker':
-            command = f'''
+            """.encode()
+        elif argv.type == "docker":
+            command = f"""
             export FUZZING_HOME=/AFLplusplus-isel
             export OUTPUT=$FUZZING_HOME/fuzzing
 
@@ -138,11 +138,12 @@ def fuzz(argv):
                 sleep 1000
             done
             exit
-            '''.encode()
+            """.encode()
         else:
             logging.fatal("UNREACHABLE, type not set")
         process = subprocess.Popen(
-            ['/bin/bash', '-c', command], stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+            ["/bin/bash", "-c", command], stdout=subprocess.PIPE, stdin=subprocess.PIPE
+        )
         # Sleep for 100ms so aflplusplus has time to bind core. Otherwise two fuzzers may bind to the same core.
         subprocess.run(["sleep", "1"])
         return process
@@ -151,35 +152,71 @@ def fuzz(argv):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description='Run all fuzzers')
-    parser.add_argument('-i', '--input', type=str, default="./seeds/",
-                        help='The directory containing input seeds, default to ./seeds')
-    parser.add_argument('-o', '--output', type=str, default="./fuzzing",
-                        help="The directory to store all organized ./fuzzing/")
-    parser.add_argument('--force', action='store_true',
-                        help="force delete the output directory if it already exists.")
-    parser.add_argument('--fuzzer', choices=['aflplusplus', 'libfuzzer', 'aflisel'],
-                        required=True, help="The fuzzer we are using for fuzzing.")
-    parser.add_argument('-j', '--jobs', type=int, default=80,
-                        help="Max number of jobs parallel, default 40.")
-    parser.add_argument('-r', '--repeat', type=int, default=3,
-                        help="Numbers to repeat one experiment.")
-    parser.add_argument('--isel', choices=["gisel", "dagisel"],
-                        required=True, help="The isel alorighm you want to run.")
-    parser.add_argument('-t', '--time', type=str,
-                        default='5m', help="Total time to run fuzzers")
-    parser.add_argument('--tier', type=int, choices=[0, 1, 2],
-                        help="The set of triples to test. 0 corresponds to everything, 1 and 2 corresponds to Tier 1 and Tier 2, see common.py for more. Will be overriden by `--set`")
+    parser = argparse.ArgumentParser(description="Run all fuzzers")
     parser.add_argument(
-        '--set', type=str, help="Select the triples to run.")
-    parser.add_argument('--type', type=str, required=True,
-                        choices=['screen', 'docker'], help="The method to start fuzzing cluster.")
+        "-i",
+        "--input",
+        type=str,
+        default="./seeds/",
+        help="The directory containing input seeds, default to ./seeds",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default="./fuzzing",
+        help="The directory to store all organized ./fuzzing/",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="force delete the output directory if it already exists.",
+    )
+    parser.add_argument(
+        "--fuzzer",
+        choices=["aflplusplus", "libfuzzer", "aflisel"],
+        required=True,
+        help="The fuzzer we are using for fuzzing.",
+    )
+    parser.add_argument(
+        "-j",
+        "--jobs",
+        type=int,
+        default=80,
+        help="Max number of jobs parallel, default 40.",
+    )
+    parser.add_argument(
+        "-r", "--repeat", type=int, default=3, help="Numbers to repeat one experiment."
+    )
+    parser.add_argument(
+        "--isel",
+        choices=["gisel", "dagisel"],
+        required=True,
+        help="The isel alorighm you want to run.",
+    )
+    parser.add_argument(
+        "-t", "--time", type=str, default="5m", help="Total time to run fuzzers"
+    )
+    parser.add_argument(
+        "--tier",
+        type=int,
+        choices=[0, 1, 2],
+        help="The set of triples to test. 0 corresponds to everything, 1 and 2 corresponds to Tier 1 and Tier 2, see common.py for more. Will be overriden by `--set`",
+    )
+    parser.add_argument("--set", type=str, help="Select the triples to run.")
+    parser.add_argument(
+        "--type",
+        type=str,
+        required=True,
+        choices=["screen", "docker"],
+        help="The method to start fuzzing cluster.",
+    )
     args = parser.parse_args()
 
     def convert_to_seconds(s: str) -> int:
-        seconds_per_unit = {"s": 1, "m": 60,
-                            "h": 3600, "d": 86400, "w": 604800}
+        seconds_per_unit = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
         return int(s[:-1]) * seconds_per_unit[s[-1]]
+
     args.time = convert_to_seconds(args.time)
 
     fuzz(args)

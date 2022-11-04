@@ -211,6 +211,21 @@ static int ExecuteFilesOnyByOne(int argc, char **argv) {
   return 0;
 }
 
+#define GET_TARGET_INFO_FROM_ENV_OR_EXIT(ENV_NAME, ARG_NAME, ARGV)             \
+  {                                                                            \
+    char *ARG_NAME = getenv(#ARG_NAME);                                        \
+    if (ARG_NAME) {                                                            \
+      static char arg_##ARG_NAME[256];                                         \
+      memset(arg_##ARG_NAME, 0, 256);                                          \
+      Printf("%s: %s", #ENV_NAME, arg_##ARG_NAME);                             \
+      sprintf(arg_##ARG_NAME, "-m%s=%s", #ARG_NAME, arg_##ARG_NAME);           \
+      ARGV.push_back(arg_##ARG_NAME);                                          \
+    } else {                                                                   \
+      Printf("%s not found, abort.\n", #ENV_NAME);                             \
+      exit(1);                                                                 \
+    }                                                                          \
+  }
+
 int main(int argc, char **argv) {
   Printf("======================= INFO =========================\n"
          "This binary is built for AFL-fuzz.\n"
@@ -229,44 +244,24 @@ int main(int argc, char **argv) {
   maybe_close_fd_mask();
   if (LLVMFuzzerInitialize) {
     std::vector<char *> Argv({argv[0]});
-    int is_gisel = 0;
     char *g = getenv("GLOBAL_ISEL");
     if (g && g[0] == '1') {
       Printf("Fuzzing GlobalISel\n");
-      is_gisel = 1;
       Argv.push_back((char *)"-global-isel");
     } else {
       Printf("Fuzzing DAGISel\n");
-      is_gisel = 0;
     }
-    char *triple = getenv("TRIPLE");
-    if (triple) {
-      static char arg[256];
-      memset(arg, 0, 256);
-      Printf("Fuzzing %s\n", triple);
-      sprintf(arg, "-mtriple=%s", triple);
-      Argv.push_back(arg);
-    } else {
-      Printf("TRIPLE not set, abort.\n");
-      exit(1);
-    }
-    char *tbl_size;
-    if (tbl_size = getenv("MATCHER_TABLE_SIZE")) {
+
+    GET_TARGET_INFO_FROM_ENV_OR_EXIT(TRIPLE, triple, Argv);
+    GET_TARGET_INFO_FROM_ENV_OR_EXIT(CPU, cpu, Argv);
+    GET_TARGET_INFO_FROM_ENV_OR_EXIT(ATTR, attr, Argv);
+
+    char *tbl_size = getenv("MATCHER_TABLE_SIZE");
+    if (tbl_size) {
       Printf("MATCHER_TABLE_SIZE set to %s", tbl_size);
     } else {
-      char tbl_name[255];
-      memset(tbl_name, 0, 255);
-      strcat(tbl_name, triple);
-      strcat(tbl_name, is_gisel ? "_GISEL_" : "_DAG_");
-      strcat(tbl_name, "MATCHER_TABLE_SIZE");
-      Printf("MATCHER_TABLE_SIZE not set, looking for %s\n", tbl_name);
-      if (tbl_size = getenv(tbl_name)) {
-        Printf("MATCHER_TABLE_SIZE found, set to %s\n", tbl_size);
-        setenv("MATCHER_TABLE_SIZE", tbl_size, 1);
-      } else {
-        Printf("MATCHER_TABLE_SIZE not found, abort.\n");
-        exit(1);
-      }
+      Printf("MATCHER_TABLE_SIZE not found, abort.\n");
+      exit(1);
     }
     char **AArgv = Argv.data();
     int AArgc = Argv.size();

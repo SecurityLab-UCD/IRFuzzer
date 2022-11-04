@@ -6,6 +6,38 @@ import os
 from typing import List
 
 
+def fetch_target_info(triple):
+    assert triple in common.TRIPLE_ARCH_MAP
+    # TODO: Support all Tier 1 attr and cpu. Only select most advanced for now.
+    if triple == "x86_64":
+        return [("alderlake", ""), ("znver3", "")]
+    if triple == "aarch64":
+        return [
+            ("apple-a16", ""),
+            ("cortex-a710", ""),
+            ("exynos-m5", ""),
+            ("neoverse-v2", ""),
+            ("thunderxt88", ""),
+        ]
+    if triple == "amdgcn":
+        # https://videocardz.com/newz/amds-ryzen-radeon-7000-rdna3-gpu-codenames-revealed-plum-bonito-wheat-nas-hotpink-bonefish-and-pink-sardine
+        return [("gfx1100", ""), ("gfx1036", ""), ("gfx1010", "")]
+    if triple == "arm":
+        return [("cortex-x1", ""), ("cortex-r8", ""), ("cortex-m55", "")]
+    if triple == "mips64":
+        return [("mips64r6", "")]
+    if triple == "nvptx64":
+        # TODO: Figure out what sm_90 means.
+        return [("sm_90", "")]
+    if triple == "ppc64":
+        return [("pwr10", "")]
+    if triple == "riscv64":
+        return [("sifive-u74", ""), ("sifive-e76", "")]
+    if triple == "wasm64":
+        return [("bleeding-edge", "")]
+    return ("", "")
+
+
 def fuzz(argv):
     argv.output = os.path.abspath(argv.output)
     if os.path.exists(argv.output):
@@ -63,6 +95,8 @@ def fuzz(argv):
 
         fuzz_cmd = f"timeout --signal=2 --foreground {argv.time} $FUZZING_HOME/$AFL/afl-fuzz -i $FUZZING_HOME/seeds/ -o $OUTPUT $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing"
 
+        cpu, attr = fetch_target_info(triple)
+
         if argv.fuzzer == "aflplusplus":
             dockerimage = "aflplusplus"
             fuzzer_specific = f"""
@@ -88,6 +122,8 @@ def fuzz(argv):
             logging.warn("UNREACHABLE")
         env_exporting = f"""
             {fuzzer_specific}
+            export CPU={cpu};
+            export ATTR={attr};
             export TRIPLE={triple};
             export global_isel={global_isel};
             export MATCHER_TABLE_SIZE={matcher_table_size[arch]};

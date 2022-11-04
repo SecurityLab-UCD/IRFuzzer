@@ -1,5 +1,6 @@
 from typing import Iterable, List, NamedTuple
 import pandas as pd
+from matplotlib import pyplot
 import os
 from common import subdirs_of
 
@@ -92,6 +93,40 @@ def combine_last_row_of_each_experiment_data(
     )
 
 
+def generate_plots(experiments: Iterable[Experiment], dir_out: str) -> None:
+    pyplot.ioff()
+
+    for experiment in experiments:
+        figure_path = os.path.join(
+            dir_out,
+            experiment.fuzzer,
+            experiment.isel,
+            experiment.arch,
+            str(experiment.replicate_id),
+        )
+        os.makedirs(figure_path, exist_ok=True)
+
+        try:
+            experiment.data.plot(x="total_execs", y="saved_crashes").figure.savefig(
+                os.path.join(figure_path, "crashes-vs-execs.png")
+            )
+            experiment.data.plot(x="total_execs", y="shw_cvg").figure.savefig(
+                os.path.join(figure_path, "shwcvg-vs-execs.png")
+            )
+            experiment.data.plot(x="# relative_time", y="saved_crashes").figure.savefig(
+                os.path.join(figure_path, "crashes-vs-time.png")
+            )
+            experiment.data.plot(x="# relative_time", y="shw_cvg").figure.savefig(
+                os.path.join(figure_path, "shwcvg-vs-time.png")
+            )
+        except:
+            print(
+                f"ERROR: Cannot plot {experiment.fuzzer}/{experiment.isel}/{experiment.arch}/{experiment.replicate_id}"
+            )
+
+        pyplot.close()
+
+
 def main() -> None:
     df = combine_last_row_of_each_experiment_data(
         iterate_over_all_experiments(
@@ -115,6 +150,13 @@ def main() -> None:
     )
 
     df_summary.to_csv("summary.csv")
+
+    generate_plots(
+        experiments=iterate_over_all_experiments(
+            "/home/peter/isel-aflexpr/archive", allow_missing_data=True
+        ),
+        dir_out="/home/henry/isel-aflexpr-plots",
+    )
 
 
 if __name__ == "__main__":

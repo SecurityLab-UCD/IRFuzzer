@@ -103,25 +103,6 @@ def main() -> None:
         global_isel=True,
     )
 
-    # batch_classify(
-    #     'aarch64',
-    #     'amdgcn',
-    #     'nvptx',
-    #     'riscv32',
-    #     'riscv64',
-    #     'wasm32',
-    #     'wasm64',
-    #     'x86_64'
-    # )
-
-    # batch_classify(
-    #     'aarch64',
-    #     'riscv32',
-    #     'riscv64',
-    #     'x86_64',
-    #     global_isel=True
-    # )
-
 
 if __name__ == "__main__":
     main()

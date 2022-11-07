@@ -4,16 +4,18 @@ import subprocess
 import argparse
 import os
 from typing import List
+import multiprocessing
 
 
 def fuzz(argv):
     argv.output = os.path.abspath(argv.output)
     if os.path.exists(argv.output):
-        if argv.force:
-            logging.info(f"{argv.output} already exists, will force remove")
+        logging.info(f"{argv.output} already exists.")
+        if argv.on_exist == "force":
+            logging.info(f"on_exist set to {argv.on_exist}, will force remove")
             subprocess.run(["rm", "-rf", argv.output])
-        else:
-            logging.info(f"{argv.output} already exists, won't work on it.")
+        elif argv.on_exist == "abort":
+            logging.info(f"on_exist set to {argv.on_exist}, won't work on it.")
             return
 
     if argv.isel == "gisel":
@@ -25,41 +27,47 @@ def fuzz(argv):
     else:
         logging.fatal("UNREACHABLE, isel not set.")
 
-    triple_arch_map = {}
+    cpu_attr_arch_list = []
     if argv.tier == 0:
-        triple_arch_map = common.TRIPLE_ARCH_MAP
+        cpu_attr_arch_list = [
+            ("", "", triple) for triple in common.TRIPLE_ARCH_MAP.keys()
+        ]
     elif argv.tier == 1:
-        triple_arch_map = common.TRIPLE_ARCH_MAP_TIER_1
+        cpu_attr_arch_list = common.CPU_ATTR_ARCH_LIST_TIER_1
     elif argv.tier == 2:
-        triple_arch_map = common.TRIPLE_ARCH_MAP_TIER_2
+        cpu_attr_arch_list = common.CPU_ATTR_ARCH_LIST_TIER_2
+    elif argv.tier == 3:
+        cpu_attr_arch_list = common.CPU_ATTR_ARCH_LIST_TIER_3
     elif argv.set is not None:
-        triple_arch_map = {}
-        for triple in argv.set.split(" "):
-            try:
-                triple_arch_map[triple] = common.TRIPLE_ARCH_MAP[triple]
-            except KeyError:
-                logging.fatal(f"No such triple: {triple}, abort.")
-                return 0
+        cpu_attr_arch_list = [tuple(s.split(" ")) for s in argv.set]
+        # TODO: Also do some sanity check for the set we are given.
+
     else:
         logging.fatal("UNREACHABLE, both tier and set is not specified.")
 
     isel = "dagisel" if global_isel == 0 else "gisel"
     tuples = []
     for r in range(argv.repeat):
-        for triple, arch in triple_arch_map.items():
+        for (cpu, attr, triple) in cpu_attr_arch_list:
+            arch = common.TRIPLE_ARCH_MAP[triple]
             if arch not in matcher_table_size:
                 logging.info(
                     f"Can't find {triple}({arch})s' matcher table size, not fuzzing "
                 )
                 continue
-            tuples.append((r, triple, arch))
+            tuples.append((r + argv.offset, cpu, attr, triple, arch))
 
     def process_creator(t):
-        r, triple, arch = t
-        logging.info(f"Fuzzing {triple}({arch}) -- {r}.")
+        r, cpu, attr, triple, arch = t
+        logging.info(f"Fuzzing {cpu} {attr} {triple} {arch} -- {r}.")
+        target = triple
+        if cpu != "":
+            target += "-" + cpu
+        if attr != "":
+            target += "-" + attr
         name = f"{r}"
-        verbose_name = f"{argv.fuzzer}-{isel}-{triple}-{r}"
-        proj_dir = f"{argv.output}/{argv.fuzzer}/{isel}/{triple}/{name}"
+        verbose_name = f"{argv.fuzzer}-{isel}-{target}-{r}"
+        proj_dir = f"{argv.output}/{argv.fuzzer}/{isel}/{target}/{name}"
 
         fuzz_cmd = f"timeout --signal=2 --foreground {argv.time} $FUZZING_HOME/$AFL/afl-fuzz -i $FUZZING_HOME/seeds/ -o $OUTPUT $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing"
 
@@ -88,6 +96,8 @@ def fuzz(argv):
             logging.warn("UNREACHABLE")
         env_exporting = f"""
             {fuzzer_specific}
+            export CPU={cpu};
+            export ATTR={attr};
             export TRIPLE={triple};
             export global_isel={global_isel};
             export MATCHER_TABLE_SIZE={matcher_table_size[arch]};
@@ -98,7 +108,8 @@ def fuzz(argv):
             mkdir -p {proj_dir}
             echo "Fuzzing instruction selection." > {config_file}
             echo "FUZZER: {argv.fuzzer}" >> {config_file}
-            echo "FORCE_REMOVAL: {argv.force}" >> {config_file}
+            echo "OFFSET: {argv.offset}" >> {config_file}
+            echo "FORCE_REMOVAL: {argv.on_exist}" >> {config_file}
             echo "MATCHER_TABLE_SIZE: $MATCHER_TABLE_SIZE" >> {config_file}
             echo "AFL_CUSTOM_MUTATOR_ONLY: $AFL_CUSTOM_MUTATOR_ONLY" >> {config_file}
             echo "AFL_CUSTOM_MUTATOR_LIBRARY: $AFL_CUSTOM_MUTATOR_LIBRARY" >> {config_file}
@@ -168,9 +179,10 @@ def main() -> None:
         help="The directory to store all organized ./fuzzing/",
     )
     parser.add_argument(
-        "--force",
-        action="store_true",
-        help="force delete the output directory if it already exists.",
+        "--on_exist",
+        default="abort",
+        choices=["abort", "force", "ignore"],
+        help="Our action if the output directory already exists",
     )
     parser.add_argument(
         "--fuzzer",
@@ -182,8 +194,8 @@ def main() -> None:
         "-j",
         "--jobs",
         type=int,
-        default=80,
-        help="Max number of jobs parallel, default 40.",
+        default=multiprocessing.cpu_count(),
+        help="Max number of jobs parallel, default to all cores.",
     )
     parser.add_argument(
         "-r", "--repeat", type=int, default=3, help="Numbers to repeat one experiment."
@@ -200,10 +212,16 @@ def main() -> None:
     parser.add_argument(
         "--tier",
         type=int,
-        choices=[0, 1, 2],
+        choices=[0, 1, 2, 3],
         help="The set of triples to test. 0 corresponds to everything, 1 and 2 corresponds to Tier 1 and Tier 2, see common.py for more. Will be overriden by `--set`",
     )
-    parser.add_argument("--set", type=str, help="Select the triples to run.")
+    parser.add_argument(
+        "--offset",
+        type=int,
+        help="The offset that we starts counting experiments.",
+        default=0,
+    )
+    parser.add_argument("--set", nargs="+", type=str, help="Select the triples to run.")
     parser.add_argument(
         "--type",
         type=str,

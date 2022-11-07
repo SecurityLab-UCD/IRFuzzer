@@ -78,51 +78,83 @@ TRIPLE_ARCH_MAP = {
     "xcore": "XCore",
 }
 
-TRIPLE_ARCH_MAP_TIER_1 = {
-    "aarch64": "AArch64",
-    "aarch64_32": "AArch64",
-    "amdgcn": "AMDGPU",
-    "arm64": "ARM",
-    "bpf": "BPF",
-    "hexagon": "Hexagon",
-    "mips64": "Mips",
-    "nvptx64": "NVPTX",
-    "ppc64": "PPC",
-    "riscv64": "RISCV",
-    "systemz": "SystemZ",
-    "thumb": "ARM",
-    "ve": "VE",
-    "wasm64": "WebAssembly",
-    "i686": "X86",
-    "x86_64": "X86",
-}
+CPU_ATTR_ARCH_LIST_TIER_1 = [
+    ("", "", "aarch64"),
+    ("", "", "aarch64_32"),
+    ("", "", "amdgcn"),
+    ("", "", "arm64"),
+    ("", "", "bpf"),
+    ("", "", "hexagon"),
+    ("", "", "mips64"),
+    ("", "", "nvptx64"),
+    ("", "", "ppc64"),
+    ("", "", "riscv64"),
+    ("", "", "systemz"),
+    ("", "", "thumb"),
+    ("", "", "ve"),
+    ("", "", "wasm64"),
+    ("", "", "i686"),
+    ("", "", "x86_64"),
+]
 
-TRIPLE_ARCH_MAP_TIER_2 = {
-    "aarch64_be": "AArch64",
-    "arm": "ARM",
-    "arm64_32": "ARM",
-    "armeb": "ARM",
-    "avr": "AVR",
-    "bpfeb": "BPF",
-    "bpfel": "BPF",
-    "lanai": "Lanai",
-    "mips": "Mips",
-    "mips64el": "Mips",
-    "mipsel": "Mips",
-    "msp430": "MSP430",
-    "nvptx": "NVPTX",
-    "ppc32": "PPC",
-    "ppc32le": "PPC",
-    "ppc64le": "PPC",
-    "r600": "R600",
-    "riscv32": "RISCV",
-    "sparc": "Sparc",
-    "sparcel": "Sparc",
-    "sparcv9": "Sparc",
-    "thumbeb": "ARM",
-    "wasm32": "WebAssembly",
-    "xcore": "XCore",
-}
+CPU_ATTR_ARCH_LIST_TIER_2 = [
+    ("", "", "aarch64_be"),
+    ("", "", "arm"),
+    ("", "", "arm64_32"),
+    ("", "", "armeb"),
+    ("", "", "avr"),
+    ("", "", "bpfeb"),
+    ("", "", "bpfel"),
+    ("", "", "lanai"),
+    ("", "", "mips"),
+    ("", "", "mips64el"),
+    ("", "", "mipsel"),
+    ("", "", "msp430"),
+    ("", "", "nvptx"),
+    ("", "", "ppc32"),
+    ("", "", "ppc32le"),
+    ("", "", "ppc64le"),
+    ("", "", "r600"),
+    ("", "", "riscv32"),
+    ("", "", "sparc"),
+    ("", "", "sparcel"),
+    ("", "", "sparcv9"),
+    ("", "", "thumbeb"),
+    ("", "", "wasm32"),
+    ("", "", "xcore"),
+]
+
+
+CPU_ATTR_ARCH_LIST_TIER_3 = [
+    # Intel
+    ("alderlake", "", "x86_64"),
+    ("sapphirerapids", "", "x86_64"),
+    # AMD
+    ("znver3", "", "x86_64"),
+    # Apple
+    ("apple-a16", "", "aarch64"),
+    ("apple-m2", "", "aarch64"),
+    # Samsung
+    ("exynos-m5", "", "aarch64"),
+    # ARM
+    ("cortex-a710", "", "aarch64"),
+    # ("cortex-x2", "", "aarch64"),
+    ("cortex-r82", "", "aarch64"),
+    ("cortex-m55", "", "aarch64"),
+    # ("neoverse-v2", "", "aarch64"),
+    # AMD
+    ("gfx1100", "", "amdgcn"),
+    ("gfx1036", "", "amdgcn"),
+    ("gfx1010", "", "amdgcn"),
+    # Qualcomm
+    ("hexagonv69", "", "hexagon"),
+    # Nvidia
+    ("sm_90", "", "nvptx64"),
+    # SiFive
+    ("sifive-u74", "", "riscv64"),
+    # WASM
+    ("bleeding-edge", "", "wasm64"),
+]
 
 LLVM_COMMIT = 66046e6
 

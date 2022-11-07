@@ -213,12 +213,12 @@ static int ExecuteFilesOnyByOne(int argc, char **argv) {
 
 #define GET_TARGET_INFO_FROM_ENV_OR_EXIT(ENV_NAME, ARG_NAME, ARGV)             \
   {                                                                            \
-    char *ARG_NAME = getenv(#ARG_NAME);                                        \
+    char *ARG_NAME = getenv(#ENV_NAME);                                        \
     if (ARG_NAME) {                                                            \
       static char arg_##ARG_NAME[256];                                         \
       memset(arg_##ARG_NAME, 0, 256);                                          \
-      Printf("%s: %s", #ENV_NAME, arg_##ARG_NAME);                             \
-      sprintf(arg_##ARG_NAME, "-m%s=%s", #ARG_NAME, arg_##ARG_NAME);           \
+      sprintf(arg_##ARG_NAME, "-m%s=%s", #ARG_NAME, ARG_NAME);                 \
+      Printf("%s: %s\n", #ENV_NAME, arg_##ARG_NAME);                           \
       ARGV.push_back(arg_##ARG_NAME);                                          \
     } else {                                                                   \
       Printf("%s not found, abort.\n", #ENV_NAME);                             \

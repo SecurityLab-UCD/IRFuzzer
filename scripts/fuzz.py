@@ -103,27 +103,11 @@ def fuzz(argv):
             export MATCHER_TABLE_SIZE={matcher_table_size[arch]};
         """
 
-        config_file = f"{proj_dir}/config"
-        config_logging = f"""
-            mkdir -p {proj_dir}
-            echo "Fuzzing instruction selection." > {config_file}
-            echo "FUZZER: {argv.fuzzer}" >> {config_file}
-            echo "OFFSET: {argv.offset}" >> {config_file}
-            echo "FORCE_REMOVAL: {argv.on_exist}" >> {config_file}
-            echo "MATCHER_TABLE_SIZE: $MATCHER_TABLE_SIZE" >> {config_file}
-            echo "AFL_CUSTOM_MUTATOR_ONLY: $AFL_CUSTOM_MUTATOR_ONLY" >> {config_file}
-            echo "AFL_CUSTOM_MUTATOR_LIBRARY: $AFL_CUSTOM_MUTATOR_LIBRARY" >> {config_file}
-            echo "TIMEOUT: {argv.time}" >> {config_file}
-            echo "CMD: {fuzz_cmd}" >> {config_file}
-            echo "TIMEOUT: {argv.time}" >> {config_file}
-        """
         if argv.type == "screen":
             command = f"""
             {env_exporting}
             export OUTPUT={proj_dir}
-
-            {config_logging}
-
+            mkdir -p {proj_dir}
             echo "START_TIME: $(date)" >> {config_file}
             screen -S {verbose_name} -dm bash -c "{fuzz_cmd}"
             echo "END_TIME: $(date)" >> {config_file}
@@ -133,11 +117,8 @@ def fuzz(argv):
             """.encode()
         elif argv.type == "docker":
             command = f"""
-            export FUZZING_HOME=/AFLplusplus-isel
             export OUTPUT=$FUZZING_HOME/fuzzing
-
-            {config_logging}
-
+            mkdir -p {proj_dir}
             docker run --cpus=1 --name={verbose_name} --rm --mount type=tmpfs,tmpfs-size=1G,dst=$OUTPUT --env OUTPUT=$OUTPUT -v {proj_dir}:/output {dockerimage} bash -c "
                 {env_exporting}
                 {fuzz_cmd}

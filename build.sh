@@ -60,7 +60,7 @@ then
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=ON \
-            -DLLVM_CCACHE_BUILD=OFF \
+            -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_PROJECTS="mlir" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
@@ -83,7 +83,8 @@ then
     mkdir -p $LLVM/build-release
     cd $LLVM/build-release
     cmake  -GNinja \
-            -DLLVM_ENABLE_PROJECTS="mlir" \
+            -DBUILD_SHARED_LIBS=ON \
+            -DLLVM_CCACHE_BUILD=ON \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -103,7 +104,8 @@ if [ ! -f /.dockerenv ]; then
         mkdir -p $LLVM/build-debug
         cd $LLVM/build-debug
         cmake  -GNinja \
-                -DLLVM_ENABLE_PROJECTS="mlir" \
+                -DBUILD_SHARED_LIBS=ON \
+                -DLLVM_CCACHE_BUILD=ON \
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DCMAKE_BUILD_TYPE=Debug \

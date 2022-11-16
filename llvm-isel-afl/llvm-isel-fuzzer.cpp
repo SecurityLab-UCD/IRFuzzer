@@ -84,6 +84,7 @@ extern "C" LLVM_ATTRIBUTE_USED int LLVMFuzzerInitialize(int *argc,
                                                         char ***argv) {
   EnableDebugBuffering = true;
 
+  /// TODO: Only init the one we are fuzzing, would that meke it faster?
   InitializeAllTargets();
   InitializeAllTargetMCs();
   InitializeAllAsmPrinters();

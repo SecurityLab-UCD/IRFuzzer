@@ -165,6 +165,21 @@ def get_summary(args):
 
     df_summary.to_csv(outpath)
 
+def get_data_slice(args):
+    if args.data == []:
+        logging.error("Data not set, abort")
+        exit(1)
+    df = combine_last_row_of_each_experiment_data(
+        iterate_over_all_experiments(
+            args.input, allow_missing_data=True
+        ),
+        columns=args.data
+    )
+    df_summary = (df.drop(columns=["replicate"])
+        .groupby(["fuzzer", "isel", "arch"])
+        .agg(["mean"])
+    )
+    print(df_summary)
 def main() -> None:
 
     parser = argparse.ArgumentParser(description="Process fuzzing output")
@@ -186,9 +201,17 @@ def main() -> None:
         "-t",
         "--type",
         type=str,
-        choices=["LastCol", "Summary", "Plot"],
+        choices=["LastCol", "Summary", "Plot", "Mann", "Data"],
         required=True,
         help="Type of the job you want me to do.",
+    )
+    parser.add_argument(
+        "-d",
+        "--data",
+        default=[],
+        nargs="+", 
+        type=str,
+        help="Type of data you want to show."
     )
     
     args = parser.parse_args()
@@ -197,10 +220,11 @@ def main() -> None:
         if args.input == None:
             logging.error(f"Input directory not set, set --input or {IRFUZZER_DATA_ENV}")
             exit(1)
-    if os.path.exists(args.output):
-        logging.warning(f"{args.output} exists, removing.")
-        subprocess.run(["rm", "-rf", args.output])
-    os.mkdir(args.output)
+    if args.type != "Data":
+        if os.path.exists(args.output):
+            logging.warning(f"{args.output} exists, removing.")
+            subprocess.run(["rm", "-rf", args.output])
+        os.mkdir(args.output)
 
     if args.type == "LastCol":
         get_last_col(args)
@@ -213,6 +237,12 @@ def main() -> None:
             ),
             dir_out=args.output,
         )
+    elif args.type == "Mann":
+        # Mann Whitney U Test to tell if we are statically significant.
+        pass
+    elif args.type == "Data":
+        get_data_slice(args)
+
 
 if __name__ == "__main__":
     logging.basicConfig()

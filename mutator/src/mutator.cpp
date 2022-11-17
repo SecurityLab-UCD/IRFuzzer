@@ -52,13 +52,13 @@ void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
   oldoutfile.close();
 }
 
-void InsertVecGetter(std::vector<TypeGetter> &Types,
-                     std::vector<TypeGetter> EleTyGetters,
-                     std::vector<int> lengths) {
-  for (auto EleTyGetter : EleTyGetters) {
-    for (int length : lengths) {
-      Types.push_back([EleTyGetter, length](LLVMContext &C) {
-        return VectorType::get(EleTyGetter(C), length, false);
+void addVectorTypeGetters(std::vector<TypeGetter> &Types) {
+  int VectorLength[] = {1, 2, 4, 8, 16, 32};
+  std::vector<TypeGetter> BasicTypeGetters(Types);
+  for (auto typeGetter : BasicTypeGetters) {
+    for (int length : VectorLength) {
+      Types.push_back([typeGetter, length](LLVMContext &C) {
+        return VectorType::get(typeGetter(C), length, false);
       });
     }
   }
@@ -68,20 +68,21 @@ void InsertVecGetter(std::vector<TypeGetter> &Types,
 /// Type* getStructType(Context& C);
 
 void createISelMutator() {
-  std::vector<TypeGetter> Types = {
-      Type::getInt1Ty,  Type::getInt8Ty,  Type::getInt16Ty, Type::getHalfTy,
-      Type::getInt32Ty, Type::getFloatTy, Type::getInt64Ty, Type::getDoubleTy,
-  };
-  InsertVecGetter(Types, {Type::getInt1Ty}, {32, 64, 256});
-  InsertVecGetter(Types, {Type::getInt8Ty}, {6, 8, 16, 32});
-  InsertVecGetter(Types, {Type::getInt16Ty, Type::getHalfTy}, {4, 8, 16});
-  InsertVecGetter(Types, {Type::getInt32Ty, Type::getFloatTy}, {2, 4, 8});
-  InsertVecGetter(Types, {Type::Type::getInt64Ty, Type::getDoubleTy}, {2, 4});
+  std::vector<TypeGetter> Types{
+      Type::getInt1Ty,  Type::getInt8Ty,  Type::getInt16Ty, Type::getInt32Ty,
+      Type::getInt64Ty, Type::getFloatTy, Type::getDoubleTy};
+  std::vector<TypeGetter> ScalarTypes = Types;
+
+  addVectorTypeGetters(Types);
 
   TypeGetter OpaquePtrGetter = [](LLVMContext &C) {
     return PointerType::get(Type::getInt32Ty(C), 0);
   };
   Types.push_back(OpaquePtrGetter);
+
+  // Copy scalar types to change distribution.
+  for (int i = 0; i < 5; i++)
+    Types.insert(Types.end(), ScalarTypes.begin(), ScalarTypes.end());
 
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();

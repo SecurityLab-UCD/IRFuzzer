@@ -99,7 +99,7 @@ def fuzz(argv):
             export CPU={cpu};
             export ATTR={attr};
             export TRIPLE={triple};
-            export global_isel={global_isel};
+            export GLOBAL_ISEL={global_isel};
             export MATCHER_TABLE_SIZE={matcher_table_size[arch]};
         """
 
@@ -108,9 +108,7 @@ def fuzz(argv):
             {env_exporting}
             export OUTPUT={proj_dir}
             mkdir -p {proj_dir}
-            echo "START_TIME: $(date)" >> {config_file}
             screen -S {verbose_name} -dm bash -c "{fuzz_cmd}"
-            echo "END_TIME: $(date)" >> {config_file}
 
             sleep {argv.time+60}
             exit

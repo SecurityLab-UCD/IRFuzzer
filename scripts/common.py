@@ -220,3 +220,5 @@ def parallel_subprocess(
 
 def subdirs_of(dir: str) -> Iterator[os.DirEntry]:
     return (f for f in os.scandir(dir) if f.is_dir())
+
+IRFUZZER_DATA_ENV = "IRFUZZER_DATA"

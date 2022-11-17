@@ -2,8 +2,10 @@ from typing import Iterable, List, NamedTuple
 import pandas as pd
 from matplotlib import pyplot
 import os
-from common import subdirs_of
-
+from common import subdirs_of, IRFUZZER_DATA_ENV
+import argparse
+import logging
+import subprocess
 
 def convert_percentage_to_float(s: str) -> float:
     return float(s.strip("%")) / 100
@@ -126,11 +128,10 @@ def generate_plots(experiments: Iterable[Experiment], dir_out: str) -> None:
 
         pyplot.close()
 
-
-def main() -> None:
+def get_last_col(args):
     df = combine_last_row_of_each_experiment_data(
         iterate_over_all_experiments(
-            "/home/peter/archives/combined", allow_missing_data=True
+            args.input, allow_missing_data=True
         ),
         columns=[
             "# relative_time",
@@ -140,24 +141,80 @@ def main() -> None:
             "corpus_count",
         ],
     )
-
-    df.to_csv("last_row_of_each_experiment.csv", index=False)
-
+    outpath = os.path.join(args.output, "last_row_of_each_experiment.csv")
+    df.to_csv(outpath, index=False)
+def get_summary(args):
+    df = combine_last_row_of_each_experiment_data(
+        iterate_over_all_experiments(
+            args.input, allow_missing_data=True
+        ),
+        columns=[
+            "# relative_time",
+            "total_execs",
+            "bit_cvg",
+            "shw_cvg",
+            "corpus_count",
+        ],
+    )
+    outpath = os.path.join(args.output, "summary.csv")
     df_summary = (
         df.drop(columns=["replicate"])
         .groupby(["fuzzer", "isel", "arch"])
         .agg(["min", "max", "count", "mean", "std"])
     )
 
-    df_summary.to_csv("summary.csv")
+    df_summary.to_csv(outpath)
 
-    generate_plots(
-        experiments=iterate_over_all_experiments(
-            "/home/peter/isel-aflexpr/archive", allow_missing_data=True
-        ),
-        dir_out="/home/henry/isel-aflexpr-plots",
+def main() -> None:
+
+    parser = argparse.ArgumentParser(description="Process fuzzing output")
+    parser.add_argument(
+        "-i",
+        "--input",
+        type=str,
+        default="",
+        help=f"The directory containing all inputs. Default to ${IRFUZZER_DATA_ENV}",
     )
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        default="./output",
+        help="The directory containing processed results, will force removal if it exists.",
+    )
+    parser.add_argument(
+        "-t",
+        "--type",
+        type=str,
+        choices=["LastCol", "Summary", "Plot"],
+        required=True,
+        help="Type of the job you want me to do.",
+    )
+    
+    args = parser.parse_args()
+    if args.input=="":
+        args.input=os.getenv(IRFUZZER_DATA_ENV)
+        if args.input == None:
+            logging.error(f"Input directory not set, set --input or {IRFUZZER_DATA_ENV}")
+            exit(1)
+    if os.path.exists(args.output):
+        logging.warning(f"{args.output} exists, removing.")
+        subprocess.run(["rm", "-rf", args.output])
+    os.mkdir(args.output)
 
+    if args.type == "LastCol":
+        get_last_col(args)
+    elif args.type == "Summary":
+        get_summary(args)
+    elif args.type == "Plot":
+        generate_plots(
+            experiments=iterate_over_all_experiments(
+                args.input, allow_missing_data=True
+            ),
+            dir_out=args.output,
+        )
 
 if __name__ == "__main__":
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.INFO)
     main()

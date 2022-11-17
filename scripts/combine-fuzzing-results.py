@@ -1,7 +1,8 @@
 import os
 
-from common import subdirs_of
-
+from common import subdirs_of, IRFUZZER_DATA_ENV
+import argparse
+import logging
 
 def merge_subdirs_by_symlink(src: str, dest: str) -> None:
     for machine_dir in subdirs_of(src):
@@ -43,9 +44,25 @@ def merge_subdirs_by_symlink(src: str, dest: str) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Combine experiments into one root.")
+    parser.add_argument(
+        "-i",
+        "--input",
+        type=str,
+        default="",
+        help=f"The directory containing all inputs. Default to ${IRFUZZER_DATA_ENV}",
+    )
+    args = parser.parse_args()
+    if args.input=="":
+        args.input=os.getenv(IRFUZZER_DATA_ENV)
+        if args.input == None:
+            logging.error(f"Input directory not set, set --input or {IRFUZZER_DATA_ENV}")
+            exit(1)
     # make sure current working directory is archive before running this
-    merge_subdirs_by_symlink(".", "./combined")
+    merge_subdirs_by_symlink(args.input, os.path.join(args.input, "./combined"))
 
 
 if __name__ == "__main__":
+    logging.basicConfig()
+    logging.getLogger().setLevel(logging.INFO)
     main()

@@ -52,53 +52,50 @@ void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
   oldoutfile.close();
 }
 
-void addVectorTypeGetters(std::vector<TypeGetter> &Types) {
-  int VectorLength[] = {1, 2, 3, 4, 7, 8, 16, 23, 37, 57};
-  std::vector<TypeGetter> BasicTypeGetters(Types);
-  for (auto typeGetter : BasicTypeGetters) {
-    for (int length : VectorLength) {
-      Types.push_back([typeGetter, length](LLVMContext &C) {
-        return VectorType::get(typeGetter(C), length, false);
+void InsertVecGetter(std::vector<TypeGetter> &Types,
+                     std::vector<TypeGetter> EleTyGetters,
+                     std::vector<int> lengths) {
+  for (auto EleTyGetter : EleTyGetters) {
+    for (int length : lengths) {
+      Types.push_back([EleTyGetter, length](LLVMContext &C) {
+        return VectorType::get(EleTyGetter(C), length, false);
       });
     }
   }
 }
+
 /// TODO:
 /// Type* getStructType(Context& C);
 
 void createISelMutator() {
-  TypeGetter Int20Getter = [](LLVMContext &C) {
-    return IntegerType::get(C, 20);
+  std::vector<TypeGetter> Types = {
+      Type::getInt1Ty,  Type::getInt8Ty,  Type::getInt16Ty, Type::getHalfTy,
+      Type::getInt32Ty, Type::getFloatTy, Type::getInt64Ty, Type::getDoubleTy,
   };
-  TypeGetter Int128Getter = [](LLVMContext &C) {
-    return IntegerType::get(C, 128);
-  };
-  std::vector<TypeGetter> Types{
-      Type::getInt1Ty,   Type::getInt8Ty,  Type::getInt16Ty,
-      Type::getInt32Ty,  Type::getInt64Ty, Type::getFloatTy,
-      Type::getDoubleTy, Int20Getter,      Int128Getter};
-  std::vector<TypeGetter> ScalarTypes = Types;
-
-  addVectorTypeGetters(Types);
+  InsertVecGetter(Types, {Type::getInt1Ty}, {32, 64, 256});
+  InsertVecGetter(Types, {Type::getInt8Ty}, {6, 8, 16, 32});
+  InsertVecGetter(Types, {Type::getInt16Ty, Type::getHalfTy}, {4, 8, 16});
+  InsertVecGetter(Types, {Type::getInt32Ty, Type::getFloatTy}, {2, 4, 8});
+  InsertVecGetter(Types, {Type::Type::getInt64Ty, Type::getDoubleTy}, {2, 4});
 
   TypeGetter OpaquePtrGetter = [](LLVMContext &C) {
     return PointerType::get(Type::getInt32Ty(C), 0);
   };
   Types.push_back(OpaquePtrGetter);
 
-  // Copy scalar types to change distribution.
-  for (int i = 0; i < 5; i++)
-    Types.insert(Types.end(), ScalarTypes.begin(), ScalarTypes.end());
-
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
 
-  Strategies.emplace_back(new InjectorIRStrategy(std::move(Ops)));
-  Strategies.emplace_back(new FunctionIRStrategy());
-  Strategies.emplace_back(new CFGIRStrategy());
-  Strategies.emplace_back(new InstDeleterIRStrategy());
-  Strategies.emplace_back(new InsertPHIStrategy());
-  Strategies.emplace_back(new OperandMutatorStrategy());
+  Strategies.push_back(std::make_unique<InjectorIRStrategy>(
+      InjectorIRStrategy::getDefaultOps()));
+  Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
+  Strategies.push_back(std::make_unique<InstModificationIRStrategy>());
+  Strategies.push_back(std::make_unique<FunctionIRStrategy>());
+  Strategies.push_back(std::make_unique<CFGIRStrategy>());
+  Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
+  Strategies.push_back(std::make_unique<InsertPHIStrategy>());
+  Strategies.push_back(std::make_unique<OperandMutatorStrategy>());
+  Strategies.push_back(std::make_unique<ShuffleBlockStrategy>());
 
   Mutator =
       std::make_unique<IRMutator>(std::move(Types), std::move(Strategies));

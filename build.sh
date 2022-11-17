@@ -71,10 +71,11 @@ then
             -DLLVM_INCLUDE_EXAMPLES=OFF \
             -DLLVM_USE_SANITIZE_COVERAGE=OFF \
             -DLLVM_USE_SANITIZER="" \
-        ../llvm && \
-    ninja -j $(nproc --all)
+        ../llvm
     cd $FUZZING_HOME
 fi
+cd $LLVM/build-afl; ninja -j $(nproc --all); cd ../..
+
 # Mutator depends on `build-release`.
 # They can't depend on `build-afl` since all AFL compiled code reference to global 
 # `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
@@ -88,8 +89,7 @@ then
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
-        ../llvm && \
-    ninja -j $(nproc --all)
+        ../llvm
     cd $FUZZING_HOME
 fi
 cd $LLVM/build-release; ninja -j $(nproc --all); cd ../..
@@ -109,8 +109,7 @@ if [ ! -f /.dockerenv ]; then
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DCMAKE_BUILD_TYPE=Debug \
-            ../llvm && \
-        ninja -j $(nproc --all)
+            ../llvm
         cd $FUZZING_HOME
     fi
     cd $LLVM/build-debug; ninja -j $(nproc --all); cd ../..

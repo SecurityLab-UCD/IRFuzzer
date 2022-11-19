@@ -3,7 +3,6 @@ import subprocess
 import os
 import re
 from typing import Iterable, Iterator, List, Optional, Set, Tuple
-from tqdm import tqdm
 import shutil
 from pathlib import Path
 import tempfile
@@ -63,7 +62,12 @@ class CrashError:
             and curr_line
             != "PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace.\n"
         ):
+            # do not include the entire DAG in the error message
+            if curr_line == '\n'  or re.match(r"^ +0x[0-9a-f]+: .+ = .+\n$", curr_line):
+                continue
+
             message_lines.append(curr_line)
+
         self.message_raw = "".join(message_lines)
 
         self.message_minimized = (
@@ -96,21 +100,24 @@ class CrashError:
         # determine error type
         if self.message_raw.startswith("LLVM ERROR: unable to legalize instruction:"):
             self.type = "instruction-legalization"
-            matches = re.findall("G_[A-Z_]+", message_lines[0])
+            matches = re.findall(r"G_[A-Z_]+", message_lines[0])
             assert len(matches) == 1
             self.subtype = matches[0]
         elif self.message_raw.startswith("LLVM ERROR: cannot select:"):
             self.type = "global-instruction-selection"
-            matches = re.findall("G_[A-Z_]+", message_lines[0])
+            matches = re.findall(r"G_[A-Z_]+", message_lines[0])
             assert len(matches) == 1
             self.subtype = matches[0]
         elif self.message_raw.startswith("LLVM ERROR: Cannot select:"):
             self.type = "dag-instruction-selection"
             match = re.match(
-                r"LLVM ERROR: Cannot select:.+ = ([a-zA_Z_]+(<.+>)?) ", message_lines[0]
+                r"LLVM ERROR: Cannot select:.+ = ([a-zA-Z_:]+(<.+>)?)", message_lines[0]
             )
-            assert match is not None
-            self.subtype = match.group(1).split("<")[0]
+            if match is None:
+                print(f'ERROR: failed to extract instruction from "{message_lines[0]}"')
+                self.subtype = "Unknown"
+            else:
+                self.subtype = match.group(1).split("<")[0]
         else:
             if self.failed_pass is None:
                 self.type = "other"
@@ -159,9 +166,11 @@ def classify(
     Path(output_dir).mkdir(parents=True)
 
     crash_hashes: Set[int] = set()
+    false_alarms: List[str] = []
 
     def on_process_exit(p: subprocess.Popen) -> None:
         if p.returncode == 0:
+            false_alarms.append(p.args[-1])  # type: ignore
             return
 
         ir_bc_path: str = p.args[-1]  # type: ignore
@@ -206,6 +215,10 @@ def classify(
         ),
         on_exit=on_process_exit,
     )
+
+    print(f"{len(false_alarms)} false positives")
+    with open(os.path.join(output_dir, "false_positives.txt"), "a+") as file:
+        file.writelines(line + "\n" for line in false_alarms)
 
 
 def main() -> None:

@@ -186,6 +186,8 @@ def main() -> None:
     if args.type == "LastCol":
         get_last_col(args)
     elif args.type == "Summary":
+        # TODO: All data required by summary can be found in expr_info now
+        # maybe stop reading the whole csv as it is slow.
         get_summary(args)
     elif args.type == "Plot":
         generate_plots(

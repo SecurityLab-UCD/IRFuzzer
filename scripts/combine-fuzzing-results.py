@@ -21,23 +21,15 @@ class BlackList:
         return do_ignore
 
 
-def fuzzed_long_enough_func(expr_info: ExprimentInfo, _: int):
-    stat_path = expr_info.get_fuzzer_stats_path()
-    with open(stat_path, "r") as f:
-        line = ""
-        while "run_time" not in line:
-            line = f.readline()
-        run_time = int(line.split(" : ")[1])
-        return run_time < 259000
-
-
 use_xcore_makeup = BlackList(
     "use_xcore_makeup",
     lambda expr_info, _: "xcore" == expr_info.arch
     and "xcore-makeup" not in expr_info.expr_path,
 )
 max_five_expr = BlackList("max_five_expr", lambda _, mapped_id: mapped_id > 4)
-fuzzed_long_enough = BlackList("fuzzed_long_enough", fuzzed_long_enough_func)
+fuzzed_long_enough = BlackList(
+    "fuzzed_long_enough", lambda expr_info, _: expr_info.run_time < 259000
+)
 
 blacklists = [use_xcore_makeup, max_five_expr, fuzzed_long_enough]
 

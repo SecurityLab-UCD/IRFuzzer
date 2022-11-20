@@ -238,6 +238,11 @@ class ExprimentInfo:
         self.isel = isel
         self.arch = arch
         self.expr_id = expr_id
+        with open(self.get_fuzzer_stats_path(), "r") as f:
+            for line in f:
+                line = line.split(" : ")
+                self.__dict__[line[0].strip()] = line[1]
+        self.run_time = int(self.run_time)
 
     def to_expr_path(self):
         return self.expr_path

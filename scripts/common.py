@@ -221,4 +221,46 @@ def parallel_subprocess(
 def subdirs_of(dir: str) -> Iterator[os.DirEntry]:
     return (f for f in os.scandir(dir) if f.is_dir())
 
+
 IRFUZZER_DATA_ENV = "IRFUZZER_DATA"
+
+
+class ExprimentInfo:
+    expr_path: str
+    fuzzer: str
+    isel: str
+    arch: str
+    expr_id: int
+
+    def __init__(self, expr_path, fuzzer, isel, arch, expr_id):
+        self.expr_path = expr_path
+        self.fuzzer = fuzzer
+        self.isel = isel
+        self.arch = arch
+        self.expr_id = expr_id
+
+    def to_expr_path(self):
+        return self.expr_path
+
+    def to_arch_path(self):
+        return os.path.join(self.expr_path, "..")
+
+    def get_plot_data_path(self):
+        return os.path.join(self.to_expr_path(), "default", "plot_data")
+
+    def get_fuzzer_stats_path(self):
+        return os.path.join(self.to_expr_path(), "default", "fuzzer_stats")
+
+
+def for_all_expriments(archive_path: str):
+    for fuzzer_dir in subdirs_of(archive_path):
+        for isel_dir in subdirs_of(fuzzer_dir.path):
+            for arch_dir in subdirs_of(isel_dir.path):
+                for expr_dir in subdirs_of(arch_dir.path):
+                    yield ExprimentInfo(
+                        os.path.abspath(expr_dir),
+                        fuzzer_dir.name.split(".")[0],
+                        isel_dir.name,
+                        arch_dir.name,
+                        int(expr_dir.name),
+                    )

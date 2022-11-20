@@ -1,46 +1,80 @@
 import os
 
-from common import subdirs_of, IRFUZZER_DATA_ENV
+from common import *
 import argparse
 import logging
+from functools import reduce
+
+
+class BlackList:
+    name: str
+    func: Callable[[ExprimentInfo, int], bool]
+
+    def __init__(self, name, func):
+        self.name = name
+        self.func = func
+
+    def ignore(self, expr_info: ExprimentInfo, mapped_id: int):
+        do_ignore = self.func(expr_info, mapped_id)
+        if do_ignore:
+            print("\t", self.name, "Failed")
+        return do_ignore
+
+
+def fuzzed_long_enough_func(expr_info: ExprimentInfo, _: int):
+    stat_path = expr_info.get_fuzzer_stats_path()
+    with open(stat_path, "r") as f:
+        line = ""
+        while "run_time" not in line:
+            line = f.readline()
+        run_time = int(line.split(" : ")[1])
+        return run_time < 259000
+
+
+use_xcore_makeup = BlackList(
+    "use_xcore_makeup",
+    lambda expr_info, _: "xcore" == expr_info.arch
+    and "xcore-makeup" not in expr_info.expr_path,
+)
+max_five_expr = BlackList("max_five_expr", lambda _, mapped_id: mapped_id > 4)
+fuzzed_long_enough = BlackList("fuzzed_long_enough", fuzzed_long_enough_func)
+
+blacklists = [use_xcore_makeup, max_five_expr, fuzzed_long_enough]
+
 
 def merge_subdirs_by_symlink(src: str, dest: str) -> None:
-    for machine_dir in subdirs_of(src):
-        for fuzzer_dir in subdirs_of(machine_dir.path):
-            for isel_dir in subdirs_of(fuzzer_dir.path):
-                for arch_dir in subdirs_of(isel_dir.path):
-                    symlink_dest_dir = os.path.join(
-                        dest, fuzzer_dir.name, isel_dir.name, arch_dir.name
-                    )
+    for archive_dir in subdirs_of(src):
+        for expr_info in for_all_expriments(archive_dir.path):
+            symlink_dest_dir = os.path.join(
+                dest, expr_info.fuzzer, expr_info.isel, expr_info.arch
+            )
+            os.makedirs(symlink_dest_dir, exist_ok=True)
+            mapped_id = 1 + max(
+                [
+                    -1,
+                    *(
+                        int(dir_entry.name)
+                        for dir_entry in subdirs_of(symlink_dest_dir)
+                    ),
+                ]
+            )
+            symlink_src = expr_info.to_expr_path()
+            symlink_dest = os.path.join(symlink_dest_dir, str(mapped_id))
+            print(
+                symlink_dest,
+                " -> ",
+                symlink_src,
+                flush=True,
+            )
 
-                    os.makedirs(symlink_dest_dir, exist_ok=True)
-
-                    i = max(
-                        [
-                            -1,
-                            *(
-                                int(dir_entry.name)
-                                for dir_entry in subdirs_of(symlink_dest_dir)
-                            ),
-                        ]
-                    )
-
-                    for inner_dir in sorted(
-                        subdirs_of(arch_dir.path), key=lambda dir: int(dir.name)
-                    ):
-                        i += 1
-                        symlink_src = os.path.join("../../../..", inner_dir.path)
-                        symlink_dest = os.path.join(symlink_dest_dir, str(i))
-                        print(
-                            symlink_dest,
-                            " -> ",
-                            symlink_src,
-                            sep="\t",
-                            end="\t",
-                            flush=True,
-                        )
-                        os.symlink(symlink_src, symlink_dest)
-                        print("DONE", flush=True)
+            if reduce(
+                lambda a, b: a or b,
+                [bl.ignore(expr_info, mapped_id) for bl in blacklists],
+            ):
+                print("NOT USED", flush=True)
+            else:
+                os.symlink(symlink_src, symlink_dest)
+                print("DONE", flush=True)
 
 
 def main() -> None:
@@ -53,13 +87,15 @@ def main() -> None:
         help=f"The directory containing all inputs. Default to ${IRFUZZER_DATA_ENV}",
     )
     args = parser.parse_args()
-    if args.input=="":
-        args.input=os.getenv(IRFUZZER_DATA_ENV)
+    if args.input == "":
+        args.input = os.getenv(IRFUZZER_DATA_ENV)
         if args.input == None:
-            logging.error(f"Input directory not set, set --input or {IRFUZZER_DATA_ENV}")
+            logging.error(
+                f"Input directory not set, set --input or {IRFUZZER_DATA_ENV}"
+            )
             exit(1)
     # make sure current working directory is archive before running this
-    merge_subdirs_by_symlink(args.input, os.path.join(args.input, "./combined"))
+    merge_subdirs_by_symlink(args.input, os.path.join(args.input, "../combined"))
 
 
 if __name__ == "__main__":

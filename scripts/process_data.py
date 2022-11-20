@@ -2,10 +2,11 @@ from typing import Iterable, List, NamedTuple
 import pandas as pd
 from matplotlib import pyplot
 import os
-from common import subdirs_of, IRFUZZER_DATA_ENV
+from common import *
 import argparse
 import logging
 import subprocess
+
 
 def convert_percentage_to_float(s: str) -> float:
     return float(s.strip("%")) / 100
@@ -42,43 +43,19 @@ def read_experiment_data(path: str) -> pd.DataFrame:
     )
 
 
-class Experiment(NamedTuple):
-    fuzzer: str
-    isel: str
-    arch: str
-    replicate_id: int
-    data: pd.DataFrame
-
-
 def iterate_over_all_experiments(
     dir: str, allow_missing_data: bool = False
-) -> Iterable[Experiment]:
-    for fuzzer_dir in subdirs_of(dir):
-        fuzzer = fuzzer_dir.name
-        for isel_dir in subdirs_of(fuzzer_dir.path):
-            isel = isel_dir.name
-            for arch_dir in subdirs_of(isel_dir.path):
-                arch = arch_dir.name
-                for replicate_dir in subdirs_of(arch_dir.path):
-                    replicate_id = int(replicate_dir.name)
-                    plot_data_path = os.path.join(
-                        replicate_dir.path, "default", "plot_data"
-                    )
-                    try:
-                        yield Experiment(
-                            fuzzer,
-                            isel,
-                            arch,
-                            replicate_id,
-                            read_experiment_data(plot_data_path),
-                        )
-                    except FileNotFoundError:
-                        if not allow_missing_data:
-                            raise
+) -> Iterable[Tuple[ExprimentInfo, pd.DataFrame]]:
+    for expr_info in for_all_expriments(dir):
+        try:
+            yield (expr_info, read_experiment_data(expr_info.get_plot_data_path()))
+        except FileNotFoundError:
+            if not allow_missing_data:
+                raise
 
 
 def combine_last_row_of_each_experiment_data(
-    experiments: Iterable[Experiment], columns: List[str]
+    experiments: Iterable[Tuple[ExprimentInfo, pd.DataFrame]], columns: List[str]
 ) -> pd.DataFrame:
     return pd.DataFrame(
         columns=["fuzzer", "isel", "arch", "replicate", *columns],
@@ -87,38 +64,40 @@ def combine_last_row_of_each_experiment_data(
                 exp.fuzzer,
                 exp.isel,
                 exp.arch,
-                exp.replicate_id,
-                *exp.data.tail(1)[columns].values.flatten().tolist(),
+                exp.expr_id,
+                *df.tail(1)[columns].values.flatten().tolist(),
             ]
-            for exp in experiments
+            for (exp, df) in experiments
         ),
     )
 
 
-def generate_plots(experiments: Iterable[Experiment], dir_out: str) -> None:
+def generate_plots(
+    experiments: Iterable[Tuple[ExprimentInfo, pd.DataFrame]], dir_out: str
+) -> None:
     pyplot.ioff()
 
-    for experiment in experiments:
+    for (experiment, df) in experiments:
         figure_path = os.path.join(
             dir_out,
             experiment.fuzzer,
             experiment.isel,
             experiment.arch,
-            str(experiment.replicate_id),
+            str(experiment.expr_id),
         )
         os.makedirs(figure_path, exist_ok=True)
 
         try:
-            experiment.data.plot(x="total_execs", y="saved_crashes").figure.savefig(
+            df.plot(x="total_execs", y="saved_crashes").figure.savefig(
                 os.path.join(figure_path, "crashes-vs-execs.png")
             )
-            experiment.data.plot(x="total_execs", y="shw_cvg").figure.savefig(
+            df.plot(x="total_execs", y="shw_cvg").figure.savefig(
                 os.path.join(figure_path, "shwcvg-vs-execs.png")
             )
-            experiment.data.plot(x="# relative_time", y="saved_crashes").figure.savefig(
+            df.plot(x="# relative_time", y="saved_crashes").figure.savefig(
                 os.path.join(figure_path, "crashes-vs-time.png")
             )
-            experiment.data.plot(x="# relative_time", y="shw_cvg").figure.savefig(
+            df.plot(x="# relative_time", y="shw_cvg").figure.savefig(
                 os.path.join(figure_path, "shwcvg-vs-time.png")
             )
         except:
@@ -128,11 +107,10 @@ def generate_plots(experiments: Iterable[Experiment], dir_out: str) -> None:
 
         pyplot.close()
 
+
 def get_last_col(args):
     df = combine_last_row_of_each_experiment_data(
-        iterate_over_all_experiments(
-            args.input, allow_missing_data=True
-        ),
+        iterate_over_all_experiments(args.input, allow_missing_data=True),
         columns=[
             "# relative_time",
             "total_execs",
@@ -143,11 +121,11 @@ def get_last_col(args):
     )
     outpath = os.path.join(args.output, "last_row_of_each_experiment.csv")
     df.to_csv(outpath, index=False)
+
+
 def get_summary(args):
     df = combine_last_row_of_each_experiment_data(
-        iterate_over_all_experiments(
-            args.input, allow_missing_data=True
-        ),
+        iterate_over_all_experiments(args.input, allow_missing_data=True),
         columns=[
             "# relative_time",
             "total_execs",
@@ -165,21 +143,7 @@ def get_summary(args):
 
     df_summary.to_csv(outpath)
 
-def get_data_slice(args):
-    if args.data == []:
-        logging.error("Data not set, abort")
-        exit(1)
-    df = combine_last_row_of_each_experiment_data(
-        iterate_over_all_experiments(
-            args.input, allow_missing_data=True
-        ),
-        columns=args.data
-    )
-    df_summary = (df.drop(columns=["replicate"])
-        .groupby(["fuzzer", "isel", "arch"])
-        .agg(["mean"])
-    )
-    print(df_summary)
+
 def main() -> None:
 
     parser = argparse.ArgumentParser(description="Process fuzzing output")
@@ -205,20 +169,13 @@ def main() -> None:
         required=True,
         help="Type of the job you want me to do.",
     )
-    parser.add_argument(
-        "-d",
-        "--data",
-        default=[],
-        nargs="+", 
-        type=str,
-        help="Type of data you want to show."
-    )
-    
     args = parser.parse_args()
-    if args.input=="":
-        args.input=os.getenv(IRFUZZER_DATA_ENV)
+    if args.input == "":
+        args.input = os.getenv(IRFUZZER_DATA_ENV)
         if args.input == None:
-            logging.error(f"Input directory not set, set --input or {IRFUZZER_DATA_ENV}")
+            logging.error(
+                f"Input directory not set, set --input or {IRFUZZER_DATA_ENV}"
+            )
             exit(1)
     if args.type != "Data":
         if os.path.exists(args.output):

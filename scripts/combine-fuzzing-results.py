@@ -30,8 +30,11 @@ max_five_expr = BlackList("max_five_expr", lambda _, mapped_id: mapped_id > 4)
 fuzzed_long_enough = BlackList(
     "fuzzed_long_enough", lambda expr_info, _: expr_info.run_time < 259000
 )
+ignore_arm64 = BlackList(
+    "ignore_arm64", lambda expr_info, mapped_id: "arm64" in expr_info.arch
+)
 
-blacklists = [use_xcore_makeup, max_five_expr, fuzzed_long_enough]
+blacklists = [use_xcore_makeup, max_five_expr, fuzzed_long_enough, ignore_arm64]
 
 
 def merge_subdirs_by_symlink(src: str, dest: str) -> None:

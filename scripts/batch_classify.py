@@ -1,5 +1,6 @@
+import logging
 import subprocess
-from typing import Optional
+from typing import Callable
 
 from classify import classify
 from os import path
@@ -7,7 +8,7 @@ from pathlib import Path
 
 from common import parallel_subprocess, subdirs_of
 
-LLVM_BIN_PATH = "./llvm-project/build-release/bin"
+LLVM_BIN_PATH = "./llvm-project-latest/build-release/bin"
 LLC = path.join(LLVM_BIN_PATH, "llc")
 LLVM_DIS = path.join(LLVM_BIN_PATH, "llvm-dis")
 TEMP_FILE = "temp.s"
@@ -15,29 +16,14 @@ TEMP_FILE = "temp.s"
 
 def classify_wrapper(
     mtriple: str,
+    input_dir: str,
+    output_dir: str,
     global_isel: bool = False,
     generate_ll_files: bool = True,
-    input_dir: Optional[str] = None,
-    output_dir: Optional[str] = None,
 ) -> None:
     args = [LLC, "-mtriple", mtriple, "-o", TEMP_FILE]
     if global_isel:
         args.append("-global-isel")
-
-    if input_dir is None:
-        input_dir = path.join(
-            "fuzzing",
-            "1",
-            "-".join(["fuzzing", "gisel" if global_isel else "dagisel", mtriple]),
-            "default",
-            "crashes",
-        )
-
-    if output_dir is None:
-        output_dir = path.join(
-            "crash-classification",
-            "-".join(["gisel" if global_isel else "dagisel", mtriple]),
-        )
 
     print(f"Start classifying {input_dir} using '{(' '.join(args))}'...")
 
@@ -64,43 +50,37 @@ def classify_wrapper(
         print(f"Done generating human-readable IR files for {output_dir}.")
 
 
-def batch_classify(
-    *mtriples: str, global_isel: bool = False, generate_ll_files: bool = True
-) -> None:
-    for mtriple in mtriples:
-        classify_wrapper(mtriple, global_isel, generate_ll_files)
-
-
 def batch_classify_v3(
     input_root_dir: str,
     output_root_dir: str,
     global_isel: bool = False,
     generate_ll_files: bool = True,
+    mtriple_filter: Callable[[str], bool] = lambda _: True,
 ) -> None:
     for subdir in subdirs_of(input_root_dir):
         mtriple = subdir.name
-        if mtriple == "r600":
+
+        if not mtriple_filter(mtriple):
             continue
+
         for subsubdir in subdirs_of(subdir.path):
-            classify_wrapper(
-                mtriple,
-                global_isel,
-                generate_ll_files,
-                input_dir=path.join(subsubdir.path, "default", "crashes"),
-                output_dir=path.join(output_root_dir, mtriple),
-            )
+            try:
+                classify_wrapper(
+                    mtriple,
+                    input_dir=path.join(subsubdir.path, "default", "crashes"),
+                    output_dir=path.join(output_root_dir, mtriple, subsubdir.name),
+                    global_isel=global_isel,
+                    generate_ll_files=generate_ll_files,
+                )
+            except Exception:
+                logging.exception(f"Something went wrong when processing {subdir.path}")
 
 
 def main() -> None:
     batch_classify_v3(
-        input_root_dir="./fuzzing-2/2-aflisel-dagisel/aflisel/dagisel",
-        output_root_dir="./crash-classification-2/dagisel",
-    )
-
-    batch_classify_v3(
-        input_root_dir="./fuzzing-2/2-aflisel-gisel/aflisel/gisel",
-        output_root_dir="./crash-classification-2/gisel",
-        global_isel=True,
+        input_root_dir="/home/peter/irfuzzer.expriment/baseline/combined/aflisel/dagisel",
+        output_root_dir="./crash-classification-6-temp",
+        mtriple_filter=lambda mtriple: mtriple == "xcore",
     )
 
 

@@ -1,4 +1,5 @@
 import argparse
+import logging
 import subprocess
 import os
 import re
@@ -63,7 +64,7 @@ class CrashError:
             != "PLEASE submit a bug report to https://github.com/llvm/llvm-project/issues/ and include the crash backtrace.\n"
         ):
             # do not include the entire DAG in the error message
-            if curr_line == '\n'  or re.match(r"^ +0x[0-9a-f]+: .+ = .+\n$", curr_line):
+            if curr_line == "\n" or re.match(r"^ +0x[0-9a-f]+: .+ = .+\n$", curr_line):
                 continue
 
             message_lines.append(curr_line)
@@ -77,6 +78,16 @@ class CrashError:
         )
 
         self.message_minimized = re.sub(r"0x[0-9a-f]+", "0x_", self.message_minimized)
+        self.message_minimized = re.sub(
+            r"(unable to allocate function argument #)[0-9]+",
+            r"\1_",
+            self.message_minimized,
+        )
+        self.message_minimized = re.sub(
+            r"(Error while trying to spill )(.+)( from class )(.+)(: Cannot scavenge register without an emergency spill slot!)",
+            r"\1_\3\4\5",
+            self.message_minimized,
+        )
 
         # extract failed pass and stack trace
         self.failed_pass = None
@@ -196,9 +207,12 @@ def classify(
             if verbose:
                 print("New crash type:", folder_name)
 
-        os.symlink(
-            ir_bc_path, os.path.join(folder_path, os.path.basename(ir_bc_path) + ".bc")
-        )
+        try:
+            os.symlink(
+                ir_bc_path, os.path.join(folder_path, os.path.basename(ir_bc_path) + ".bc")
+            )
+        except FileNotFoundError:
+            logging.exception('Failed to create symlink')
 
     parallel_subprocess(
         iter=list(
@@ -216,9 +230,12 @@ def classify(
         on_exit=on_process_exit,
     )
 
-    print(f"{len(false_alarms)} false positives")
+    print(f"{len(false_alarms)} false positives, {len(crash_hashes)} unique crashes")
     with open(os.path.join(output_dir, "false_positives.txt"), "a+") as file:
         file.writelines(line + "\n" for line in false_alarms)
+
+    with open(os.path.join(output_dir, "unique_crashes"), "w+") as file:
+        file.write(str(len(crash_hashes)))
 
 
 def main() -> None:

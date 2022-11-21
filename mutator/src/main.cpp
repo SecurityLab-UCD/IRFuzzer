@@ -66,6 +66,7 @@ int main(int argc, char **argv) {
     if (argc > 2) {
       Seed = atoi(argv[2]);
     }
+    llvm::errs() << Seed << "\n";
     bool validateMode = false;
     if (argc > 3 && argv[3][1] == 'v') {
       validateMode = true;

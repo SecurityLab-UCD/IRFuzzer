@@ -60,7 +60,7 @@ then
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=ON \
-            -DLLVM_CCACHE_BUILD=OFF \
+            -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_ENABLE_PROJECTS="mlir" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
@@ -71,10 +71,11 @@ then
             -DLLVM_INCLUDE_EXAMPLES=OFF \
             -DLLVM_USE_SANITIZE_COVERAGE=OFF \
             -DLLVM_USE_SANITIZER="" \
-        ../llvm && \
-    ninja -j $(nproc --all)
+        ../llvm
     cd $FUZZING_HOME
 fi
+cd $LLVM/build-afl; ninja -j $(nproc --all); cd ../..
+
 # Mutator depends on `build-release`.
 # They can't depend on `build-afl` since all AFL compiled code reference to global 
 # `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
@@ -83,12 +84,12 @@ then
     mkdir -p $LLVM/build-release
     cd $LLVM/build-release
     cmake  -GNinja \
-            -DLLVM_ENABLE_PROJECTS="mlir" \
+            -DBUILD_SHARED_LIBS=ON \
+            -DLLVM_CCACHE_BUILD=ON \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
-        ../llvm && \
-    ninja -j $(nproc --all)
+        ../llvm
     cd $FUZZING_HOME
 fi
 cd $LLVM/build-release; ninja -j $(nproc --all); cd ../..
@@ -103,12 +104,12 @@ if [ ! -f /.dockerenv ]; then
         mkdir -p $LLVM/build-debug
         cd $LLVM/build-debug
         cmake  -GNinja \
-                -DLLVM_ENABLE_PROJECTS="mlir" \
+                -DBUILD_SHARED_LIBS=ON \
+                -DLLVM_CCACHE_BUILD=ON \
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DCMAKE_BUILD_TYPE=Debug \
-            ../llvm && \
-        ninja -j $(nproc --all)
+            ../llvm
         cd $FUZZING_HOME
     fi
     cd $LLVM/build-debug; ninja -j $(nproc --all); cd ../..

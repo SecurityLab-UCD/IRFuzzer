@@ -1,3 +1,4 @@
+import argparse
 import logging
 import subprocess
 from typing import Callable
@@ -87,16 +88,38 @@ def batch_classify(
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Batch classify LLVM crashes",
+    )
+
+    parser.add_argument(
+        "-i",
+        "--input",
+        type=str,
+        required=True,
+        help="The input directory containing all fuzzer directories",
+    )
+
+    parser.add_argument(
+        "-o",
+        "--output",
+        type=str,
+        required=True,
+        help="The output directory",
+    )
+
+    args = parser.parse_args()
+
     batch_classify(
-        input_root_dir="/home/peter/irfuzzer.expriment/baseline/combined/aflisel/dagisel",
-        output_root_dir="./crash-classification-7-fuzzing/aflisel/dagisel",
-        generate_ll_files=False
+        input_root_dir=path.join(args.input, "aflisel", "dagisel"),
+        output_root_dir=path.join(args.output, "aflisel", "dagisel"),
+        generate_ll_files=False,
     )
 
     batch_classify(
-        input_root_dir="/home/peter/irfuzzer.expriment/baseline/combined/libfuzzer/dagisel",
-        output_root_dir="./crash-classification-7-fuzzing/libfuzzer/dagisel",
-        generate_ll_files=False
+        input_root_dir=path.join(args.input, "libfuzzer", "dagisel"),
+        output_root_dir=path.join(args.output, "libfuzzer", "dagisel"),
+        generate_ll_files=False,
     )
 
 

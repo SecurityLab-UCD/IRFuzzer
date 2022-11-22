@@ -16,7 +16,7 @@ class StackTrace:
     # using tuple instead of list for easier equality check
     stack_frames: Tuple[Tuple[str, str], ...]
 
-    def __init__(self, stacktrace: Iterable[str]):
+    def __init__(self, stacktrace: Iterable[str], remove_addr: bool = False):
         stack_frames: List[Tuple[str, str]] = []
 
         for line in stacktrace:
@@ -24,6 +24,8 @@ class StackTrace:
             assert words[0].startswith("#")
             function = " ".join(words[2:-1])
             location = words[-1]
+            if remove_addr:
+                location = re.sub(r"0x[0-9a-f]+", "0x_", location)
             stack_frames.append((function, location))
 
         self.stack_frames = tuple(stack_frames)
@@ -51,10 +53,21 @@ class CrashError:
     message_minimized: str
     type: str
     subtype: Optional[str]
+    undefined_external_symbol: bool
     stack_trace: StackTrace
+    hash_stacktrace_only: bool
 
-    def __init__(self, args: List[str], return_code: int, stderr_iter: Iterator[str]):
+    def __init__(
+        self,
+        args: List[str],
+        return_code: int,
+        stderr_iter: Iterator[str],
+        hash_stacktrace_only: bool = False,
+        remove_addr_in_stacktrace: bool = False,
+    ):
         self.return_code = return_code
+        self.hash_stacktrace_only = hash_stacktrace_only
+        self.undefined_external_symbol = False
 
         # extract and minimize error message
         message_lines = []
@@ -66,6 +79,9 @@ class CrashError:
             # do not include the entire DAG in the error message
             if curr_line == "\n" or re.match(r"^ +0x[0-9a-f]+: .+ = .+\n$", curr_line):
                 continue
+
+            if re.match(r'LLVM ERROR: Undefined external symbol ".+"\n', curr_line):
+                self.undefined_external_symbol = True
 
             message_lines.append(curr_line)
 
@@ -104,7 +120,7 @@ class CrashError:
                     self.failed_pass = match.group(1)
 
             # extract stack trace
-            self.stack_trace = StackTrace(stderr_iter)
+            self.stack_trace = StackTrace(stderr_iter, remove_addr_in_stacktrace)
         else:
             self.stack_trace = StackTrace([])
 
@@ -157,11 +173,22 @@ class CrashError:
         )
 
     def __hash__(self):
-        return hash(self.stack_trace) ^ hash(self.message_minimized)
+        if self.hash_stacktrace_only:
+            return hash(self.stack_trace)
+        else:
+            return hash(self.stack_trace) ^ hash(self.message_minimized)
 
 
 def classify(
-    cmd: List[str], input_dir: str, output_dir: str, force: bool, verbose: bool = False
+    cmd: List[str],
+    input_dir: str,
+    output_dir: str,
+    force: bool,
+    verbose: bool = False,
+    create_symlink_to_source: bool = True,
+    hash_stacktrace_only: bool = False,
+    remove_addr_in_stacktrace: bool = False,
+    ignore_undefined_external_symbol: bool = False,
 ) -> None:
     output_dir = os.path.abspath(output_dir)
     input_dir = os.path.abspath(input_dir)
@@ -189,10 +216,19 @@ def classify(
         stderr_dump_path = os.path.join(temp_dir, file_name + ".stderr")
         stderr_dump_file = open(stderr_dump_path)
 
-        crash = CrashError(p.args, p.returncode, stderr_dump_file)  # type: ignore
+        crash = CrashError(
+            p.args,  # type: ignore
+            p.returncode,
+            stderr_dump_file,
+            hash_stacktrace_only,
+            remove_addr_in_stacktrace,
+        )
 
         stderr_dump_file.close()
         os.remove(stderr_dump_path)
+
+        if ignore_undefined_external_symbol and crash.undefined_external_symbol:
+            return
 
         folder_name = crash.get_folder_name()
         folder_path = os.path.join(output_dir, folder_name)
@@ -207,12 +243,11 @@ def classify(
             if verbose:
                 print("New crash type:", folder_name)
 
-        try:
+        if create_symlink_to_source:
             os.symlink(
-                ir_bc_path, os.path.join(folder_path, os.path.basename(ir_bc_path) + ".bc")
+                ir_bc_path,
+                os.path.join(folder_path, os.path.basename(ir_bc_path) + ".bc"),
             )
-        except FileNotFoundError:
-            logging.exception('Failed to create symlink')
 
     parallel_subprocess(
         iter=list(

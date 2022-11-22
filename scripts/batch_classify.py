@@ -8,7 +8,7 @@ from pathlib import Path
 
 from common import parallel_subprocess, subdirs_of
 
-LLVM_BIN_PATH = "./llvm-project-latest/build-release/bin"
+LLVM_BIN_PATH = "./llvm-project-fuzzing/build-release/bin"
 LLC = path.join(LLVM_BIN_PATH, "llc")
 LLVM_DIS = path.join(LLVM_BIN_PATH, "llvm-dis")
 TEMP_FILE = "temp.s"
@@ -27,7 +27,17 @@ def classify_wrapper(
 
     print(f"Start classifying {input_dir} using '{(' '.join(args))}'...")
 
-    classify(args, input_dir, output_dir, force=True)
+    classify(
+        args,
+        input_dir,
+        output_dir,
+        force=True,
+        verbose=False,
+        create_symlink_to_source=False,
+        hash_stacktrace_only=True,
+        remove_addr_in_stacktrace=True,
+        ignore_undefined_external_symbol=True,
+    )
 
     # remove temp file if exists
     Path(TEMP_FILE).unlink(missing_ok=True)
@@ -50,7 +60,7 @@ def classify_wrapper(
         print(f"Done generating human-readable IR files for {output_dir}.")
 
 
-def batch_classify_v3(
+def batch_classify(
     input_root_dir: str,
     output_root_dir: str,
     global_isel: bool = False,
@@ -77,10 +87,16 @@ def batch_classify_v3(
 
 
 def main() -> None:
-    batch_classify_v3(
+    batch_classify(
         input_root_dir="/home/peter/irfuzzer.expriment/baseline/combined/aflisel/dagisel",
-        output_root_dir="./crash-classification-6-temp",
-        mtriple_filter=lambda mtriple: mtriple == "xcore",
+        output_root_dir="./crash-classification-7-fuzzing/aflisel/dagisel",
+        generate_ll_files=False
+    )
+
+    batch_classify(
+        input_root_dir="/home/peter/irfuzzer.expriment/baseline/combined/libfuzzer/dagisel",
+        output_root_dir="./crash-classification-7-fuzzing/libfuzzer/dagisel",
+        generate_ll_files=False
     )
 
 

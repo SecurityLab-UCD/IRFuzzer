@@ -36,6 +36,7 @@ def classify_wrapper(
         verbose=False,
         create_symlink_to_source=False,
         hash_stacktrace_only=True,
+        hash_op_code_only_for_dag_isel_crash=True,
         remove_addr_in_stacktrace=True,
         ignore_undefined_external_symbol=True,
     )
@@ -122,6 +123,19 @@ def main() -> None:
         generate_ll_files=False,
     )
 
+    # batch_classify(
+    #     input_root_dir=path.join(args.input, "aflisel", "gisel"),
+    #     output_root_dir=path.join(args.output, "aflisel", "gisel"),
+    #     global_isel=True,
+    #     generate_ll_files=False,
+    # )
+
+    # batch_classify(
+    #     input_root_dir=path.join(args.input, "libfuzzer", "gisel"),
+    #     output_root_dir=path.join(args.output, "libfuzzer", "gisel"),
+    #     global_isel=True,
+    #     generate_ll_files=False,
+    # )
 
 if __name__ == "__main__":
     main()

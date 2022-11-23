@@ -1,5 +1,4 @@
 import argparse
-import logging
 import subprocess
 import os
 import re
@@ -56,6 +55,7 @@ class CrashError:
     undefined_external_symbol: bool
     stack_trace: StackTrace
     hash_stacktrace_only: bool
+    hash_op_code_only_for_dag_isel_crash: bool
 
     def __init__(
         self,
@@ -63,10 +63,12 @@ class CrashError:
         return_code: int,
         stderr_iter: Iterator[str],
         hash_stacktrace_only: bool = False,
+        hash_op_code_only_for_dag_isel_crash: bool = False,
         remove_addr_in_stacktrace: bool = False,
     ):
         self.return_code = return_code
         self.hash_stacktrace_only = hash_stacktrace_only
+        self.hash_op_code_only_for_dag_isel_crash = hash_op_code_only_for_dag_isel_crash
         self.undefined_external_symbol = False
 
         # extract and minimize error message
@@ -120,7 +122,11 @@ class CrashError:
                     self.failed_pass = match.group(1)
 
             # extract stack trace
-            self.stack_trace = StackTrace(stderr_iter, remove_addr_in_stacktrace)
+            try:
+                self.stack_trace = StackTrace(stderr_iter, remove_addr_in_stacktrace)
+            except:
+                print(f"WARNING: Unable to parse stack trace for {args[-1]}")
+                self.stack_trace = StackTrace([])
         else:
             self.stack_trace = StackTrace([])
 
@@ -173,10 +179,16 @@ class CrashError:
         )
 
     def __hash__(self):
+        if (
+            self.hash_op_code_only_for_dag_isel_crash
+            and self.type == "dag-instruction-selection"
+        ):
+            return hash(self.subtype)
+
         if self.hash_stacktrace_only:
             return hash(self.stack_trace)
-        else:
-            return hash(self.stack_trace) ^ hash(self.message_minimized)
+
+        return hash(self.stack_trace) ^ hash(self.message_minimized)
 
 
 def classify(
@@ -187,6 +199,7 @@ def classify(
     verbose: bool = False,
     create_symlink_to_source: bool = True,
     hash_stacktrace_only: bool = False,
+    hash_op_code_only_for_dag_isel_crash: bool = False,
     remove_addr_in_stacktrace: bool = False,
     ignore_undefined_external_symbol: bool = False,
 ) -> None:
@@ -221,6 +234,7 @@ def classify(
             p.returncode,
             stderr_dump_file,
             hash_stacktrace_only,
+            hash_op_code_only_for_dag_isel_crash,
             remove_addr_in_stacktrace,
         )
 

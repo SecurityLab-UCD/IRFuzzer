@@ -69,7 +69,7 @@ def fuzz(argv):
         verbose_name = f"{argv.fuzzer}-{isel}-{target}-{r}"
         proj_dir = f"{argv.output}/{argv.fuzzer}/{isel}/{target}/{name}"
 
-        fuzz_cmd = f"timeout --signal=2 --foreground {argv.time} $FUZZING_HOME/$AFL/afl-fuzz -i $FUZZING_HOME/seeds/ -o $OUTPUT $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing"
+        fuzz_cmd = f"$FUZZING_HOME/$AFL/afl-fuzz -V {argv.time} -i {argv.input} -o $OUTPUT"
 
         if argv.fuzzer == "aflplusplus":
             dockerimage = "aflplusplus"
@@ -89,11 +89,10 @@ def fuzz(argv):
             export AFL_CUSTOM_MUTATOR_ONLY=1
             export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so;
             """
-            fuzz_cmd = fuzz_cmd.split(" ")
-            fuzz_cmd.insert(-1, "-w")
-            fuzz_cmd = " ".join(fuzz_cmd)
+            fuzz_cmd += " -w"
         else:
             logging.warn("UNREACHABLE")
+        fuzz_cmd += " $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing"
         env_exporting = f"""
             {fuzzer_specific}
             export CPU={cpu};
@@ -128,6 +127,14 @@ def fuzz(argv):
                 sleep 1000
             done
             exit
+            """.encode()
+        elif argv.type == "stdout":
+            command = f"""
+            {env_exporting}
+            export AFL_NO_UI=1
+            export OUTPUT={proj_dir}
+            mkdir -p {proj_dir}
+            {fuzz_cmd}
             """.encode()
         else:
             logging.fatal("UNREACHABLE, type not set")
@@ -205,7 +212,7 @@ def main() -> None:
         "--type",
         type=str,
         required=True,
-        choices=["screen", "docker"],
+        choices=["screen", "docker", "stdout"],
         help="The method to start fuzzing cluster.",
     )
     args = parser.parse_args()

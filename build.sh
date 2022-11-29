@@ -42,7 +42,7 @@ export AFL_LLVM_INSTRUMENT=CLASSIC
 ###### Download llvm-project
 if [ ! -d $FUZZING_HOME/$LLVM ]
 then
-    git clone --branch fuzzing https://github.com/DataCorrupted/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
+    git clone --branch fuzzing-unittests https://github.com/DataCorrupted/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
 fi
 
 ###### Build LLVM & AIE

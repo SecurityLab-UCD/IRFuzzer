@@ -34,8 +34,8 @@ export PATH=$PATH:$HOME/clang+llvm/bin
 if [ ! -d $FUZZING_HOME/$AFL ]
 then
     git clone https://github.com/DataCorrupted/AFLplusplus.git --branch=isel --depth=1 $FUZZING_HOME/$AFL
-    cd $AFL; make -j; cd $FUZZING_HOME
 fi
+cd $FUZZING_HOME/$AFL; make -j; cd $FUZZING_HOME
 export AFL_LLVM_INSTRUMENT=CLASSIC
 
 ###### Download llvm-project

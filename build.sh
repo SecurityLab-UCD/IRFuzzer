@@ -25,6 +25,7 @@ then
     CLANG_LLVM=clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04
     wget https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/$CLANG_LLVM.tar.xz
     tar -xvf $CLANG_LLVM.tar.xz
+    rm $CLANG_LLVM.tar.xz
     mv $CLANG_LLVM clang+llvm14
     ln -s clang+llvm14 clang+llvm
 fi
@@ -41,7 +42,7 @@ export AFL_LLVM_INSTRUMENT=CLASSIC
 ###### Download llvm-project
 if [ ! -d $FUZZING_HOME/$LLVM ]
 then
-    git clone https://github.com/DataCorrupted/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
+    git clone --branch fuzzing https://github.com/DataCorrupted/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
 fi
 
 ###### Build LLVM & AIE

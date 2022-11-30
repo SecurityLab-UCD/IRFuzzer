@@ -55,7 +55,7 @@ class CrashError:
     undefined_external_symbol: bool
     stack_trace: StackTrace
     hash_stacktrace_only: bool
-    hash_op_code_only_for_dag_isel_crash: bool
+    hash_op_code_only_for_isel_crash: bool
 
     def __init__(
         self,
@@ -63,12 +63,12 @@ class CrashError:
         return_code: int,
         stderr_iter: Iterator[str],
         hash_stacktrace_only: bool = False,
-        hash_op_code_only_for_dag_isel_crash: bool = False,
+        hash_op_code_only_for_isel_crash: bool = False,
         remove_addr_in_stacktrace: bool = False,
     ):
         self.return_code = return_code
         self.hash_stacktrace_only = hash_stacktrace_only
-        self.hash_op_code_only_for_dag_isel_crash = hash_op_code_only_for_dag_isel_crash
+        self.hash_op_code_only_for_isel_crash = hash_op_code_only_for_isel_crash
         self.undefined_external_symbol = False
 
         # extract and minimize error message
@@ -179,9 +179,9 @@ class CrashError:
         )
 
     def __hash__(self):
-        if (
-            self.hash_op_code_only_for_dag_isel_crash
-            and self.type == "dag-instruction-selection"
+        if self.hash_op_code_only_for_isel_crash and (
+            self.type == "dag-instruction-selection"
+            or self.type == "global-instruction-selection"
         ):
             return hash(self.subtype)
 
@@ -199,7 +199,7 @@ def classify(
     verbose: bool = False,
     create_symlink_to_source: bool = True,
     hash_stacktrace_only: bool = False,
-    hash_op_code_only_for_dag_isel_crash: bool = False,
+    hash_op_code_only_for_isel_crash: bool = False,
     remove_addr_in_stacktrace: bool = False,
     ignore_undefined_external_symbol: bool = False,
 ) -> None:
@@ -220,7 +220,8 @@ def classify(
     false_alarms: List[str] = []
 
     def on_process_exit(p: subprocess.Popen) -> None:
-        if p.returncode == 0:
+        if os.stat(os.path.join(temp_dir, os.path.basename(p.args[-1]) + ".stderr")).st_size == 0:  # type: ignore
+            print(p.returncode)
             false_alarms.append(p.args[-1])  # type: ignore
             return
 
@@ -234,7 +235,7 @@ def classify(
             p.returncode,
             stderr_dump_file,
             hash_stacktrace_only,
-            hash_op_code_only_for_dag_isel_crash,
+            hash_op_code_only_for_isel_crash,
             remove_addr_in_stacktrace,
         )
 
@@ -246,9 +247,10 @@ def classify(
 
         folder_name = crash.get_folder_name()
         folder_path = os.path.join(output_dir, folder_name)
+        Path(folder_path).mkdir(parents=True, exist_ok=True)
+
         if hash(crash) not in crash_hashes:
             crash_hashes.add(hash(crash))
-            Path(folder_path).mkdir(parents=True)
             with open(
                 os.path.join(output_dir, folder_name + ".log"), "w+"
             ) as report_path:

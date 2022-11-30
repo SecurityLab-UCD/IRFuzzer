@@ -26,7 +26,9 @@ def iterate_over_all_experiments(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Summerize crash data")
+    parser = argparse.ArgumentParser(
+        description="Combine crash data from differnt experiments to count unique crashes"
+    )
 
     parser.add_argument(
         "-i",

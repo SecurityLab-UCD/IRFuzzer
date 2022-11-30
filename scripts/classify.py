@@ -220,15 +220,14 @@ def classify(
     false_alarms: List[str] = []
 
     def on_process_exit(p: subprocess.Popen) -> None:
-        if os.stat(os.path.join(temp_dir, os.path.basename(p.args[-1]) + ".stderr")).st_size == 0:  # type: ignore
-            print(p.returncode)
-            false_alarms.append(p.args[-1])  # type: ignore
-            return
-
         ir_bc_path: str = p.args[-1]  # type: ignore
         file_name = os.path.basename(ir_bc_path)
         stderr_dump_path = os.path.join(temp_dir, file_name + ".stderr")
         stderr_dump_file = open(stderr_dump_path)
+
+        if os.stat(stderr_dump_path).st_size == 0:
+            false_alarms.append(ir_bc_path)
+            return
 
         crash = CrashError(
             p.args,  # type: ignore

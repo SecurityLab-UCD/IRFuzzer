@@ -22,7 +22,7 @@ def classify_wrapper(
     global_isel: bool = False,
     generate_ll_files: bool = True,
 ) -> None:
-    args = [LLC, "-mtriple", mtriple, "-o", TEMP_FILE]
+    args = [LLC, f"-mtriple={mtriple}", "-o", TEMP_FILE]
     if global_isel:
         args.append("-global-isel")
 
@@ -34,9 +34,9 @@ def classify_wrapper(
         output_dir,
         force=True,
         verbose=False,
-        create_symlink_to_source=False,
+        create_symlink_to_source=True,
         hash_stacktrace_only=True,
-        hash_op_code_only_for_dag_isel_crash=True,
+        hash_op_code_only_for_isel_crash=True,
         remove_addr_in_stacktrace=True,
         ignore_undefined_external_symbol=True,
     )
@@ -114,27 +114,23 @@ def main() -> None:
     batch_classify(
         input_root_dir=path.join(args.input, "aflisel", "dagisel"),
         output_root_dir=path.join(args.output, "aflisel", "dagisel"),
-        generate_ll_files=False,
     )
 
     batch_classify(
         input_root_dir=path.join(args.input, "libfuzzer", "dagisel"),
         output_root_dir=path.join(args.output, "libfuzzer", "dagisel"),
-        generate_ll_files=False,
     )
 
     # batch_classify(
     #     input_root_dir=path.join(args.input, "aflisel", "gisel"),
     #     output_root_dir=path.join(args.output, "aflisel", "gisel"),
     #     global_isel=True,
-    #     generate_ll_files=False,
     # )
 
     # batch_classify(
     #     input_root_dir=path.join(args.input, "libfuzzer", "gisel"),
     #     output_root_dir=path.join(args.output, "libfuzzer", "gisel"),
     #     global_isel=True,
-    #     generate_ll_files=False,
     # )
 
 if __name__ == "__main__":

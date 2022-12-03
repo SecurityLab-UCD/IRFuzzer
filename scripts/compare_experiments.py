@@ -154,13 +154,15 @@ def main():
 
     x_col = "# relative_time"
     y_col = "shw_cvg"
-    desired_xs = range(100, 80000 + 1, 100)
+    desired_xs = range(800, 80000 + 1, 200)
     t = 2.776  # t(df=4, two-tail alpha=0.05)
     dir_mt_off = os.path.join(args.dir_mt_off, "aflisel/dagisel")
     dir_mt_on = os.path.join(args.dir_mt_on, "aflisel/dagisel")
     archs = ["aarch64", "arm", "nvptx", "riscv64", "x86_64"]
 
-    fig, axs = pyplot.subplots(nrows=1, ncols=len(archs), figsize=(28, 4))
+    fig, axs = pyplot.subplots(
+        nrows=1, ncols=len(archs), layout="constrained", figsize=(12, 2.4)
+    )
 
     for i, arch in enumerate(archs):
         df_ci = compare(
@@ -175,37 +177,39 @@ def main():
 
         axs[i].set_title(arch)
 
-        axs[i].plot(x_col, f"{y_col}_mean_off", data=df_ci, color="blue")
+        axs[i].plot(x_col, f"{y_col}_mean_off", data=df_ci, color="#4899dc")
         axs[i].fill_between(
             x=x_col,
             y1=f"{y_col}_ci_lower_off",
             y2=f"{y_col}_ci_upper_off",
             data=df_ci,
-            color="lightblue",
+            color="#a2ccee",
             alpha=0.5,
         )
 
-        axs[i].plot(x_col, f"{y_col}_mean_on", data=df_ci, color="red")
+        axs[i].plot(x_col, f"{y_col}_mean_on", data=df_ci, color="#f89d49")
         axs[i].fill_between(
             x=x_col,
             y1=f"{y_col}_ci_lower_on",
             y2=f"{y_col}_ci_upper_on",
             data=df_ci,
-            color="pink",
+            color="#fccea7",
             alpha=0.5,
         )
 
     axs[0].set_ylabel("Matcher Table Coverage")
     axs[len(archs) // 2].set_xlabel("Time (sec)")
-    axs[len(archs) - 1].legend(
+    axs[0].legend(
         [
             "Matcher Table Off (Mean)",
             "Matcher Table Off (95% CI)",
             "Matcher Table On (Mean)",
             "Matcher Table On (95% CI)",
         ],
-        bbox_to_anchor=(1.04, 0.5),
-        loc="center left",
+        bbox_to_anchor=(0, 1.25, 6, 0.2),
+        loc="lower left",
+        mode="expand",
+        ncol=4,
     )
 
     fig.savefig(args.out)

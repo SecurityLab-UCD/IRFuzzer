@@ -156,7 +156,7 @@ CPU_ATTR_ARCH_LIST_TIER_3 = [
     ("bleeding-edge", "", "wasm64"),
 ]
 
-LLVM_COMMIT = 66046e6
+LLVM_COMMIT = "0c35b6165ccc"
 
 
 def __verify():
@@ -166,15 +166,26 @@ def __verify():
             "$FUZZING_HOME not set, why am I running? Did you install correctly?"
         )
         return
-    if os.getcwd() != FUZZING_HOME:
+    if not os.path.samefile(os.getcwd(), FUZZING_HOME):
         logging.warning("I am not in $FUZZING_HOME now.")
     LLVM = os.getenv("LLVM")
     if LLVM == None:
         logging.warn("$LLVM not set, using llvm-project as default.")
         LLVM = "llvm-project"
-    LLVM = os.path.join(FUZZING_HOME, LLVM)
+    LLVM_path = os.path.join(FUZZING_HOME, LLVM)
 
-    # TODO: Verify that current commit in LLVM is COMMIT.
+    # Verify that current commit in LLVM is LLVM_COMMIT.
+    cur_commit = (
+        subprocess.check_output(
+            ["git", "-C", LLVM_path, "rev-parse", "--short", "HEAD"]
+        )
+        .decode("ascii")
+        .strip()
+    )
+    if cur_commit != LLVM_COMMIT:
+        logging.warn(
+            f"Your LLVM version ({cur_commit}) is different from what I have here ({LLVM_COMMIT}), matcher table size maybe incorrect."
+        )
 
 
 __verify()
@@ -238,7 +249,7 @@ class ExprimentInfo:
         self.isel = isel
         self.arch = arch
         self.expr_id = expr_id
-        
+
         try:
             with open(self.get_fuzzer_stats_path(), "r") as f:
                 for line in f:

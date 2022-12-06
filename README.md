@@ -248,3 +248,21 @@ __What if `MatcherTable` is not set or set incorrectly?__
 To pass compilation and AFL's self-testing, `MATCHER_TABLE_SIZE` is defaulted to a small amount. You would most like to see `Shadow table size: 32 too small. Did you set it properly?` that means it is not set.
 If `MATCHER_TABLE_SIZE` is not set correctly, you will have false positives where the seed is stored in `crashes` (Indicating the fuzzer finds the seed crashing), but you can't reproduce it with `llc`. 
 That means the runtime code we injected is crashing, not the LLVM itself. Most likely, it's because `MATCHER_TABLE_SIZE` is set too small, and an OOB Write happened.
+
+__My mutator aborted during fuzzing?__
+
+This is a common issue, its not a bug in the mutator.
+Most likely you didn't set the types correctly. 
+If mutator can't find a typed value to complete an instruction generation, it aborts.
+Therefore, it is important to write all types when creating the mutator.
+
+Mutator is non-deterministic, debuging is hard. 
+But here's a trick, the mutator is deterministic is the seed is the same.
+If your fuzzer crashed, go find the `.cur_input` in your repo, this is the last input that mutator worked on before it crashed.
+Use `./mutator/scripts/validate.sh .cur_input` to verify the mutator with this input.
+The script will (hopefully) give you the seed that crashed the mutator.
+You can then debug the mutator by providing it with a deterministic seed that validator just poped out: `./mutator/build/MutatorDriver .cur_input <seed>`.
+If you can confirm that the last stack trace is `SourcePred.generate`, that's it, you didn't provide all the types required.
+If you see any other reasons for crashing, contact me.
+
+Also, when mutator dies, the fuzzer become a zombie process, don't forget to clean it up :)

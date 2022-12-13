@@ -99,6 +99,7 @@ def main() -> None:
         if not os.path.exists(args.csmith_root):
             print(f"ERROR: missing CSmith in {args.csmith_root}.")
             print(f"Run `git clone https://github.com/csmith-project/csmith.git {args.csmith_root}`")
+            return
 
         if (include is not None and not os.path.exists(include)) or (
             sysroot is not None and not os.path.exists(sysroot)

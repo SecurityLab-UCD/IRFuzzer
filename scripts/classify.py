@@ -144,7 +144,7 @@ class CrashError:
         elif self.message_raw.startswith("LLVM ERROR: Cannot select:"):
             self.type = "dag-instruction-selection"
             match = re.match(
-                r"LLVM ERROR: Cannot select:.+ = ([a-zA-Z_:]+(<.+>)?)", message_lines[0]
+                r"LLVM ERROR: Cannot select:.+ = ([a-zA-Z0-9_:]+(<.+>)?)", message_lines[0]
             )
             if match is None:
                 print(f'ERROR: failed to extract instruction from "{message_lines[0]}"')

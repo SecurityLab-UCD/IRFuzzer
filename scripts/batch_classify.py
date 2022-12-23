@@ -1,7 +1,7 @@
 import argparse
 import logging
 import subprocess
-from typing import Callable
+from typing import Callable, Optional
 
 from classify import classify
 from os import path
@@ -16,15 +16,22 @@ TEMP_FILE = "temp.s"
 
 
 def classify_wrapper(
-    mtriple: str,
     input_dir: str,
     output_dir: str,
+    mtriple: str,
+    mcpu: Optional[str] = None,
     global_isel: bool = False,
     generate_ll_files: bool = True,
 ) -> None:
-    args = [LLC, f"-mtriple={mtriple}", "-o", TEMP_FILE]
+    args = [LLC, f"-mtriple={mtriple}"]
+
+    if mcpu is not None:
+        args.append(f"-mcpu={mcpu}")
+
     if global_isel:
         args.append("-global-isel")
+
+    args += ["-o", TEMP_FILE]
 
     print(f"Start classifying {input_dir} using '{(' '.join(args))}'...")
 
@@ -70,7 +77,10 @@ def batch_classify(
     mtriple_filter: Callable[[str], bool] = lambda _: True,
 ) -> None:
     for subdir in subdirs_of(input_root_dir):
-        mtriple = subdir.name
+        parts = subdir.name.split('-', 1)
+        
+        mtriple = parts[0]
+        mcpu = parts[1] if len(parts) == 2 else None
 
         if not mtriple_filter(mtriple):
             continue
@@ -78,9 +88,10 @@ def batch_classify(
         for subsubdir in subdirs_of(subdir.path):
             try:
                 classify_wrapper(
-                    mtriple,
                     input_dir=path.join(subsubdir.path, "default", "crashes"),
-                    output_dir=path.join(output_root_dir, mtriple, subsubdir.name),
+                    output_dir=path.join(output_root_dir, subdir.name, subsubdir.name),
+                    mtriple=mtriple,
+                    mcpu=mcpu,
                     global_isel=global_isel,
                     generate_ll_files=generate_ll_files,
                 )

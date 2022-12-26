@@ -1,6 +1,6 @@
 import argparse
 import os
-from typing import Iterable, Iterator, List, Tuple
+from typing import Iterable, Iterator, Tuple
 from matplotlib import pyplot
 import numpy as np
 import pandas as pd
@@ -156,8 +156,8 @@ def main():
     y_col = "shw_cvg"
     desired_xs = range(800, 80000 + 1, 200)
     t = 2.776  # t(df=4, two-tail alpha=0.05)
-    dir_mt_off = os.path.join(args.dir_mt_off, "aflisel/dagisel")
-    dir_mt_on = os.path.join(args.dir_mt_on, "aflisel/dagisel")
+    dir_mt_off = os.path.join(args.dir_mt_off, "irfuzzer/dagisel")
+    dir_mt_on = os.path.join(args.dir_mt_on, "irfuzzer/dagisel")
     archs = ["aarch64", "arm", "nvptx", "riscv64", "x86_64"]
 
     fig, axs = pyplot.subplots(

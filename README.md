@@ -1,4 +1,4 @@
-# Fuzzing isel using AFL++
+# IR Fuzzer
 
 # Quick start
 
@@ -110,7 +110,7 @@ Check `./script/common.py`.
 ### Dependencies
 
 We prepared many scripts to automate the fuzzing process.
-These scripts runs on `python3.8`, as it supports type hints to make it look less messy.
+These scripts runs on Python 3.8+, as it supports type hints to make it look less messy.
 Use `python3.8` explictly to avoid conflict with `python3.6`... suppose you are still using ubuntu 18.04 or order.
 To install some dependencies you may want to:
 ```sh
@@ -136,10 +136,10 @@ Using `fuzz.py` don't need you to set any environment variables, the script will
 You would most likely use the `fuzz.py` like this:
 
 ```sh
-python3.8 scripts/fuzz.py -i seeds -o fuzzing -r 5 --set="  aie" --type=screen --isel=dagisel --fuzzer=aflisel --time=1w -j 80 --on_exist=force
+python3.8 scripts/fuzz.py -i seeds -o fuzzing -r 5 --set="  aie" --type=screen --isel=dagisel --fuzzer=irfuzzer --time=1w -j 80 --on_exist=force
 ```
 
-It means: start fuzzing using input from `seeds` (`-i seed`), put the result in `fuzzing` (`-o fuzzing`), repeat the experiment for five times (`-r 5`), test aie without attribute and cpu setting (`--set="  aie"`), use screen to monitor the fuzzing (`--type=screen`), test SelectionDAG (`--isel=dagisel`), use our fuzzer (`--fuzzer=aflisel`), test for a week (`--time=1w`), start at most 80 jobs in parallel (`-j 80`) and if the output directory already exists, force remove it (`--on_exist=force`)
+It means: start fuzzing using input from `seeds` (`-i seed`), put the result in `fuzzing` (`-o fuzzing`), repeat the experiment for five times (`-r 5`), test aie without attribute and cpu setting (`--set="  aie"`), use screen to monitor the fuzzing (`--type=screen`), test SelectionDAG (`--isel=dagisel`), use our fuzzer (`--fuzzer=irfuzzer`), test for a week (`--time=1w`), start at most 80 jobs in parallel (`-j 80`) and if the output directory already exists, force remove it (`--on_exist=force`)
 
 # How do we fuzz
 

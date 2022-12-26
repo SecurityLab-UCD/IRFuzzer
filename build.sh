@@ -34,7 +34,7 @@ export PATH=$PATH:$HOME/clang+llvm/bin
 ###### Download and compile AFLplusplus
 if [ ! -d $FUZZING_HOME/$AFL ]
 then
-    git clone https://github.com/DataCorrupted/AFLplusplus.git --branch=isel --depth=1 $FUZZING_HOME/$AFL
+    git clone https://github.com/SecurityLab-UCD/AFLplusplus.git --branch=isel --depth=1 $FUZZING_HOME/$AFL
 fi
 cd $FUZZING_HOME/$AFL; make -j; cd $FUZZING_HOME
 export AFL_LLVM_INSTRUMENT=CLASSIC
@@ -42,7 +42,7 @@ export AFL_LLVM_INSTRUMENT=CLASSIC
 ###### Download llvm-project
 if [ ! -d $FUZZING_HOME/$LLVM ]
 then
-    git clone --branch fuzzing-unittests https://github.com/DataCorrupted/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
+    git clone --branch fuzzing-unittests https://github.com/SecurityLab-UCD/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
 fi
 
 ###### Build LLVM & AIE
@@ -150,9 +150,9 @@ export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMuta
 
 # for I in {0..2}
 # do
-#     screen -S fuzzing-dagisel-$I -dm bash -c "export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_LLVM/seeds/ -o ~/fuzzing_LLVM/3.fuzzing.vec++/fuzzing-dagisel-$I  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
-#     screen -S fuzzing-globalisel-$I -dm bash -c "export GLOBAL_ISEL=1; export MATCHER_TABLE_SIZE=13780; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_LLVM/seeds/ -o ~/fuzzing_LLVM/3.fuzzing.vec++/fuzzing-globalisel-$I  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
+#     screen -S fuzzing-dagisel-$I -dm bash -c "export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_LLVM/seeds/ -o ~/fuzzing_LLVM/3.fuzzing.vec++/fuzzing-dagisel-$I  -w /home/yuyangr/IRFuzzer/llvm-isel-afl/build/isel-fuzzing; bash"
+#     screen -S fuzzing-globalisel-$I -dm bash -c "export GLOBAL_ISEL=1; export MATCHER_TABLE_SIZE=13780; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_LLVM/seeds/ -o ~/fuzzing_LLVM/3.fuzzing.vec++/fuzzing-globalisel-$I  -w /home/yuyangr/IRFuzzer/llvm-isel-afl/build/isel-fuzzing; bash"
 # done
 
-# screen -S dagisel -dm bash -c "export TRIPLE=aie; export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/5.aie16.0-isel/dagisel  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
-# screen -S globalisel -dm bash -c "export TRIPLE=aie; export GLOBAL_ISEL=1; export MATCHER_TABLE_SIZE=13780; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/5.aie16.0-isel/globalisel  -w /home/yuyangr/aflplusplus-isel/llvm-isel-afl/build/isel-fuzzing; bash"
+# screen -S dagisel -dm bash -c "export TRIPLE=aie; export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/5.aie16.0-isel/dagisel  -w /home/yuyangr/IRFuzzer/llvm-isel-afl/build/isel-fuzzing; bash"
+# screen -S globalisel -dm bash -c "export TRIPLE=aie; export GLOBAL_ISEL=1; export MATCHER_TABLE_SIZE=13780; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/5.aie16.0-isel/globalisel  -w /home/yuyangr/IRFuzzer/llvm-isel-afl/build/isel-fuzzing; bash"

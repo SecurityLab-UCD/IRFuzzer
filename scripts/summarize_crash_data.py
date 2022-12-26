@@ -54,13 +54,13 @@ def main() -> None:
 
     df_summary.to_csv("crash-counts.csv")
 
-    df_aflisel = df[df["fuzzer"] == "aflisel"].drop(columns=["fuzzer"])
+    df_irfuzzer = df[df["fuzzer"] == "irfuzzer"].drop(columns=["fuzzer"])
     df_libfuzzer = df[df["fuzzer"] == "libfuzzer"].drop(columns=["fuzzer"])
 
-    df_comparison = df_aflisel.merge(
+    df_comparison = df_irfuzzer.merge(
         df_libfuzzer,
         on=["isel", "arch", "replicate"],
-        suffixes=("_aflisel", "_libfuzzer"),
+        suffixes=("_irfuzzer", "_libfuzzer"),
     )
 
     df_comparison.to_csv("crash-data-comparison.csv")

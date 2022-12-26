@@ -123,8 +123,8 @@ def main() -> None:
     args = parser.parse_args()
 
     batch_classify(
-        input_root_dir=path.join(args.input, "aflisel", "dagisel"),
-        output_root_dir=path.join(args.output, "aflisel", "dagisel"),
+        input_root_dir=path.join(args.input, "irfuzzer", "dagisel"),
+        output_root_dir=path.join(args.output, "irfuzzer", "dagisel"),
     )
 
     batch_classify(
@@ -133,8 +133,8 @@ def main() -> None:
     )
 
     # batch_classify(
-    #     input_root_dir=path.join(args.input, "aflisel", "gisel"),
-    #     output_root_dir=path.join(args.output, "aflisel", "gisel"),
+    #     input_root_dir=path.join(args.input, "irfuzzer", "gisel"),
+    #     output_root_dir=path.join(args.output, "irfuzzer", "gisel"),
     #     global_isel=True,
     # )
 

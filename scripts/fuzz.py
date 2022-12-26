@@ -3,7 +3,6 @@ import common
 import subprocess
 import argparse
 import os
-from typing import List
 import multiprocessing
 
 
@@ -69,7 +68,9 @@ def fuzz(argv):
         verbose_name = f"{argv.fuzzer}-{isel}-{target}-{r}"
         proj_dir = f"{argv.output}/{argv.fuzzer}/{isel}/{target}/{name}"
 
-        fuzz_cmd = f"$FUZZING_HOME/$AFL/afl-fuzz -V {argv.time} -i {argv.input} -o $OUTPUT"
+        fuzz_cmd = (
+            f"$FUZZING_HOME/$AFL/afl-fuzz -V {argv.time} -i {argv.input} -o $OUTPUT"
+        )
 
         if argv.fuzzer == "aflplusplus":
             dockerimage = "aflplusplus"
@@ -83,8 +84,8 @@ def fuzz(argv):
             export AFL_CUSTOM_MUTATOR_ONLY=1
             export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLFuzzMutate.so;
             """
-        elif argv.fuzzer == "aflisel":
-            dockerimage = "aflplusplus-isel"
+        elif argv.fuzzer == "irfuzzer":
+            dockerimage = "irfuzzer"
             fuzzer_specific = f"""
             export AFL_CUSTOM_MUTATOR_ONLY=1
             export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so;
@@ -172,7 +173,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--fuzzer",
-        choices=["aflplusplus", "libfuzzer", "aflisel"],
+        choices=["aflplusplus", "libfuzzer", "irfuzzer"],
         required=True,
         help="The fuzzer we are using for fuzzing.",
     )

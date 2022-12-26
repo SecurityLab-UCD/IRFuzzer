@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get install -y -q git build-essential wget zlib1g-dev cmake python3 python3-pip ninja-build ccache && \
     apt-get clean
 
-ENV FUZZING_HOME=/AFLplusplus-isel
+ENV FUZZING_HOME=/IRFuzzer
 
 RUN mkdir -p /$FUZZING_HOME
 COPY . /$FUZZING_HOME

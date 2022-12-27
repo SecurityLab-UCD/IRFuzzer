@@ -145,14 +145,3 @@ export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMuta
 # It will report a `no such process`, that's ok.
 # That process is `grep`, which is also shown in `ps`, which died before `kill` thus doesn't exist.
 # kill -9 $(ps aux | grep isel-fuzzing | awk '{print $2}')
-
-# cat fuzzing-wo-shadow*/default/fuzzer_stats | grep shadow_cvg ; cat fuzzing-w-shadow*/default/fuzzer_stats | grep shadow_cvg
-
-# for I in {0..2}
-# do
-#     screen -S fuzzing-dagisel-$I -dm bash -c "export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_LLVM/seeds/ -o ~/fuzzing_LLVM/3.fuzzing.vec++/fuzzing-dagisel-$I  -w /home/yuyangr/IRFuzzer/llvm-isel-afl/build/isel-fuzzing; bash"
-#     screen -S fuzzing-globalisel-$I -dm bash -c "export GLOBAL_ISEL=1; export MATCHER_TABLE_SIZE=13780; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_LLVM/seeds/ -o ~/fuzzing_LLVM/3.fuzzing.vec++/fuzzing-globalisel-$I  -w /home/yuyangr/IRFuzzer/llvm-isel-afl/build/isel-fuzzing; bash"
-# done
-
-# screen -S dagisel -dm bash -c "export TRIPLE=aie; export MATCHER_TABLE_SIZE=22600; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/5.aie16.0-isel/dagisel  -w /home/yuyangr/IRFuzzer/llvm-isel-afl/build/isel-fuzzing; bash"
-# screen -S globalisel -dm bash -c "export TRIPLE=aie; export GLOBAL_ISEL=1; export MATCHER_TABLE_SIZE=13780; $FUZZING_HOME/$AFL/afl-fuzz -i ~/fuzzing_AIE/seeds/ -o ~/fuzzing_AIE/5.aie16.0-isel/globalisel  -w /home/yuyangr/IRFuzzer/llvm-isel-afl/build/isel-fuzzing; bash"

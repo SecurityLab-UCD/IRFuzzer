@@ -77,8 +77,8 @@ def batch_classify(
     mtriple_filter: Callable[[str], bool] = lambda _: True,
 ) -> None:
     for subdir in subdirs_of(input_root_dir):
-        parts = subdir.name.split('-', 1)
-        
+        parts = subdir.name.split("-", 1)
+
         mtriple = parts[0]
         mcpu = parts[1] if len(parts) == 2 else None
 
@@ -122,27 +122,14 @@ def main() -> None:
 
     args = parser.parse_args()
 
-    batch_classify(
-        input_root_dir=path.join(args.input, "irfuzzer", "dagisel"),
-        output_root_dir=path.join(args.output, "irfuzzer", "dagisel"),
-    )
+    for fuzzer_dir in subdirs_of(args.input):
+        for isel_dir in subdirs_of(fuzzer_dir.path):
+            batch_classify(
+                input_root_dir=path.join(isel_dir.path),
+                output_root_dir=path.join(args.output, fuzzer_dir.name, isel_dir.name),
+                global_isel=isel_dir.name == "gisel",
+            )
 
-    batch_classify(
-        input_root_dir=path.join(args.input, "libfuzzer", "dagisel"),
-        output_root_dir=path.join(args.output, "libfuzzer", "dagisel"),
-    )
-
-    # batch_classify(
-    #     input_root_dir=path.join(args.input, "irfuzzer", "gisel"),
-    #     output_root_dir=path.join(args.output, "irfuzzer", "gisel"),
-    #     global_isel=True,
-    # )
-
-    # batch_classify(
-    #     input_root_dir=path.join(args.input, "libfuzzer", "gisel"),
-    #     output_root_dir=path.join(args.output, "libfuzzer", "gisel"),
-    #     global_isel=True,
-    # )
 
 if __name__ == "__main__":
     main()

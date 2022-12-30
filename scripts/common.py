@@ -82,7 +82,7 @@ CPU_ATTR_ARCH_LIST_TIER_1 = [
     ("", "", "aarch64"),
     ("", "", "aarch64_32"),
     ("", "", "amdgcn"),
-    ("", "", "arm64"),
+    # ("", "", "arm64"),
     ("", "", "bpf"),
     ("", "", "hexagon"),
     ("", "", "mips64"),
@@ -100,7 +100,7 @@ CPU_ATTR_ARCH_LIST_TIER_1 = [
 CPU_ATTR_ARCH_LIST_TIER_2 = [
     ("", "", "aarch64_be"),
     ("", "", "arm"),
-    ("", "", "arm64_32"),
+    # ("", "", "arm64_32"),
     ("", "", "armeb"),
     ("", "", "avr"),
     ("", "", "bpfeb"),
@@ -138,9 +138,8 @@ CPU_ATTR_ARCH_LIST_TIER_3 = [
     ("exynos-m5", "", "aarch64"),
     # ARM
     ("cortex-a710", "", "aarch64"),
-    # ("cortex-x2", "", "aarch64"),
+    ("cortex-x2", "", "aarch64"),
     ("cortex-r82", "", "aarch64"),
-    ("cortex-m55", "", "aarch64"),
     # ("neoverse-v2", "", "aarch64"),
     # AMD
     ("gfx1100", "", "amdgcn"),

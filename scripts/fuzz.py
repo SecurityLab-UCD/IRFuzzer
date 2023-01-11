@@ -1,62 +1,135 @@
 import logging
+from typing import Dict, Iterable, List, Literal, Optional, Tuple
 import common
 import subprocess
-import argparse
 import os
 import multiprocessing
+from tap import Tap
 
 
-def fuzz(argv):
-    argv.output = os.path.abspath(argv.output)
-    if os.path.exists(argv.output):
-        logging.info(f"{argv.output} already exists.")
-        if argv.on_exist == "force":
-            logging.info(f"on_exist set to {argv.on_exist}, will force remove")
-            subprocess.run(["rm", "-rf", argv.output])
-        elif argv.on_exist == "abort":
-            logging.info(f"on_exist set to {argv.on_exist}, won't work on it.")
-            return
+DOCKER_IMAGE = "irfuzzer"
+SECONDS_PER_UNIT = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
 
-    if argv.isel == "gisel":
-        global_isel = 1
-        matcher_table_size = common.MATCHER_TABLE_SIZE_GISEL
-    elif argv.isel == "dagisel":
-        global_isel = 0
-        matcher_table_size = common.MATCHER_TABLE_SIZE_DAGISEL
-    else:
-        logging.fatal("UNREACHABLE, isel not set.")
+Fuzzer = Literal["aflplusplus", "libfuzzer", "irfuzzer"]
+Tier = Literal[0, 1, 2, 3]
+ClutserType = Literal["screen", "docker", "stdout"]
+CpuAttrArchList = List[Tuple[str, str, str]]
 
-    cpu_attr_arch_list = []
-    if argv.tier == 0:
-        cpu_attr_arch_list = [
-            ("", "", triple) for triple in common.TRIPLE_ARCH_MAP.keys()
-        ]
-    elif argv.tier == 1:
-        cpu_attr_arch_list = common.CPU_ATTR_ARCH_LIST_TIER_1
-    elif argv.tier == 2:
-        cpu_attr_arch_list = common.CPU_ATTR_ARCH_LIST_TIER_2
-    elif argv.tier == 3:
-        cpu_attr_arch_list = common.CPU_ATTR_ARCH_LIST_TIER_3
-    elif argv.set is not None:
-        cpu_attr_arch_list = [tuple(s.split(" ")) for s in argv.set]
-        # TODO: Also do some sanity check for the set we are given.
 
-    else:
-        logging.fatal("UNREACHABLE, both tier and set is not specified.")
+class Args(Tap):
+    """
+    Command-line Arguments
+    (Reference: https://github.com/swansonk14/typed-argument-parser)
+    """
 
-    isel = "dagisel" if global_isel == 0 else "gisel"
+    fuzzer: Fuzzer = "irfuzzer"
+    """the fuzzer used for fuzzing"""
+
+    input: str = "./seeds"
+    """the directory containing input seeds"""
+
+    output: str = "./fuzzing"
+    """the output directory"""
+
+    on_exist: Literal["abort", "force", "ignore"] = "abort"
+    """the action to take if the output directory already exists"""
+
+    isel: Literal["gisel", "dagisel"] = "dagisel"
+    """the LLVM instruction selection method to fuzz"""
+
+    tier: Optional[Tier] = None
+    """
+    the set of targets to fuzz
+    (0: everything, 1: Tier 1, 2: Tier 2, see 'common.py' for details)
+    (can be overriden by `--set`)
+    """
+
+    set: Optional[List[str]] = None
+    """manually specify targets to fuzz ('tier' will be ignored)"""
+
+    time: str = "5m"
+    """duration for each experiment (e.g. '100s', '30m', '2h', '1d')"""
+
+    repeat: int = 3
+    """how many times each experiemt should run"""
+
+    offset: int = 0
+    """the offset to start counting experiments"""
+
+    jobs: int = multiprocessing.cpu_count()
+    """the max number of concurrent subprocesses"""
+
+    type: ClutserType
+    """the method to start fuzzing cluster"""
+
+    def configure(self):
+        self.add_argument("-i", "--input")
+        self.add_argument("-o", "--output")
+        self.add_argument("-j", "--jobs")
+        self.add_argument("-t", "--time")
+
+    def get_cpu_attr_arch_list(self) -> CpuAttrArchList:
+        if self.tier == 0:
+            return [("", "", triple) for triple in common.TRIPLE_ARCH_MAP.keys()]
+        elif self.tier == 1:
+            return common.CPU_ATTR_ARCH_LIST_TIER_1
+        elif self.tier == 2:
+            return common.CPU_ATTR_ARCH_LIST_TIER_2
+        elif self.tier == 3:
+            return common.CPU_ATTR_ARCH_LIST_TIER_3
+        elif self.set is not None:
+            return [tuple(s.split(" ")) for s in self.set]
+        else:
+            logging.error("Either '--tier' or '--set' has to be specified.")
+            exit(1)
+
+    def get_time_in_seconds(self) -> int:
+        return int(self.time[:-1]) * SECONDS_PER_UNIT[self.time[-1]]
+
+
+def get_export_command(name: str, value: str) -> str:
+    return f'export {name}="{value}"'
+
+
+def get_export_commands(env: Dict[str, str]) -> Iterable[str]:
+    return (get_export_command(name, value) for name, value in env.items())
+
+
+def combine_commands(*commands: str) -> str:
+    return " && ".join(commands)
+
+
+def fuzz(
+    fuzzer: Fuzzer,
+    cpu_attr_arch_list: CpuAttrArchList,
+    global_isel: bool,
+    in_dir: str,
+    out_dir: str,
+    time: int,
+    repeat: int,
+    offset: int,
+    type: ClutserType,
+    jobs: int,
+) -> None:
+    matcher_table_size = (
+        common.MATCHER_TABLE_SIZE_GISEL
+        if global_isel
+        else common.MATCHER_TABLE_SIZE_DAGISEL
+    )
+    isel = "gisel" if global_isel else "dagisel"
+
     tuples = []
-    for r in range(argv.repeat):
+    for r in range(repeat):
         for (cpu, attr, triple) in cpu_attr_arch_list:
             arch = common.TRIPLE_ARCH_MAP[triple]
             if arch not in matcher_table_size:
-                logging.info(
-                    f"Can't find {triple}({arch})s' matcher table size, not fuzzing "
+                logging.warn(
+                    f"Can't find {triple}({arch})s' matcher table size, not fuzzing"
                 )
                 continue
-            tuples.append((r + argv.offset, cpu, attr, triple, arch))
+            tuples.append((r + offset, cpu, attr, triple, arch))
 
-    def process_creator(t):
+    def process_creator(t) -> subprocess.Popen:
         r, cpu, attr, triple, arch = t
         logging.info(f"Fuzzing {cpu} {attr} {triple} {arch} -- {r}.")
         target = triple
@@ -64,167 +137,112 @@ def fuzz(argv):
             target += "-" + cpu
         if attr != "":
             target += "-" + attr
-        name = f"{r}"
-        verbose_name = f"{argv.fuzzer}-{isel}-{target}-{r}"
-        proj_dir = f"{argv.output}/{argv.fuzzer}/{isel}/{target}/{name}"
 
-        fuzz_cmd = (
-            f"$FUZZING_HOME/$AFL/afl-fuzz -V {argv.time} -i {argv.input} -o $OUTPUT"
-        )
+        name = f"{fuzzer}-{isel}-{target}-{r}"
+        expr_dir = f"{out_dir}/{fuzzer}/{isel}/{target}/{r}"
 
-        if argv.fuzzer == "aflplusplus":
-            dockerimage = "aflplusplus"
-            fuzzer_specific = f"""
-            export AFL_CUSTOM_MUTATOR_ONLY=0
-            export AFL_CUSTOM_MUTATOR_LIBRARY="";
-            """
-        elif argv.fuzzer == "libfuzzer":
-            dockerimage = "libfuzzer"
-            fuzzer_specific = f"""
-            export AFL_CUSTOM_MUTATOR_ONLY=1
-            export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLFuzzMutate.so;
-            """
-        elif argv.fuzzer == "irfuzzer":
-            dockerimage = "irfuzzer"
-            fuzzer_specific = f"""
-            export AFL_CUSTOM_MUTATOR_ONLY=1
-            export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so;
-            """
+        fuzz_cmd = f"$FUZZING_HOME/$AFL/afl-fuzz -V {time} -i {in_dir} -o $OUTPUT"
+
+        env = {}
+
+        if fuzzer == "aflplusplus":
+            env["AFL_CUSTOM_MUTATOR_ONLY"] = "0"
+            env["AFL_CUSTOM_MUTATOR_LIBRARY"] = ""
+        elif fuzzer == "libfuzzer":
+            env["AFL_CUSTOM_MUTATOR_ONLY"] = "1"
+            env[
+                "AFL_CUSTOM_MUTATOR_LIBRARY"
+            ] = "$FUZZING_HOME/mutator/build/libAFLFuzzMutate.so"
+        elif fuzzer == "irfuzzer":
+            env["AFL_CUSTOM_MUTATOR_ONLY"] = "1"
+            env[
+                "AFL_CUSTOM_MUTATOR_LIBRARY"
+            ] = "$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so"
             fuzz_cmd += " -w"
         else:
-            logging.warn("UNREACHABLE")
+            logging.fatal("UNREACHABLE")
+            exit(1)
+
         fuzz_cmd += " $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing"
-        env_exporting = f"""
-            {fuzzer_specific}
-            export CPU={cpu};
-            export ATTR={attr};
-            export TRIPLE={triple};
-            export GLOBAL_ISEL={global_isel};
-            export MATCHER_TABLE_SIZE={matcher_table_size[arch]};
-        """
 
-        if argv.type == "screen":
-            command = f"""
-            {env_exporting}
-            export OUTPUT={proj_dir}
-            mkdir -p {proj_dir}
-            screen -S {verbose_name} -dm bash -c "{fuzz_cmd}"
+        env["CPU"] = cpu
+        env["ATTR"] = attr
+        env["TRIPLE"] = triple
+        env["GLOBAL_ISEL"] = "1" if global_isel else "0"
+        env["MATCHER_TABLE_SIZE"] = str(matcher_table_size[arch])
 
-            sleep {argv.time+60}
-            exit
-            """.encode()
-        elif argv.type == "docker":
-            command = f"""
-            export OUTPUT=$FUZZING_HOME/fuzzing
-            mkdir -p {proj_dir}
-            docker run --cpus=1 --name={verbose_name} --rm --mount type=tmpfs,tmpfs-size=1G,dst=$OUTPUT --env OUTPUT=$OUTPUT -v {proj_dir}:/output {dockerimage} bash -c "
-                {env_exporting}
-                {fuzz_cmd}
-                mv $OUTPUT/default /output/default
-            "
-            # Keep track of this container before it quits.
-            while [[ ! -z $(docker ps | grep {verbose_name}) ]]
-            do
-                sleep 1000
-            done
-            exit
-            """.encode()
-        elif argv.type == "stdout":
-            command = f"""
-            {env_exporting}
-            export AFL_NO_UI=1
-            export OUTPUT={proj_dir}
-            mkdir -p {proj_dir}
-            {fuzz_cmd}
-            """.encode()
+        command = ""
+
+        if type == "screen":
+            env["OUTPUT"] = expr_dir
+            command = combine_commands(
+                *get_export_commands(env),
+                f"mkdir -p {expr_dir}",
+                f'screen -S {name} -dm bash -c "{fuzz_cmd}"',
+                f"sleep {time + 60}",
+            )
+        elif type == "docker":
+            command_in_container = (
+                combine_commands(
+                    *get_export_commands(env),
+                    fuzz_cmd,
+                    f"chown -R {os.getuid()} /fuzzing/default",
+                    "mv /fuzzing/default /output/default",
+                )
+                .replace("$", "\\$")
+                .replace('"', '\\"')
+            )
+
+            command = combine_commands(
+                f"mkdir -p {expr_dir}",
+                f'docker run --cpus=1 --name={name} --rm --mount type=tmpfs,tmpfs-size=1G,dst=/fuzzing --env OUTPUT=/fuzzing -v {expr_dir}:/output {DOCKER_IMAGE} bash -c "{command_in_container}"',
+            )
+        elif type == "stdout":
+            env["OUTPUT"] = expr_dir
+            env["AFL_NO_UI"] = "1"
+            command = combine_commands(
+                *get_export_commands(env),
+                f"mkdir -p {expr_dir}",
+                fuzz_cmd,
+            )
         else:
             logging.fatal("UNREACHABLE, type not set")
+
         process = subprocess.Popen(
             ["/bin/bash", "-c", command], stdout=subprocess.PIPE, stdin=subprocess.PIPE
         )
-        # Sleep for 100ms so aflplusplus has time to bind core. Otherwise two fuzzers may bind to the same core.
+        # Sleep for 1s so aflplusplus has time to bind core. Otherwise two fuzzers may bind to the same core.
         subprocess.run(["sleep", "1"])
         return process
 
-    common.parallel_subprocess(tuples, argv.jobs, process_creator, None)
+    common.parallel_subprocess(tuples, jobs, process_creator, None)
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Run all fuzzers")
-    parser.add_argument(
-        "-i",
-        "--input",
-        type=str,
-        default="./seeds/",
-        help="The directory containing input seeds, default to ./seeds",
-    )
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        default="./fuzzing",
-        help="The directory to store all organized ./fuzzing/",
-    )
-    parser.add_argument(
-        "--on_exist",
-        default="abort",
-        choices=["abort", "force", "ignore"],
-        help="Our action if the output directory already exists",
-    )
-    parser.add_argument(
-        "--fuzzer",
-        choices=["aflplusplus", "libfuzzer", "irfuzzer"],
-        required=True,
-        help="The fuzzer we are using for fuzzing.",
-    )
-    parser.add_argument(
-        "-j",
-        "--jobs",
-        type=int,
-        default=multiprocessing.cpu_count(),
-        help="Max number of jobs parallel, default to all cores.",
-    )
-    parser.add_argument(
-        "-r", "--repeat", type=int, default=3, help="Numbers to repeat one experiment."
-    )
-    parser.add_argument(
-        "--isel",
-        choices=["gisel", "dagisel"],
-        required=True,
-        help="The isel alorighm you want to run.",
-    )
-    parser.add_argument(
-        "-t", "--time", type=str, default="5m", help="Total time to run fuzzers"
-    )
-    parser.add_argument(
-        "--tier",
-        type=int,
-        choices=[0, 1, 2, 3],
-        help="The set of triples to test. 0 corresponds to everything, 1 and 2 corresponds to Tier 1 and Tier 2, see common.py for more. Will be overriden by `--set`",
-    )
-    parser.add_argument(
-        "--offset",
-        type=int,
-        help="The offset that we starts counting experiments.",
-        default=0,
-    )
-    parser.add_argument("--set", nargs="+", type=str, help="Select the triples to run.")
-    parser.add_argument(
-        "--type",
-        type=str,
-        required=True,
-        choices=["screen", "docker", "stdout"],
-        help="The method to start fuzzing cluster.",
-    )
-    args = parser.parse_args()
+    args = Args().parse_args()
 
-    def convert_to_seconds(s: str) -> int:
-        seconds_per_unit = {"s": 1, "m": 60, "h": 3600, "d": 86400, "w": 604800}
-        return int(s[:-1]) * seconds_per_unit[s[-1]]
+    output = os.path.abspath(args.output)
+    if os.path.exists(output):
+        logging.info(f"{args.output} already exists.")
+        if args.on_exist == "force":
+            logging.info(f"'on_exist' set to {args.on_exist}, will force remove")
+            subprocess.run(["rm", "-rf", output])
+        elif args.on_exist == "abort":
+            logging.error(f"'on_exist' set to {args.on_exist}, won't work on it.")
+            exit(1)
 
-    args.time = convert_to_seconds(args.time)
-
-    fuzz(args)
+    fuzz(
+        fuzzer=args.fuzzer,
+        cpu_attr_arch_list=args.get_cpu_attr_arch_list(),
+        global_isel=args.isel == "gisel",
+        in_dir=args.input,
+        out_dir=output,
+        time=args.get_time_in_seconds(),
+        repeat=args.repeat,
+        offset=args.offset,
+        type=args.type,
+        jobs=args.jobs,
+    )
 
 
 if __name__ == "__main__":

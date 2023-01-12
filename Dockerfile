@@ -36,7 +36,7 @@ RUN mkdir -p $LLVM/build-afl && \
     -DBUILD_SHARED_LIBS=OFF \
     -DLLVM_BUILD_TOOLS=ON \
     -DLLVM_CCACHE_BUILD=ON \
-    -DLLVM_ENABLE_PROJECTS="mlir" \
+    -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
     -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
     -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
     -DCMAKE_BUILD_TYPE=Release \
@@ -55,6 +55,7 @@ RUN mkdir -p $LLVM/build-release && \
     -GNinja \
     -DBUILD_SHARED_LIBS=ON \
     -DLLVM_CCACHE_BUILD=ON \
+    -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
     -DCMAKE_C_COMPILER=clang \
     -DCMAKE_CXX_COMPILER=clang++ \
     -DCMAKE_BUILD_TYPE=Release \

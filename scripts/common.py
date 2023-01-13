@@ -7,11 +7,17 @@ from tqdm import tqdm
 MATCHER_TABLE_SIZE_DAGISEL = {
     "AArch64": 451325,
     "AMDGPU": 479297,
+    "ARC": 1999,
     "ARM": 200565,
     "AVR": 2840,
     "BPF": 3586,
+    "CSKY": 19032,
+    # DirectX doesn't have SelectionDAG yet?
+    "DirectX": None,
     "Hexagon": 174265,
     "Lanai": 2337,
+    "LoongArch": 19831,
+    "M68k": 18316,
     "MSP430": 9103,
     "Mips": 54044,
     "NVPTX": 184663,
@@ -29,6 +35,7 @@ MATCHER_TABLE_SIZE_GISEL = {
     "AArch64": 196445,
     "AMDGPU": 292004,
     "ARM": 129520,
+    "M68k": 2384,
     "Mips": 60445,
     "PPC": 28499,
     "RISCV": 152490,
@@ -40,6 +47,7 @@ TRIPLE_ARCH_MAP = {
     "aarch64_32": "AArch64",
     "aarch64_be": "AArch64",
     "amdgcn": "AMDGPU",
+    "arc": "ARC",
     "arm": "ARM",
     # "arm64": "AArch64",
     # "arm64_32": "AArch64",
@@ -48,8 +56,12 @@ TRIPLE_ARCH_MAP = {
     "bpf": "BPF",
     "bpfeb": "BPF",
     "bpfel": "BPF",
+    "csky": "CSKY",
     "hexagon": "Hexagon",
     "lanai": "Lanai",
+    "loongarch32": "LoongArch",
+    "loongarch64": "LoongArch",
+    "m68k": "M68k",
     "mips": "Mips",
     "mips64": "Mips",
     "mips64el": "Mips",
@@ -155,7 +167,7 @@ CPU_ATTR_ARCH_LIST_TIER_3 = [
     ("bleeding-edge", "", "wasm64"),
 ]
 
-LLVM_COMMIT = "0c35b6165ccc"
+LLVM_COMMIT = "01ce71433"
 
 
 def __verify():

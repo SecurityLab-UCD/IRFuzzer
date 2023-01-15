@@ -258,8 +258,6 @@ def batch_fuzz_using_docker(
 
         container_queue.append(container)
 
-        sleep(1)
-
     # wait for all running containers to exit
     while len(container_queue) > 0:
         dequeue_and_wait()

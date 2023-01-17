@@ -1,16 +1,14 @@
-FROM ubuntu:20.04
+FROM ubuntu:22.04
 
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && \
-    apt-get -y upgrade 
-ENV DEBIAN_FRONTEND noninteractive
-RUN apt-get install -y -q git build-essential wget zlib1g-dev cmake python3 python3-pip ninja-build ccache && \
+    apt-get -y upgrade && \
+    apt-get install -y -q git build-essential wget zlib1g-dev cmake python3 python3-pip ninja-build ccache && \
     apt-get clean
 
 ENV FUZZING_HOME=/IRFuzzer
-
-RUN mkdir -p /$FUZZING_HOME
-COPY . /$FUZZING_HOME
-WORKDIR /$FUZZING_HOME
+WORKDIR $FUZZING_HOME
+COPY . $FUZZING_HOME
 
 ENV LLVM=llvm-project
 ENV AFL=AFLplusplus
@@ -18,16 +16,16 @@ ENV PATH="${PATH}:/clang+llvm/bin"
 ENV AFL_LLVM_INSTRUMENT=CLASSIC
 
 RUN CLANG_LLVM=clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04 && \
-    wget https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/$CLANG_LLVM.tar.xz && \
+    wget --no-verbose --show-progress --progress=dot:mega https://github.com/llvm/llvm-project/releases/download/llvmorg-14.0.0/$CLANG_LLVM.tar.xz && \
     tar -xvf $CLANG_LLVM.tar.xz -C / && \
     mv /$CLANG_LLVM /clang+llvm && \
     rm $CLANG_LLVM.tar.xz
 
-RUN git clone https://github.com/SecurityLab-UCD/AFLplusplus.git --branch=isel --depth=1 $FUZZING_HOME/$AFL && \
-    cd $FUZZING_HOME/$AFL && \
+RUN git clone https://github.com/SecurityLab-UCD/AFLplusplus.git --branch=isel --depth=1 $AFL && \
+    cd $AFL && \
     make -j
 
-RUN git clone --branch irfuzzer-0.1 https://github.com/SecurityLab-UCD/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
+RUN git clone --branch irfuzzer-0.1 https://github.com/SecurityLab-UCD/llvm-project.git --depth=1 $LLVM
 
 RUN mkdir -p $LLVM/build-afl && \
     cd $LLVM/build-afl && \
@@ -75,8 +73,3 @@ RUN mkdir -p mutator/build && \
     cd mutator/build && \
     cmake -GNinja .. && \
     ninja -j $(nproc --all)
-
-# Tell AFL++ to only use our mutator
-ENV AFL_CUSTOM_MUTATOR_ONLY=1
-# Tell AFL++ Where our mutator is
-ENV AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so

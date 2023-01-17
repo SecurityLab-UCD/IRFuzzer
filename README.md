@@ -29,7 +29,7 @@ export AFL_LLVM_INSTRUMENT=CLASSIC
 If you want to use dockerized environment, you can also do
 
 ```sh
-docker build .
+docker build . -t irfuzzer
 ```
 
 ## Seed selection

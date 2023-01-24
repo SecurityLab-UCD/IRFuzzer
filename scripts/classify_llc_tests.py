@@ -1,13 +1,28 @@
+from itertools import groupby
 from pathlib import Path
 import re
-from typing import List, Optional
+from typing import Callable, Iterable, List, Optional
+import pandas as pd
+from tap import Tap
+
+
+class Args(Tap):
+    input: str = "llvm-project"
+    """root of llvm-project repository"""
+
+    output: str
+    """directory for storing output (will create if not exist)"""
+
+    def configure(self):
+        self.add_argument("-i", "--input")
+        self.add_argument("-o", "--output")
 
 
 class LLCCommand:
     arch: str
     cpu: Optional[str]
     triple: Optional[str]
-    attr: Optional[str]
+    attrs: List[str]
 
     def __init__(self, command: str, default_triple: Optional[str] = None) -> None:
         assert "llc" in command
@@ -31,10 +46,7 @@ class LLCCommand:
         else:
             self.cpu = None
 
-        if (match := re.match(r".*-mattr[= ]\"?([a-z0-9-]+)", command)) is not None:
-            self.attr = match.group(1)
-        else:
-            self.attr = None
+        self.attrs = re.findall(r"-mattr[= ]\"?([a-z0-9-]+)", command)
 
 
 class LLCTest:
@@ -52,9 +64,10 @@ class LLCTest:
 
     code_lines: List[str]
 
-    def __init__(self, file_path: Path) -> None:
+    def __init__(self, arch: str, file_path: Path) -> None:
         assert file_path.name.endswith(".ll")
 
+        self.arch = arch
         self.path = file_path
         self.test_commands = []
         self.code_lines = []
@@ -117,11 +130,6 @@ class LLCTest:
             len(self.runnable_llc_commands) > 0
         ), f"WARNING: {file_path} does not contain any runnable `llc` command."
 
-        if default_triple is not None:
-            self.arch = default_triple.split("-")[0]
-        else:
-            self.arch = self.runnable_llc_commands[0].arch
-
     def get_default_triple(self) -> Optional[str]:
         lines_with_triple = [
             line for line in self.code_lines if line.startswith("target triple")
@@ -142,17 +150,69 @@ class LLCTest:
         return match.group(1)
 
 
-def main() -> None:
+def parse_all_llc_tests(
+    llvm_root: Path, arch_filter: Callable[[str], bool] = lambda _: True
+) -> Iterable[LLCTest]:
     total = 0
     success = 0
-    for path in Path("llvm-project/llvm/test/CodeGen").rglob("*.ll"):
-        try:
-            LLCTest(path)
-            success += 1
-        except Exception as e:
-            print(e)
-        total += 1
-    print(f"Successfully parsed {success}/{total} LLC tests")
+
+    for arch_dir in llvm_root.joinpath("llvm/test/CodeGen").iterdir():
+        if not arch_dir.is_dir() or not arch_filter(arch_dir.name):
+            continue
+
+        for file_path in arch_dir.rglob("*.ll"):
+            try:
+                yield LLCTest(arch_dir.name, file_path)
+                success += 1
+            except Exception as e:
+                print(e)
+            total += 1
+
+    print(f"Successfully parsed {success}/{total} LLC tests.")
+
+
+def main() -> None:
+
+    args = Args().parse_args()
+
+    output_root = Path(args.output)
+    output_root.mkdir(exist_ok=True)
+
+    tests = parse_all_llc_tests(Path(args.input))
+
+    for key, group in groupby(tests, key=lambda test: test.arch):
+        commands = (cmd for test in group for cmd in test.runnable_llc_commands)
+
+        df = pd.DataFrame(
+            columns=["arch", "triple", "cpu", "attrs"],
+            data=(
+                [
+                    cmd.arch,
+                    cmd.triple,
+                    cmd.cpu,
+                    " ".join(sorted(cmd.attrs)),
+                ]
+                for cmd in commands
+            ),
+        )
+
+        output_dir = output_root.joinpath(key)
+        output_dir.mkdir(exist_ok=True)
+
+        df.to_csv(output_dir.joinpath(f"{key}-raw.csv"))
+
+        df.groupby(["arch", "triple", "cpu", "attrs"], dropna=False).size().to_csv(
+            output_dir.joinpath(f"{key}-summary.csv")
+        )
+
+        for subarch in df["arch"].unique():
+            subarch_df = df[df["arch"] == subarch]
+
+            pd.crosstab(
+                index=subarch_df["cpu"].fillna(""),
+                columns=subarch_df["attrs"],
+                dropna=False,
+            ).to_csv(output_dir.joinpath(f"{subarch}-crosstab.csv"))
 
 
 if __name__ == "__main__":

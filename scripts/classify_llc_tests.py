@@ -10,12 +10,14 @@ class Args(Tap):
     input: str = "llvm-project"
     """root of llvm-project repository"""
 
-    output: str
-    """directory for storing output (will create if not exist)"""
+    summary_out: Optional[str] = None
+    """directory for storing summary (will create if not exist)"""
+
+    seeds_out: Optional[str] = None
+    """directory for storing seeds (will create if not exist)"""
 
     def configure(self):
         self.add_argument("-i", "--input")
-        self.add_argument("-o", "--output")
 
 
 class LLCCommand:
@@ -23,6 +25,7 @@ class LLCCommand:
     cpu: Optional[str]
     triple: Optional[str]
     attrs: List[str]
+    global_isel: bool
 
     def __init__(self, command: str, default_triple: Optional[str] = None) -> None:
         assert "llc" in command
@@ -47,6 +50,7 @@ class LLCCommand:
             self.cpu = None
 
         self.attrs = re.findall(r"-mattr[= ]\"?([a-z0-9-]+)", command)
+        self.global_isel = re.match(r".*-global-isel", command) is not None
 
 
 class LLCTest:
@@ -171,48 +175,91 @@ def parse_all_llc_tests(
     print(f"Successfully parsed {success}/{total} LLC tests.")
 
 
-def main() -> None:
 
-    args = Args().parse_args()
+def classify(
+    arch: str,
+    tests: List[LLCTest],
+    summary_out: Optional[Path] = None,
+    seeds_out: Optional[Path] = None,
+) -> None:
+    commands = (cmd for test in tests for cmd in test.runnable_llc_commands)
 
-    output_root = Path(args.output)
-    output_root.mkdir(exist_ok=True)
+    df = pd.DataFrame(
+        columns=["arch", "gisel", "triple", "cpu", "attrs"],
+        data=(
+            [
+                cmd.arch,
+                cmd.global_isel,
+                cmd.triple,
+                cmd.cpu,
+                " ".join(sorted(cmd.attrs)),
+            ]
+            for cmd in commands
+        ),
+    )
 
-    tests = parse_all_llc_tests(Path(args.input))
+    if summary_out:
+        df.to_csv(summary_out.joinpath(f"{arch}-raw.csv"))
 
-    for key, group in groupby(tests, key=lambda test: test.arch):
-        commands = (cmd for test in group for cmd in test.runnable_llc_commands)
+        df.groupby(
+            ["arch", "gisel", "triple", "cpu", "attrs"], dropna=False
+        ).size().to_csv(summary_out.joinpath(f"{arch}-summary.csv"))
 
-        df = pd.DataFrame(
-            columns=["arch", "triple", "cpu", "attrs"],
-            data=(
-                [
-                    cmd.arch,
-                    cmd.triple,
-                    cmd.cpu,
-                    " ".join(sorted(cmd.attrs)),
-                ]
-                for cmd in commands
-            ),
-        )
-
-        output_dir = output_root.joinpath(key)
-        output_dir.mkdir(exist_ok=True)
-
-        df.to_csv(output_dir.joinpath(f"{key}-raw.csv"))
-
-        df.groupby(["arch", "triple", "cpu", "attrs"], dropna=False).size().to_csv(
-            output_dir.joinpath(f"{key}-summary.csv")
-        )
-
-        for subarch in df["arch"].unique():
+    for subarch in df["arch"].unique():
+        if summary_out:
             subarch_df = df[df["arch"] == subarch]
 
             pd.crosstab(
                 index=subarch_df["cpu"].fillna(""),
                 columns=subarch_df["attrs"],
                 dropna=False,
-            ).to_csv(output_dir.joinpath(f"{subarch}-crosstab.csv"))
+            ).to_csv(summary_out.joinpath(f"{subarch}-crosstab.csv"))
+
+        if seeds_out:
+            subarch_seeds_dir = seeds_out.joinpath(subarch)
+            subarch_seeds_dir.mkdir(exist_ok=True)
+            dagisel_seeds_dir = subarch_seeds_dir.joinpath("dagisel")
+            dagisel_seeds_dir.mkdir(exist_ok=True)
+            gisel_seeds_dir = subarch_seeds_dir.joinpath("gisel")
+            gisel_seeds_dir.mkdir(exist_ok=True)
+
+            for test in tests:
+                try:
+                    if any(cmd.arch == subarch for cmd in test.runnable_llc_commands):
+                        if any(not cmd.global_isel for cmd in test.runnable_llc_commands):
+                            dagisel_seeds_dir.joinpath(test.path.name).symlink_to(test.path.absolute())
+                        if any(cmd.global_isel for cmd in test.runnable_llc_commands):
+                            gisel_seeds_dir.joinpath(test.path.name).symlink_to(test.path.absolute())
+                except FileExistsError as err:
+                    print(err)
+
+
+def main() -> None:
+    args = Args(underscores_to_dashes=True).parse_args()
+
+    summary_out = Path(args.summary_out) if args.summary_out else None
+    seeds_out = Path(args.seeds_out) if args.seeds_out else None
+
+    if summary_out:
+        summary_out.mkdir(exist_ok=True)
+
+    if seeds_out:
+        seeds_out.mkdir(exist_ok=True)
+
+    tests = parse_all_llc_tests(Path(args.input))
+
+    for key, group in groupby(tests, key=lambda test: test.arch):
+        arch_summary_out = summary_out.joinpath(key) if summary_out else None
+
+        if arch_summary_out:
+            arch_summary_out.mkdir(exist_ok=True)
+
+        classify(
+            arch=key,
+            tests=list(group),
+            summary_out=arch_summary_out,
+            seeds_out=seeds_out,
+        )
 
 
 if __name__ == "__main__":

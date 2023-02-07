@@ -11,9 +11,13 @@ class Args(Tap):
     triple: Optional[str] = None
     cpu: Optional[str] = None
     attrs: List[str] = []
+    global_isel: bool = False
 
     output: str
     """directory for storing seeds (will create if not exist)"""
+
+    def configure(self):
+        self.add_argument("-o", "--output")
 
 
 def collect_seeds_from_tests(
@@ -22,6 +26,7 @@ def collect_seeds_from_tests(
     triple: Optional[str] = None,
     cpu: Optional[str] = None,
     attrs: Set[str] = set(),
+    global_isel: bool = False,
     dump_bc: bool = True,
     symlink_to_ll: bool = False,
 ) -> None:
@@ -44,6 +49,7 @@ def collect_seeds_from_tests(
             and cmd.triple == triple
             and cmd.cpu == cpu
             and cmd.attrs == attrs
+            and cmd.global_isel == global_isel
             for cmd in test.runnable_llc_commands
         ):
             if symlink_to_ll:
@@ -80,6 +86,7 @@ def main() -> None:
         triple=args.triple,
         cpu=args.cpu,
         attrs=set(args.attrs),
+        global_isel=args.global_isel,
     )
 
 

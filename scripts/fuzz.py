@@ -142,7 +142,7 @@ class Args(Tap):
     time: str = "5m"
     """duration for each experiment (e.g. '100s', '30m', '2h', '1d')"""
 
-    repeat: int = 3
+    repeat: int = 1
     """how many times each experiemt should run"""
 
     offset: int = 0
@@ -151,7 +151,7 @@ class Args(Tap):
     jobs: int = multiprocessing.cpu_count()
     """the max number of concurrent subprocesses"""
 
-    type: ClutserType
+    type: Optional[ClutserType] = None
     """the method to start fuzzing cluster"""
 
     def configure(self):
@@ -236,7 +236,7 @@ def combine_commands(*commands: str) -> str:
 
 def batch_fuzz_using_docker(
     experiment_configs: List[ExperimentConfig],
-    out_dir: Path,
+    out_root: Path,
     jobs: int,
 ) -> None:
     """
@@ -259,7 +259,7 @@ def batch_fuzz_using_docker(
         logging.info(f"Starting experiment {experiment.name}...")
 
         expr_seed_dir = experiment.seed_dir
-        expr_out_dir = experiment.get_output_dir(out_dir)
+        expr_out_dir = experiment.get_output_dir(out_root)
         os.makedirs(expr_out_dir)
 
         container = client.containers.run(
@@ -297,18 +297,18 @@ def batch_fuzz_using_docker(
 
 def batch_fuzz(
     experiment_configs: List[ExperimentConfig],
-    out_dir: Path,
+    out_root: Path,
     type: ClutserType,
     jobs: int,
 ) -> None:
     if type == "docker":
-        batch_fuzz_using_docker(experiment_configs, out_dir, jobs)
+        batch_fuzz_using_docker(experiment_configs, out_root, jobs)
         return
 
     def start_subprocess(experiment: ExperimentConfig) -> subprocess.Popen:
         logging.info(f"Starting experiment {experiment.name}...")
 
-        expr_out_dir = experiment.get_output_dir(out_dir)
+        expr_out_dir = experiment.get_output_dir(out_root)
         os.makedirs(expr_out_dir)
 
         env = experiment.get_fuzzing_env()
@@ -339,36 +339,57 @@ def batch_fuzz(
     common.parallel_subprocess(experiment_configs, jobs, start_subprocess, None)
 
 
+def fuzz(expr_config: ExperimentConfig, out_dir: Path) -> int:
+    expr_out_dir = expr_config.get_output_dir(out_dir)
+    os.makedirs(expr_out_dir)
+
+    process = subprocess.run(
+        expr_config.get_fuzzing_command(expr_out_dir),
+        env={**os.environ, **expr_config.get_fuzzing_env()},
+        shell=True,
+    )
+
+    print(f"Fuzzing process exited with code {process.returncode}.")
+    return process.returncode
+
+
 def main() -> None:
     args = Args(underscores_to_dashes=True).parse_args()
 
-    output = Path(args.output).absolute()
-    if output.exists():
+    out_root = Path(args.output).absolute()
+    if out_root.exists():
         logging.info(f"{args.output} already exists.")
         if args.on_exist == "force":
             logging.info(f"'on-exist' set to {args.on_exist}, will force remove")
-            subprocess.run(["rm", "-rf", output])
+            subprocess.run(["rm", "-rf", out_root])
         elif args.on_exist == "abort":
             logging.error(f"'on-exist' set to {args.on_exist}, won't work on it.")
             exit(1)
 
-    expr_configs = get_experiment_configs(
-        fuzzer=args.fuzzer,
-        cpu_attr_arch_list=args.get_cpu_attr_arch_list(),
-        seed_dir=Path(args.seeds).absolute(),
-        seeding_from_tests=args.seeding_from_tests,
-        isel=args.isel,
-        time=args.get_time_in_seconds(),
-        repeat=args.repeat,
-        offset=args.offset,
+    expr_configs = list(
+        get_experiment_configs(
+            fuzzer=args.fuzzer,
+            cpu_attr_arch_list=args.get_cpu_attr_arch_list(),
+            seed_dir=Path(args.seeds).absolute(),
+            seeding_from_tests=args.seeding_from_tests,
+            isel=args.isel,
+            time=args.get_time_in_seconds(),
+            repeat=args.repeat,
+            offset=args.offset,
+        )
     )
 
-    batch_fuzz(
-        experiment_configs=list(expr_configs),
-        out_dir=output,
-        type=args.type,
-        jobs=args.jobs,
-    )
+    if len(expr_configs) == 1 and args.type is None:
+        exit(fuzz(expr_config=expr_configs[0], out_dir=out_root))
+    elif args.type is None:
+        logging.error("'--type' must be specified when running multiple fuzzing experiments")
+    else:
+        batch_fuzz(
+            experiment_configs=expr_configs,
+            out_root=out_root,
+            type=args.type,
+            jobs=args.jobs,
+        )
 
 
 if __name__ == "__main__":

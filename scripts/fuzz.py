@@ -258,9 +258,9 @@ def batch_fuzz_using_docker(
 
         logging.info(f"Starting experiment {experiment.name}...")
 
-        expr_seed_dir = experiment.seed_dir
-        expr_out_dir = experiment.get_output_dir(out_root)
-        os.makedirs(expr_out_dir)
+        seed_dir = experiment.seed_dir
+        out_dir = experiment.get_output_dir(out_root)
+        out_dir.mkdir()
 
         container = client.containers.run(
             image=DOCKER_IMAGE,
@@ -283,8 +283,8 @@ def batch_fuzz_using_docker(
             cpuset_cpus=str(i % jobs),  # core binding
             tmpfs={"/fuzzing": "size=1G"},
             volumes=[
-                f"{expr_seed_dir}:{expr_seed_dir}",
-                f"{expr_out_dir}:/output",
+                f"{seed_dir}:{seed_dir}",
+                f"{out_dir}:/output",
             ],
         )
 
@@ -308,15 +308,15 @@ def batch_fuzz(
     def start_subprocess(experiment: ExperimentConfig) -> subprocess.Popen:
         logging.info(f"Starting experiment {experiment.name}...")
 
-        expr_out_dir = experiment.get_output_dir(out_root)
-        os.makedirs(expr_out_dir)
+        out_dir = experiment.get_output_dir(out_root)
+        out_dir.mkdir()
 
         env = experiment.get_fuzzing_env()
 
         if type == "stdout":
             env["AFL_NO_UI"] = "1"
 
-        fuzzing_command = experiment.get_fuzzing_command(expr_out_dir)
+        fuzzing_command = experiment.get_fuzzing_command(out_dir)
 
         if type == "screen":
             fuzzing_command = f'screen -S {experiment.name} -dm bash -c "{fuzzing_command}" && sleep {experiment.time + 30}'
@@ -341,7 +341,7 @@ def batch_fuzz(
 
 def fuzz(expr_config: ExperimentConfig, out_root: Path) -> int:
     out_dir = expr_config.get_output_dir(out_root)
-    os.makedirs(out_dir)
+    out_dir.mkdir()
 
     process = subprocess.run(
         expr_config.get_fuzzing_command(out_dir),

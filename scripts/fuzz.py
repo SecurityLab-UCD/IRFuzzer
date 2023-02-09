@@ -283,8 +283,8 @@ def batch_fuzz_using_docker(
             cpuset_cpus=str(i % jobs),  # core binding
             tmpfs={"/fuzzing": "size=1G"},
             volumes=[
-                f"{seed_dir}:{seed_dir}",
-                f"{out_dir}:/output",
+                f"{seed_dir.absolute()}:{seed_dir.absolute()}",
+                f"{out_dir.absolute()}:/output",
             ],
         )
 
@@ -356,7 +356,7 @@ def fuzz(expr_config: ExperimentConfig, out_root: Path) -> int:
 def main() -> None:
     args = Args(underscores_to_dashes=True).parse_args()
 
-    out_root = Path(args.output).absolute()
+    out_root = Path(args.output)
     if out_root.exists():
         logging.info(f"{args.output} already exists.")
         if args.on_exist == "force":
@@ -370,7 +370,7 @@ def main() -> None:
         get_experiment_configs(
             fuzzer=args.fuzzer,
             cpu_attr_arch_list=args.get_cpu_attr_arch_list(),
-            seed_dir=Path(args.seeds).absolute(),
+            seed_dir=Path(args.seeds),
             seeding_from_tests=args.seeding_from_tests,
             isel=args.isel,
             time=args.get_time_in_seconds(),

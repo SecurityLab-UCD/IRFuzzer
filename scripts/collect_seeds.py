@@ -29,7 +29,7 @@ def collect_seeds_from_tests(
     global_isel: bool = False,
     dump_bc: bool = True,
     symlink_to_ll: bool = False,
-) -> None:
+) -> Path:
     if arch_with_sub is None:
         assert triple is not None, f"either arch or triple has to be specified"
         arch_with_sub = triple.split("-")[0]
@@ -57,6 +57,8 @@ def collect_seeds_from_tests(
 
             if dump_bc:
                 test.dump_bc(out_dir)
+    
+    return out_dir
 
 
 def get_seeds_dir_name_parts(

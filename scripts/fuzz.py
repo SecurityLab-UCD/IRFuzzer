@@ -1,4 +1,5 @@
 import logging
+from pathlib import Path
 from typing import Dict, Iterable, List, Literal, NamedTuple, Optional, Tuple
 import common
 import subprocess
@@ -7,6 +8,8 @@ import multiprocessing
 from tap import Tap
 import docker
 from time import sleep
+
+from collect_seeds import collect_seeds_from_tests
 
 
 Fuzzer = Literal["aflplusplus", "libfuzzer", "irfuzzer"]
@@ -37,6 +40,7 @@ class ExperimentConfig(NamedTuple):
     cpu: str
     attr: str
     isel: ISel
+    seed_dir: Path
     time: int
     replicate_id: int
 
@@ -61,7 +65,7 @@ class ExperimentConfig(NamedTuple):
             else common.MATCHER_TABLE_SIZE_DAGISEL
         )
 
-        matcher_table = common.TRIPLE_ARCH_MAP[self.triple]
+        matcher_table = common.TRIPLE_ARCH_MAP[self.triple.split("-")[0]]
 
         if matcher_table not in matcher_table_size:
             return None
@@ -79,8 +83,8 @@ class ExperimentConfig(NamedTuple):
             "MATCHER_TABLE_SIZE": str(self.matcher_table_size),
         }
 
-    def get_fuzzing_command(self, input_dir: str, output_dir: str) -> str:
-        cmd = f"$AFL/afl-fuzz -V {self.time} -i {input_dir} -o {output_dir}"
+    def get_fuzzing_command(self, output_dir: str | Path) -> str:
+        cmd = f"$AFL/afl-fuzz -V {self.time} -i {self.seed_dir} -o {output_dir}"
 
         if self.fuzzer == "irfuzzer":
             cmd += " -w"
@@ -89,9 +93,8 @@ class ExperimentConfig(NamedTuple):
 
         return cmd
 
-    def get_output_dir(self, output_root_path: str) -> str:
-        return os.path.join(
-            output_root_path,
+    def get_output_dir(self, output_root_dir: Path) -> Path:
+        return output_root_dir.joinpath(
             self.fuzzer,
             self.isel,
             self.target,
@@ -108,8 +111,14 @@ class Args(Tap):
     fuzzer: Fuzzer = "irfuzzer"
     """the fuzzer used for fuzzing"""
 
-    input: str = "./seeds"
-    """the directory containing input seeds"""
+    seeds: str
+    """
+    the directory containing input seeds for fuzzing (if 'seeding_from_tests' flag is not set)
+    or the directory to store the seeds collected from tests (if 'seeding_from_tests' flag is set)
+    """
+
+    seeding_from_tests: bool = False
+    """whether to use tests for each triple-cpu-attr combination as seeds for fuzzing"""
 
     output: str = "./fuzzing"
     """the output directory"""
@@ -146,9 +155,9 @@ class Args(Tap):
     """the method to start fuzzing cluster"""
 
     def configure(self):
-        self.add_argument("-i", "--input")
-        self.add_argument("-o", "--output")
         self.add_argument("-j", "--jobs")
+        self.add_argument("-o", "--output")
+        self.add_argument("-r", "--repeat")
         self.add_argument("-t", "--time")
 
     def get_cpu_attr_arch_list(self) -> CpuAttrArchList:
@@ -173,15 +182,35 @@ class Args(Tap):
 def get_experiment_configs(
     fuzzer: Fuzzer,
     cpu_attr_arch_list: CpuAttrArchList,
+    seed_dir: Path,
+    seeding_from_tests: bool,
     isel: ISel,
     time: int,
     repeat: int,
     offset: int,
 ) -> Iterable[ExperimentConfig]:
-    for r in range(repeat):
-        for (cpu, attr, triple) in cpu_attr_arch_list:
+    for (cpu, attr, triple) in cpu_attr_arch_list:
+        expr_seed_dir = seed_dir
+
+        if seeding_from_tests:
+            expr_seed_dir = collect_seeds_from_tests(
+                out_dir_parent=seed_dir,
+                arch_with_sub=triple.split("-")[0],
+                triple=triple,
+                cpu=None if cpu == "" else cpu,
+                attrs=set(attr.split(",")),
+            )
+
+        for r in range(repeat):
             expr_config = ExperimentConfig(
-                fuzzer, triple, cpu, attr, isel, time, r + offset
+                fuzzer=fuzzer,
+                triple=triple,
+                cpu=cpu,
+                attr=attr,
+                isel=isel,
+                seed_dir=expr_seed_dir,
+                time=time,
+                replicate_id=r + offset,
             )
 
             if expr_config.matcher_table_size is None:
@@ -207,8 +236,7 @@ def combine_commands(*commands: str) -> str:
 
 def batch_fuzz_using_docker(
     experiment_configs: List[ExperimentConfig],
-    in_dir: str,
-    out_dir: str,
+    out_dir: Path,
     jobs: int,
 ) -> None:
     """
@@ -230,6 +258,7 @@ def batch_fuzz_using_docker(
 
         logging.info(f"Starting experiment {experiment.name}...")
 
+        expr_seed_dir = experiment.seed_dir
         expr_out_dir = experiment.get_output_dir(out_dir)
         os.makedirs(expr_out_dir)
 
@@ -242,18 +271,21 @@ def batch_fuzz_using_docker(
                     # Docker is responsible for core binding,
                     # if AFL_NO_AFFINITY is not set, fuzzer will fail to start
                     "export AFL_NO_AFFINITY=1",
-                    experiment.get_fuzzing_command(in_dir, "/fuzzing"),
+                    experiment.get_fuzzing_command("/fuzzing"),
                     f"chown -R {os.getuid()} /fuzzing/default",
                     "mv /fuzzing/default /output/default",
                 ),
             ],
             remove=True,
             detach=True,
-            name=experiment.name,
+            name=experiment.name.replace("+", "").replace(",", "-"),
             environment=experiment.get_fuzzing_env(),
             cpuset_cpus=str(i % jobs),  # core binding
             tmpfs={"/fuzzing": "size=1G"},
-            volumes=[f"{expr_out_dir}:/output"],
+            volumes=[
+                f"{expr_seed_dir}:{expr_seed_dir}",
+                f"{expr_out_dir}:/output",
+            ],
         )
 
         container_queue.append(container)
@@ -265,13 +297,12 @@ def batch_fuzz_using_docker(
 
 def batch_fuzz(
     experiment_configs: List[ExperimentConfig],
-    in_dir: str,
-    out_dir: str,
+    out_dir: Path,
     type: ClutserType,
     jobs: int,
 ) -> None:
     if type == "docker":
-        batch_fuzz_using_docker(experiment_configs, in_dir, out_dir, jobs)
+        batch_fuzz_using_docker(experiment_configs, out_dir, jobs)
         return
 
     def start_subprocess(experiment: ExperimentConfig) -> subprocess.Popen:
@@ -285,7 +316,7 @@ def batch_fuzz(
         if type == "stdout":
             env["AFL_NO_UI"] = "1"
 
-        fuzzing_command = experiment.get_fuzzing_command(in_dir, expr_out_dir)
+        fuzzing_command = experiment.get_fuzzing_command(expr_out_dir)
 
         if type == "screen":
             fuzzing_command = f'screen -S {experiment.name} -dm bash -c "{fuzzing_command}" && sleep {experiment.time + 30}'
@@ -309,21 +340,23 @@ def batch_fuzz(
 
 
 def main() -> None:
-    args = Args().parse_args()
+    args = Args(underscores_to_dashes=True).parse_args()
 
-    output = os.path.abspath(args.output)
-    if os.path.exists(output):
+    output = Path(args.output).absolute()
+    if output.exists():
         logging.info(f"{args.output} already exists.")
         if args.on_exist == "force":
-            logging.info(f"'on_exist' set to {args.on_exist}, will force remove")
+            logging.info(f"'on-exist' set to {args.on_exist}, will force remove")
             subprocess.run(["rm", "-rf", output])
         elif args.on_exist == "abort":
-            logging.error(f"'on_exist' set to {args.on_exist}, won't work on it.")
+            logging.error(f"'on-exist' set to {args.on_exist}, won't work on it.")
             exit(1)
 
     expr_configs = get_experiment_configs(
         fuzzer=args.fuzzer,
         cpu_attr_arch_list=args.get_cpu_attr_arch_list(),
+        seed_dir=Path(args.seeds).absolute(),
+        seeding_from_tests=args.seeding_from_tests,
         isel=args.isel,
         time=args.get_time_in_seconds(),
         repeat=args.repeat,
@@ -332,7 +365,6 @@ def main() -> None:
 
     batch_fuzz(
         experiment_configs=list(expr_configs),
-        in_dir=args.input,
         out_dir=output,
         type=args.type,
         jobs=args.jobs,

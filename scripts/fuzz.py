@@ -339,12 +339,12 @@ def batch_fuzz(
     common.parallel_subprocess(experiment_configs, jobs, start_subprocess, None)
 
 
-def fuzz(expr_config: ExperimentConfig, out_dir: Path) -> int:
-    expr_out_dir = expr_config.get_output_dir(out_dir)
-    os.makedirs(expr_out_dir)
+def fuzz(expr_config: ExperimentConfig, out_root: Path) -> int:
+    out_dir = expr_config.get_output_dir(out_root)
+    os.makedirs(out_dir)
 
     process = subprocess.run(
-        expr_config.get_fuzzing_command(expr_out_dir),
+        expr_config.get_fuzzing_command(out_dir),
         env={**os.environ, **expr_config.get_fuzzing_env()},
         shell=True,
     )
@@ -380,7 +380,7 @@ def main() -> None:
     )
 
     if len(expr_configs) == 1 and args.type is None:
-        exit(fuzz(expr_config=expr_configs[0], out_dir=out_root))
+        exit(fuzz(expr_config=expr_configs[0], out_root=out_root))
     elif args.type is None:
         logging.error("'--type' must be specified when running multiple fuzzing experiments")
     else:

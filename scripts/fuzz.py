@@ -222,14 +222,6 @@ def get_experiment_configs(
             yield expr_config
 
 
-def get_export_command(name: str, value: str) -> str:
-    return f'export {name}="{value}"'
-
-
-def get_export_commands(env: Dict[str, str]) -> Iterable[str]:
-    return (get_export_command(name, value) for name, value in env.items())
-
-
 def combine_commands(*commands: str) -> str:
     return " && ".join(commands)
 
@@ -322,11 +314,9 @@ def batch_fuzz(
             fuzzing_command = f'screen -S {experiment.name} -dm bash -c "{fuzzing_command}" && sleep {experiment.time + 30}'
 
         process = subprocess.Popen(
-            [
-                "/bin/bash",
-                "-c",
-                combine_commands(*get_export_commands(env), fuzzing_command),
-            ],
+            experiment.get_fuzzing_command(out_dir),
+            env={**os.environ, **experiment.get_fuzzing_env()},
+            shell=True,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
         )
@@ -382,7 +372,9 @@ def main() -> None:
     if len(expr_configs) == 1 and args.type is None:
         exit(fuzz(expr_config=expr_configs[0], out_root=out_root))
     elif args.type is None:
-        logging.error("'--type' must be specified when running multiple fuzzing experiments")
+        logging.error(
+            "'--type' must be specified when running multiple fuzzing experiments"
+        )
     else:
         batch_fuzz(
             experiment_configs=expr_configs,

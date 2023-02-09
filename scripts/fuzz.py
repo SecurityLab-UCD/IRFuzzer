@@ -198,7 +198,7 @@ def get_experiment_configs(
                 arch_with_sub=triple.split("-")[0],
                 triple=triple,
                 cpu=None if cpu == "" else cpu,
-                attrs=set(attr.split(",")),
+                attrs=set() if attr == "" else set(attr.split(",")),
             )
 
         for r in range(repeat):
@@ -260,7 +260,7 @@ def batch_fuzz_using_docker(
 
         seed_dir = experiment.seed_dir
         out_dir = experiment.get_output_dir(out_root)
-        out_dir.mkdir()
+        out_dir.mkdir(parents=True)
 
         container = client.containers.run(
             image=DOCKER_IMAGE,
@@ -309,7 +309,7 @@ def batch_fuzz(
         logging.info(f"Starting experiment {experiment.name}...")
 
         out_dir = experiment.get_output_dir(out_root)
-        out_dir.mkdir()
+        out_dir.mkdir(parents=True)
 
         env = experiment.get_fuzzing_env()
 
@@ -341,7 +341,7 @@ def batch_fuzz(
 
 def fuzz(expr_config: ExperimentConfig, out_root: Path) -> int:
     out_dir = expr_config.get_output_dir(out_root)
-    out_dir.mkdir()
+    out_dir.mkdir(parents=True)
 
     process = subprocess.run(
         expr_config.get_fuzzing_command(out_dir),

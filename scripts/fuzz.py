@@ -113,8 +113,8 @@ class Args(Tap):
 
     seeds: str
     """
-    the directory containing input seeds for fuzzing (if 'seeding_from_tests' flag is not set)
-    or the directory to store the seeds collected from tests (if 'seeding_from_tests' flag is set)
+    the directory containing input seeds for fuzzing (if 'seeding-from-tests' flag is not set)
+    or the directory to store the seeds collected from tests (if 'seeding-from-tests' flag is set)
     """
 
     seeding_from_tests: bool = False

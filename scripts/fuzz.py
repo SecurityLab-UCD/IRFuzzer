@@ -314,8 +314,8 @@ def batch_fuzz(
             fuzzing_command = f'screen -S {experiment.name} -dm bash -c "{fuzzing_command}" && sleep {experiment.time + 30}'
 
         process = subprocess.Popen(
-            experiment.get_fuzzing_command(out_dir),
-            env={**os.environ, **experiment.get_fuzzing_env()},
+            fuzzing_command,
+            env={**os.environ, **env},
             shell=True,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,

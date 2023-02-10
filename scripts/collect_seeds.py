@@ -4,6 +4,7 @@ from typing import Iterable, List, Optional, Set
 from tap import Tap
 
 from llc_test_parsing import parse_llc_tests
+from common import TRIPLE_ARCH_MAP
 
 
 class Args(Tap):
@@ -35,7 +36,7 @@ def collect_seeds_from_tests(
         arch_with_sub = triple.split("-")[0]
 
     llc_tests = parse_llc_tests(
-        arch_filter=lambda arch: arch_with_sub.startswith(arch.lower())
+        arch_filter=lambda arch: arch == TRIPLE_ARCH_MAP[arch_with_sub]
     )
 
     out_dir_parent.mkdir(exist_ok=True)
@@ -57,7 +58,7 @@ def collect_seeds_from_tests(
 
             if dump_bc:
                 test.dump_bc(out_dir)
-    
+
     return out_dir
 
 

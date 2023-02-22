@@ -15,10 +15,10 @@ from math import ceil
 
 class Args(Tap):
     input: str
-    '''root directory containing fuzzing output'''
+    """root directory containing fuzzing output"""
 
     def configure(self) -> None:
-        self.add_argument('input')
+        self.add_argument("input")
 
 
 def read_coverage_map(path: Path, matcher_table_size: int) -> bitarray:

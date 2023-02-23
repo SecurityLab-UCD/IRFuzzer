@@ -286,12 +286,14 @@ class ExprimentInfo:
 def for_all_expriments(archive_path: str):
     for fuzzer_dir in subdirs_of(archive_path):
         for isel_dir in subdirs_of(fuzzer_dir.path):
-            for arch_dir in subdirs_of(isel_dir.path):
-                for expr_dir in subdirs_of(arch_dir.path):
+            for triple_dir in sorted(
+                subdirs_of(isel_dir.path), key=lambda dir: dir.name
+            ):
+                for expr_dir in subdirs_of(triple_dir.path):
                     yield ExprimentInfo(
                         os.path.abspath(expr_dir),
                         fuzzer_dir.name.split(".")[0],
                         isel_dir.name,
-                        arch_dir.name,
+                        triple_dir.name,
                         int(expr_dir.name),
                     )

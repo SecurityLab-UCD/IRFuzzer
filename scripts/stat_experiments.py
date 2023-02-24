@@ -20,7 +20,8 @@ def print_experiment_statuses(root_dir: str) -> None:
             print(
                 f"{df.iloc[-1]['# relative_time'] / 3600 :.1f}h".ljust(6),
                 f"{df.iloc[0]['shw_cvg']:.3%}".ljust(7),
-                "-> " f"{df.iloc[-1]['shw_cvg']:.3%}".ljust(8),
+                "->",
+                f"{df.iloc[-1]['shw_cvg']:.3%}".ljust(8),
             )
         else:
             print()

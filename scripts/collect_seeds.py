@@ -1,15 +1,15 @@
+import os
 from pathlib import Path
 from typing import Iterable, List, Optional, Set
 
 from tap import Tap
 
-from llc_test_parsing import parse_llc_tests
+from llc_test_parsing import Triple, parse_llc_tests
 from common import TRIPLE_ARCH_MAP
 
 
 class Args(Tap):
-    arch: Optional[str] = None
-    triple: Optional[str] = None
+    triple: str
     cpu: Optional[str] = None
     attrs: List[str] = []
     global_isel: bool = False
@@ -21,33 +21,48 @@ class Args(Tap):
         self.add_argument("-o", "--output")
 
 
+def get_seeds_dir_name(
+    triple: Triple,
+    cpu: Optional[str] = None,
+    attrs: Set[str] = set(),
+    global_isel: bool = False,
+) -> str:
+    def get_parts() -> Iterable[str]:
+        yield str(triple)
+
+        if cpu:
+            yield f"cpu={cpu}"
+
+        for attr in attrs:
+            yield attr
+
+        if global_isel:
+            yield "gisel"
+
+    return ",".join(get_parts())
+
+
 def collect_seeds_from_tests(
     out_dir_parent: Path,
-    arch_with_sub: Optional[str],
-    triple: Optional[str] = None,
+    triple: Triple,
     cpu: Optional[str] = None,
     attrs: Set[str] = set(),
     global_isel: bool = False,
     dump_bc: bool = True,
     symlink_to_ll: bool = False,
 ) -> Path:
-    if arch_with_sub is None:
-        assert triple is not None, f"either arch or triple has to be specified"
-        arch_with_sub = triple.split("-")[0]
-
     llc_tests = parse_llc_tests(
-        arch_filter=lambda arch: arch == TRIPLE_ARCH_MAP[arch_with_sub]
+        arch_filter=lambda arch: arch == TRIPLE_ARCH_MAP[triple.arch_with_sub]
     )
 
     out_dir_parent.mkdir(exist_ok=True)
-    out_dir_name = ",".join(get_seeds_dir_name_parts(arch_with_sub, triple, cpu, attrs))
+    out_dir_name = get_seeds_dir_name(triple, cpu, attrs, global_isel)
     out_dir = out_dir_parent.joinpath(out_dir_name)
     out_dir.mkdir()
 
     for test in llc_tests:
         if any(
-            cmd.arch_with_sub == arch_with_sub
-            and cmd.triple == triple
+            cmd.triple == triple
             and cmd.cpu == cpu
             and cmd.attrs == attrs
             and cmd.global_isel == global_isel
@@ -62,35 +77,22 @@ def collect_seeds_from_tests(
     return out_dir
 
 
-def get_seeds_dir_name_parts(
-    arch_with_sub: str,
-    triple: Optional[str] = None,
-    cpu: Optional[str] = None,
-    attrs: Set[str] = set(),
-) -> Iterable[str]:
-    if triple:
-        yield f"triple={triple}"
-    else:
-        yield f"arch={arch_with_sub}"
-
-    if cpu:
-        yield f"cpu={cpu}"
-
-    if len(attrs) > 0:
-        yield f"attrs={','.join(attrs)}"
+def count_files_in_dir(dir: Path) -> int:
+    return len(next(os.walk(dir))[2])
 
 
 def main() -> None:
     args = Args().parse_args()
 
-    collect_seeds_from_tests(
+    out_dir = collect_seeds_from_tests(
         out_dir_parent=Path(args.output),
-        arch_with_sub=args.arch,
-        triple=args.triple,
+        triple=Triple.parse(args.triple),
         cpu=args.cpu,
         attrs=set(args.attrs),
         global_isel=args.global_isel,
     )
+
+    print(f"{count_files_in_dir(out_dir)} seeds written to {out_dir}.")
 
 
 if __name__ == "__main__":

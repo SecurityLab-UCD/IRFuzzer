@@ -1,6 +1,6 @@
 from itertools import groupby
 from pathlib import Path
-from typing import List, Optional
+from typing import List
 import pandas as pd
 from tap import Tap
 
@@ -15,7 +15,7 @@ class Args(Tap):
     """directory for storing summary (will create if not exist)"""
 
     def configure(self):
-        self.add_argument("-i", "--input")
+        self.add_argument("input")
         self.add_argument("-o", "--output")
 
 
@@ -30,9 +30,9 @@ def classify(
         columns=["arch", "gisel", "triple", "cpu", "attrs"],
         data=(
             [
-                cmd.arch_with_sub,
+                cmd.triple.arch_with_sub,
                 cmd.global_isel,
-                cmd.triple,
+                str(cmd.triple),
                 cmd.cpu,
                 ",".join(sorted(cmd.attrs)),
             ]

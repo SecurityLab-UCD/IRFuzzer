@@ -1,0 +1,38 @@
+DAGISEL_MATCHER_TABLE_SIZES: dict[str, int] = {
+    "AArch64": 476832,
+    "AMDGPU": 492246,
+    "ARC": 1998,
+    "ARM": 200669,
+    "AVR": 2973,
+    "BPF": 3586,
+    "CSKY": 19076,
+    # DirectX doesn't have SelectionDAG yet?
+    # "DirectX": None,
+    "Hexagon": 177837,
+    "Lanai": 2337,
+    "LoongArch": 23137,
+    "M68k": 18499,
+    "MSP430": 9103,
+    "Mips": 54044,
+    "NVPTX": 185247,
+    "PPC": 190302,
+    "R600": 37558,
+    "RISCV": 2349786,
+    "Sparc": 6589,
+    "SystemZ": 53271,
+    "VE": 71577,
+    "WebAssembly": 24807,
+    "X86": 685870,
+    "XCore": 3854,
+}
+
+GISEL_MATCHER_TABLE_SIZES: dict[str, int] = {
+    "AArch64": 199167,
+    "AMDGPU": 330592,
+    "ARM": 129520,
+    "M68k": 2388,
+    "Mips": 60449,
+    "PPC": 40160,
+    "RISCV": 152823,
+    "X86": 62440,
+}

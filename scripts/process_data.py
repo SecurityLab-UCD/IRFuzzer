@@ -1,70 +1,38 @@
-from typing import Iterable, List, NamedTuple
+from pathlib import Path
+from typing import Iterable, Tuple
 import pandas as pd
 from matplotlib import pyplot
 import os
-from common import *
 import argparse
 import logging
 import subprocess
 
-
-def convert_percentage_to_float(s: str) -> float:
-    return float(s.strip("%")) / 100
-
-
-def read_experiment_data(path: str) -> pd.DataFrame:
-    # the table header is not consistent, so we don't want pandas to detect and process the header (1st row of csv)
-    # but let it use the hard-coded column names below.
-    return pd.read_csv(
-        path,
-        index_col=False,
-        header=None,
-        skiprows=1,
-        names=[
-            "# relative_time",
-            "cycles_done",
-            "cur_item",
-            "corpus_count",
-            "pending_total",
-            "pending_favs",
-            "bit_cvg",
-            "shw_cvg",
-            "saved_crashes",
-            "saved_hangs",
-            "max_depth",
-            "execs_per_sec",
-            "total_execs",
-            "edges_found",
-        ],
-        converters={
-            "bit_cvg": convert_percentage_to_float,
-            "shw_cvg": convert_percentage_to_float,
-        },
-    )
+from lib import IRFUZZER_DATA_ENV
+from lib.experiment import Experiment, get_all_experiments
 
 
 def iterate_over_all_experiments(
-    dir: str, allow_missing_data: bool = False
-) -> Iterable[Tuple[ExprimentInfo, pd.DataFrame]]:
-    for expr_info in for_all_expriments(dir):
+    dir: Path | str, allow_missing_data: bool = False
+) -> Iterable[Tuple[Experiment, pd.DataFrame]]:
+    for expr in get_all_experiments(dir):
         try:
-            yield (expr_info, read_experiment_data(expr_info.get_plot_data_path()))
+            yield (expr, expr.read_plot_data())
         except FileNotFoundError:
             if not allow_missing_data:
                 raise
 
 
 def combine_last_row_of_each_experiment_data(
-    experiments: Iterable[Tuple[ExprimentInfo, pd.DataFrame]], columns: List[str]
+    experiments: Iterable[Tuple[Experiment, pd.DataFrame]], columns: list[str]
 ) -> pd.DataFrame:
     return pd.DataFrame(
-        columns=["fuzzer", "isel", "arch", "replicate", *columns],
+        columns=["fuzzer", "isel", "target", "replicate", *columns],
         data=(
             [
                 exp.fuzzer,
                 exp.isel,
-                exp.arch,
-                exp.expr_id,
+                str(exp.target),
+                exp.replicate_id,
                 *df.tail(1)[columns].values.flatten().tolist(),
             ]
             for (exp, df) in experiments
@@ -73,7 +41,7 @@ def combine_last_row_of_each_experiment_data(
 
 
 def generate_plots(
-    experiments: Iterable[Tuple[ExprimentInfo, pd.DataFrame]], dir_out: str
+    experiments: Iterable[Tuple[Experiment, pd.DataFrame]], dir_out: str
 ) -> None:
     pyplot.ioff()
 
@@ -82,8 +50,8 @@ def generate_plots(
             dir_out,
             experiment.fuzzer,
             experiment.isel,
-            experiment.arch,
-            str(experiment.expr_id),
+            str(experiment.target),
+            str(experiment.replicate_id),
         )
         os.makedirs(figure_path, exist_ok=True)
 
@@ -102,7 +70,7 @@ def generate_plots(
             )
         except:
             print(
-                f"ERROR: Cannot plot {experiment.fuzzer}/{experiment.isel}/{experiment.arch}/{experiment.replicate_id}"
+                f"ERROR: Cannot plot {experiment.fuzzer}/{experiment.isel}/{experiment.target}/{experiment.replicate_id}"
             )
 
         pyplot.close()
@@ -137,7 +105,7 @@ def get_summary(args):
     outpath = os.path.join(args.output, "summary.csv")
     df_summary = (
         df.drop(columns=["replicate"])
-        .groupby(["fuzzer", "isel", "arch"])
+        .groupby(["fuzzer", "isel", "target"])
         .agg(["min", "max", "count", "mean", "std"])
     )
 
@@ -199,8 +167,6 @@ def main() -> None:
     elif args.type == "Mann":
         # Mann Whitney U Test to tell if we are statically significant.
         pass
-    elif args.type == "Data":
-        get_data_slice(args)
 
 
 if __name__ == "__main__":

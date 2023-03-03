@@ -1,33 +1,38 @@
 import logging
 from pathlib import Path
-from typing import Dict, Iterable, List, Literal, NamedTuple, Optional, Tuple
-import common
 import subprocess
+from typing import Iterable, Literal, NamedTuple, Optional
 import os
-import multiprocessing
 from tap import Tap
 import docker
 from time import sleep
 
-from collect_seeds import collect_seeds_from_tests
+from collect_seeds import TargetProp, collect_seeds_from_tests
+from lib.archs import ARCH_WITH_SUB_TO_ARCH_MAP
+from lib.process_concurrency import MAX_SUBPROCESSES, run_concurrent_subprocesses
+from lib.target import Target
+from lib.matcher_table_sizes import (
+    DAGISEL_MATCHER_TABLE_SIZES,
+    GISEL_MATCHER_TABLE_SIZES,
+)
+from lib.target_lists import TARGET_LIST_TIER_1, TARGET_LIST_TIER_2, TARGET_LIST_TIER_3
 
 
 Fuzzer = Literal["aflplusplus", "libfuzzer", "irfuzzer"]
 ISel = Literal["dagisel", "gisel"]
 Tier = Literal[0, 1, 2, 3]
 ClutserType = Literal["screen", "docker", "stdout"]
-CpuAttrArchList = List[Tuple[str, str, str]]
 
 
 DOCKER_IMAGE = "irfuzzer"
-SECONDS_PER_UNIT: Dict[str, int] = {
+SECONDS_PER_UNIT: dict[str, int] = {
     "s": 1,
     "m": 60,
     "h": 3600,
     "d": 86400,
     "w": 604800,
 }
-MUTATOR_LIBRARY_PATHS: Dict[Fuzzer, str] = {
+MUTATOR_LIBRARY_PATHS: dict[Fuzzer, str] = {
     "aflplusplus": "",
     "libfuzzer": "mutator/build/libAFLFuzzMutate.so",
     "irfuzzer": "mutator/build/libAFLCustomIRMutator.so",
@@ -36,49 +41,38 @@ MUTATOR_LIBRARY_PATHS: Dict[Fuzzer, str] = {
 
 class ExperimentConfig(NamedTuple):
     fuzzer: Fuzzer
-    triple: str
-    cpu: str
-    attr: str
+    target: Target
     isel: ISel
     seed_dir: Path
     time: int
     replicate_id: int
 
     @property
-    def target(self) -> str:
-        target = self.triple
-        if self.cpu != "":
-            target += "-" + self.cpu
-        if self.attr != "":
-            target += "-" + self.attr
-        return target
-
-    @property
     def name(self) -> str:
-        return f"{self.fuzzer}-{self.isel}-{self.target}-{self.replicate_id}"
+        return f"{self.fuzzer}:{self.isel}:{self.target}:{self.replicate_id}"
 
     @property
     def matcher_table_size(self) -> Optional[int]:
-        matcher_table_size = (
-            common.MATCHER_TABLE_SIZE_GISEL
+        matcher_table_sizes = (
+            GISEL_MATCHER_TABLE_SIZES
             if self.isel == "gisel"
-            else common.MATCHER_TABLE_SIZE_DAGISEL
+            else DAGISEL_MATCHER_TABLE_SIZES
         )
 
-        matcher_table = common.TRIPLE_ARCH_MAP[self.triple.split("-")[0]]
+        arch = self.target.arch
 
-        if matcher_table not in matcher_table_size:
+        if arch not in matcher_table_sizes:
             return None
 
-        return matcher_table_size[matcher_table]
+        return matcher_table_sizes[arch]
 
-    def get_fuzzing_env(self) -> Dict[str, str]:
+    def get_fuzzing_env(self) -> dict[str, str]:
         return {
             "AFL_CUSTOM_MUTATOR_ONLY": "0" if self.fuzzer == "aflplusplus" else "1",
             "AFL_CUSTOM_MUTATOR_LIBRARY": MUTATOR_LIBRARY_PATHS[self.fuzzer],
-            "TRIPLE": self.triple,
-            "CPU": self.cpu,
-            "ATTR": self.attr,
+            "TRIPLE": str(self.target.triple),
+            "CPU": self.target.cpu if self.target.cpu else "",
+            "ATTR": ",".join(self.target.attrs),
             "GLOBAL_ISEL": "1" if self.isel == "gisel" else "0",
             "MATCHER_TABLE_SIZE": str(self.matcher_table_size),
         }
@@ -97,7 +91,7 @@ class ExperimentConfig(NamedTuple):
         return output_root_dir.joinpath(
             self.fuzzer,
             self.isel,
-            self.target,
+            str(self.target),
             str(self.replicate_id),
         )
 
@@ -118,7 +112,14 @@ class Args(Tap):
     """
 
     seeding_from_tests: bool = False
-    """whether to use tests for each triple-cpu-attr combination as seeds for fuzzing"""
+    """whether to use tests as seeds for fuzzing"""
+
+    props_to_match: list[TargetProp] | Literal["all"] = "all"
+    """
+    the properties of a test target to match those of the fuzzing target,
+    used to determine which tests should be included as seeds.
+    (if 'seeding_from_tests' flag is not set, this option as no effect)
+    """
 
     output: str = "./fuzzing"
     """the output directory"""
@@ -132,12 +133,19 @@ class Args(Tap):
     tier: Optional[Tier] = None
     """
     the set of targets to fuzz
-    (0: everything, 1: Tier 1, 2: Tier 2, see 'common.py' for details)
-    (can be overriden by `--set`)
+    (0: everything, 1: Tier 1, 2: Tier 2, see 'lib/target_lists.py' for details)
+    (can be overriden by `--targets`)
     """
 
-    set: Optional[List[str]] = None
-    """manually specify targets to fuzz ('tier' will be ignored)"""
+    targets: Optional[list[str]] = None
+    """
+    manually specify targets to fuzz ('tier' will be ignored).
+    Format for each target can be
+    "<triple> [<cpu>] [<attr1> <attr2> ...]",
+    "<triple> [<cpu>] [<attr1>,<attr2>,...]", or
+    "<triple>[,<cpu>][,<attr1>,<attr2>,...]".
+    (An attribute must start with '+' or '-' to avoid ambiguity.)
+    """
 
     time: str = "5m"
     """duration for each experiment (e.g. '100s', '30m', '2h', '1d')"""
@@ -148,7 +156,7 @@ class Args(Tap):
     offset: int = 0
     """the offset to start counting experiments"""
 
-    jobs: int = multiprocessing.cpu_count()
+    jobs: int = MAX_SUBPROCESSES
     """the max number of concurrent subprocesses"""
 
     type: Optional[ClutserType] = None
@@ -160,17 +168,20 @@ class Args(Tap):
         self.add_argument("-r", "--repeat")
         self.add_argument("-t", "--time")
 
-    def get_cpu_attr_arch_list(self) -> CpuAttrArchList:
+    def get_fuzzing_targets(self) -> list[Target]:
         if self.tier == 0:
-            return [("", "", triple) for triple in common.TRIPLE_ARCH_MAP.keys()]
+            return [
+                Target(triple=arch_with_sub)
+                for arch_with_sub in ARCH_WITH_SUB_TO_ARCH_MAP.keys()
+            ]
         elif self.tier == 1:
-            return common.CPU_ATTR_ARCH_LIST_TIER_1
+            return TARGET_LIST_TIER_1
         elif self.tier == 2:
-            return common.CPU_ATTR_ARCH_LIST_TIER_2
+            return TARGET_LIST_TIER_2
         elif self.tier == 3:
-            return common.CPU_ATTR_ARCH_LIST_TIER_3
-        elif self.set is not None:
-            return [tuple(s.split(" ")) for s in self.set]
+            return TARGET_LIST_TIER_3
+        elif self.targets is not None:
+            return [Target.parse(s) for s in self.targets]
         else:
             logging.error("Either '--tier' or '--set' has to be specified.")
             exit(1)
@@ -181,32 +192,30 @@ class Args(Tap):
 
 def get_experiment_configs(
     fuzzer: Fuzzer,
-    cpu_attr_arch_list: CpuAttrArchList,
-    seed_dir: Path,
-    seeding_from_tests: bool,
     isel: ISel,
+    targets: list[Target],
     time: int,
     repeat: int,
     offset: int,
+    seed_dir: Path,
+    seeding_from_tests: bool,
+    props_to_match: list[TargetProp] | Literal["all"] = "all",
 ) -> Iterable[ExperimentConfig]:
-    for (cpu, attr, triple) in cpu_attr_arch_list:
+    for target in targets:
         expr_seed_dir = seed_dir
 
         if seeding_from_tests:
             expr_seed_dir = collect_seeds_from_tests(
+                target=target,
+                global_isel=isel == "gisel",
                 out_dir_parent=seed_dir,
-                arch_with_sub=triple.split("-")[0],
-                triple=triple,
-                cpu=None if cpu == "" else cpu,
-                attrs=set() if attr == "" else set(attr.split(",")),
+                props_to_match=props_to_match,
             )
 
         for r in range(repeat):
             expr_config = ExperimentConfig(
                 fuzzer=fuzzer,
-                triple=triple,
-                cpu=cpu,
-                attr=attr,
+                target=target,
                 isel=isel,
                 seed_dir=expr_seed_dir,
                 time=time,
@@ -215,7 +224,7 @@ def get_experiment_configs(
 
             if expr_config.matcher_table_size is None:
                 logging.warn(
-                    f"Can't find matcher table size for triple '{triple}', not fuzzing"
+                    f"Can't find matcher table size for target '{expr_config.target}', not fuzzing"
                 )
                 continue
 
@@ -227,7 +236,7 @@ def combine_commands(*commands: str) -> str:
 
 
 def batch_fuzz_using_docker(
-    experiment_configs: List[ExperimentConfig],
+    experiment_configs: list[ExperimentConfig],
     out_root: Path,
     jobs: int,
 ) -> None:
@@ -270,7 +279,7 @@ def batch_fuzz_using_docker(
             ],
             remove=True,
             detach=True,
-            name=experiment.name.replace("+", "").replace(",", "-"),
+            name=experiment.name.replace("+", "").replace(",", "-").replace(":", "-"),
             environment=experiment.get_fuzzing_env(),
             cpuset_cpus=str(i % jobs),  # core binding
             tmpfs={"/fuzzing": "size=1G"},
@@ -288,7 +297,7 @@ def batch_fuzz_using_docker(
 
 
 def batch_fuzz(
-    experiment_configs: List[ExperimentConfig],
+    experiment_configs: list[ExperimentConfig],
     out_root: Path,
     type: ClutserType,
     jobs: int,
@@ -311,14 +320,14 @@ def batch_fuzz(
         fuzzing_command = experiment.get_fuzzing_command(out_dir)
 
         if type == "screen":
-            fuzzing_command = f'screen -S {experiment.name} -dm bash -c "{fuzzing_command}" && sleep {experiment.time + 30}'
+            fuzzing_command = f'screen -S "{experiment.name}" -dm bash -c "{fuzzing_command}" && sleep {experiment.time + 180}'
 
         process = subprocess.Popen(
             fuzzing_command,
             env={**os.environ, **env},
             shell=True,
             stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
         )
 
         # Sleep for 1s so aflplusplus has time to bind core. Otherwise two fuzzers may bind to the same core.
@@ -326,7 +335,7 @@ def batch_fuzz(
 
         return process
 
-    common.parallel_subprocess(experiment_configs, jobs, start_subprocess, None)
+    run_concurrent_subprocesses(experiment_configs, start_subprocess, None, jobs)
 
 
 def fuzz(expr_config: ExperimentConfig, out_root: Path) -> int:
@@ -359,15 +368,25 @@ def main() -> None:
     expr_configs = list(
         get_experiment_configs(
             fuzzer=args.fuzzer,
-            cpu_attr_arch_list=args.get_cpu_attr_arch_list(),
-            seed_dir=Path(args.seeds),
-            seeding_from_tests=args.seeding_from_tests,
             isel=args.isel,
+            targets=args.get_fuzzing_targets(),
             time=args.get_time_in_seconds(),
             repeat=args.repeat,
             offset=args.offset,
+            seed_dir=Path(args.seeds),
+            seeding_from_tests=args.seeding_from_tests,
+            props_to_match=args.props_to_match,
         )
     )
+
+    print(
+        f"\nThe following {len(expr_configs)} experiment(s) will start in 10 seconds:\n"
+    )
+    for expr in expr_configs:
+        print(f" - {expr.name}")
+    print()
+
+    sleep(10)
 
     if len(expr_configs) == 1 and args.type is None:
         exit(fuzz(expr_config=expr_configs[0], out_root=out_root))

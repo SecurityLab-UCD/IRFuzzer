@@ -21,11 +21,11 @@ RUN CLANG_LLVM=clang+llvm-14.0.0-x86_64-linux-gnu-ubuntu-18.04 && \
     mv /$CLANG_LLVM /clang+llvm && \
     rm $CLANG_LLVM.tar.xz
 
-RUN git clone https://github.com/SecurityLab-UCD/AFLplusplus.git --branch=isel --depth=1 $AFL && \
+RUN git clone https://github.com/SecurityLab-UCD/AFLplusplus.git --branch=irfuzzer-0.2 --depth=1 $AFL && \
     cd $AFL && \
     make -j
 
-RUN git clone --branch irfuzzer-0.1 https://github.com/SecurityLab-UCD/llvm-project.git --depth=1 $LLVM
+RUN git clone https://github.com/SecurityLab-UCD/llvm-project.git --branch=irfuzzer-0.2 --depth=1 $LLVM
 
 RUN mkdir -p $LLVM/build-afl && \
     cd $LLVM/build-afl && \

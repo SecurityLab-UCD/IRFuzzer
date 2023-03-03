@@ -34,7 +34,7 @@ export PATH=$PATH:$HOME/clang+llvm/bin
 ###### Download and compile AFLplusplus
 if [ ! -d $FUZZING_HOME/$AFL ]
 then
-    git clone https://github.com/SecurityLab-UCD/AFLplusplus.git --branch=isel --depth=1 $FUZZING_HOME/$AFL
+    git clone https://github.com/SecurityLab-UCD/AFLplusplus.git --branch=irfuzzer-0.2 --depth=1 $FUZZING_HOME/$AFL
 fi
 cd $FUZZING_HOME/$AFL; make -j; cd $FUZZING_HOME
 export AFL_LLVM_INSTRUMENT=CLASSIC
@@ -42,7 +42,7 @@ export AFL_LLVM_INSTRUMENT=CLASSIC
 ###### Download llvm-project
 if [ ! -d $FUZZING_HOME/$LLVM ]
 then
-    git clone --branch irfuzzer-0.1 https://github.com/SecurityLab-UCD/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
+    git clone --branch irfuzzer-0.2 https://github.com/SecurityLab-UCD/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
 fi
 
 ###### Build LLVM & AIE
@@ -61,7 +61,7 @@ then
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=ON \
-            -DLLVM_CCACHE_BUILD=ON \
+            -DLLVM_CCACHE_BUILD=OFF \
             -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \

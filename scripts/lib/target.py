@@ -139,6 +139,6 @@ def create_target_filter(
                 and get_target_prop_equality_checker(target, prop)(candidate)
             )
         ),
-        sequence=props_to_match,
-        initial=lambda _: True,
+        props_to_match,
+        lambda _: True,
     )

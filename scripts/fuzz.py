@@ -114,7 +114,7 @@ class Args(Tap):
     seeding_from_tests: bool = False
     """whether to use tests as seeds for fuzzing"""
 
-    props_to_match: list[TargetProp] | Literal["all"] = "all"
+    props_to_match: list[TargetProp] = ["triple", "cpu", "attrs"]
     """
     the properties of a test target to match those of the fuzzing target,
     used to determine which tests should be included as seeds.
@@ -199,7 +199,7 @@ def get_experiment_configs(
     offset: int,
     seed_dir: Path,
     seeding_from_tests: bool,
-    props_to_match: list[TargetProp] | Literal["all"] = "all",
+    props_to_match: list[TargetProp] = ["triple", "cpu", "attrs"],
 ) -> Iterable[ExperimentConfig]:
     for target in targets:
         expr_seed_dir = seed_dir

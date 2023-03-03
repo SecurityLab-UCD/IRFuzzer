@@ -14,7 +14,7 @@ class Args(Tap):
     cpu: Optional[str] = None
     attrs: list[str] = []
     global_isel: bool = False
-    props_to_match: list[TargetProp] | Literal["all"] = "all"
+    props_to_match: list[TargetProp] = ["triple", "cpu", "attrs"]
     seed_format: Literal["bc", "ll"] = "bc"
 
     output: str
@@ -43,7 +43,7 @@ def collect_seeds_from_tests(
     target: Target,
     global_isel: bool,
     out_dir_parent: Path,
-    props_to_match: list[TargetProp] | Literal["all"] = "all",
+    props_to_match: list[TargetProp] = ["triple", "cpu", "attrs"],
     dump_bc: bool = True,
     symlink_to_ll: bool = False,
 ) -> Path:
@@ -54,16 +54,10 @@ def collect_seeds_from_tests(
     )
     out_dir.mkdir(parents=True)
 
-    target_filter = (
-        (lambda candidate: candidate == target)
-        if props_to_match == "all"
-        else create_target_filter(target, props_to_match)
-    )
-
     for test in get_runnable_llc_tests(
         arch=target.arch,
         global_isel=global_isel,
-        target_filter=target_filter,
+        target_filter=create_target_filter(target, props_to_match),
     ):
         if symlink_to_ll:
             out_dir.joinpath(test.path.name).symlink_to(test.path.absolute())
@@ -77,7 +71,7 @@ def collect_seeds_from_tests(
 
 
 def main() -> None:
-    args = Args().parse_args()
+    args = Args(underscores_to_dashes=True).parse_args()
 
     target = Target(
         triple=Triple.parse(args.triple),

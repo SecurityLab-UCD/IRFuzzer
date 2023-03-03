@@ -11,8 +11,8 @@ class Target:
     attrs: set[str]
 
     @property
-    def arch(self) -> str:
-        return self.triple.arch
+    def backend(self) -> str:
+        return self.triple.backend
 
     def __init__(
         self,
@@ -99,7 +99,7 @@ class Target:
 
 
 TargetFilter = Callable[[Target], bool]
-TargetProp = Literal["triple", "arch-with-sub", "vendor", "os", "abi", "cpu", "attrs"]
+TargetProp = Literal["triple", "arch", "vendor", "os", "abi", "cpu", "attrs"]
 
 
 def get_target_prop_selector(
@@ -108,8 +108,8 @@ def get_target_prop_selector(
     match prop:
         case "triple":
             return lambda target: target.triple
-        case "arch-with-sub":
-            return lambda target: target.triple.arch_with_sub
+        case "arch":
+            return lambda target: target.triple.arch
         case "vendor":
             return lambda target: target.triple.vendor
         case "os":

@@ -25,13 +25,13 @@ class Args(Tap):
 
 
 def get_runnable_llc_tests(
-    arch: str,
+    backend: str,
     global_isel: bool,
     target_filter: TargetFilter = lambda _: True,
 ) -> Iterable[LLCTest]:
     return (
         test
-        for test in parse_llc_tests(arch_filter=lambda a: a == arch)
+        for test in parse_llc_tests(backend_filter=lambda a: a == backend)
         if any(
             cmd.global_isel == global_isel and target_filter(cmd.target)
             for cmd in test.runnable_llc_commands
@@ -55,7 +55,7 @@ def collect_seeds_from_tests(
     out_dir.mkdir(parents=True)
 
     for test in get_runnable_llc_tests(
-        arch=target.arch,
+        backend=target.backend,
         global_isel=global_isel,
         target_filter=create_target_filter(target, props_to_match),
     ):

@@ -2,7 +2,7 @@ from ctypes import CDLL, c_char_p, cdll
 from typing import ClassVar, Optional
 from lib import LLVM
 
-from lib.archs import ARCH_WITH_SUB_TO_ARCH_MAP
+from lib.arch import ARCH_TO_BACKEND_MAP, normalize_arch
 
 
 LIB_LLVM_TARGET_PATH = LLVM + "/build-release/lib/libLLVMTarget.so"
@@ -10,24 +10,24 @@ LIB_LLVM_TARGET_PATH = LLVM + "/build-release/lib/libLLVMTarget.so"
 class Triple:
     llvm_lib: ClassVar[Optional[CDLL]] = None
 
-    arch_with_sub: str
+    arch: str
     vendor: Optional[str]
     os: Optional[str]
     abi: Optional[str]
 
     @property
-    def arch(self) -> str:
-        return ARCH_WITH_SUB_TO_ARCH_MAP[self.arch_with_sub]
+    def backend(self) -> str:
+        return ARCH_TO_BACKEND_MAP[self.backend]
 
     def __init__(
         self,
-        arch_with_sub: str,
+        arch: str,
         vendor: Optional[str] = None,
         os: Optional[str] = None,
         abi: Optional[str] = None,
     ) -> None:
-        assert len(arch_with_sub) > 0
-        self.arch_with_sub = arch_with_sub
+        assert len(arch) > 0
+        self.arch = normalize_arch(arch)
         self.vendor = self.normalize_component(vendor)
         self.os = self.normalize_component(os)
         self.abi = self.normalize_component(abi)
@@ -37,7 +37,7 @@ class Triple:
             return False
 
         return (
-            self.arch_with_sub == __o.arch_with_sub
+            self.arch == __o.arch
             and self.vendor == __o.vendor
             and self.os == __o.os
             and self.abi == __o.abi
@@ -49,7 +49,7 @@ class Triple:
     def __repr__(self) -> str:
         s = "-".join(
             (component if component else "")
-            for component in [self.arch_with_sub, self.vendor, self.os, self.abi]
+            for component in [self.arch, self.vendor, self.os, self.abi]
         )
 
         return s.rstrip("-")
@@ -78,7 +78,7 @@ class Triple:
         assert n > 0 and n <= 4
 
         return Triple(
-            arch_with_sub=parts[0],
+            arch=parts[0],
             vendor=parts[1] if n >= 2 else None,
             os=parts[2] if n >= 3 else None,
             abi=parts[3] if n == 4 else None,

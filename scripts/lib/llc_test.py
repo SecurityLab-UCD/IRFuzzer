@@ -11,7 +11,7 @@ from lib.triple import Triple
 class LLCTest:
     path: Path
 
-    arch: str
+    backend: str
 
     test_commands: list[str]
 
@@ -23,10 +23,10 @@ class LLCTest:
 
     code_lines: list[str]
 
-    def __init__(self, arch: str, file_path: Path) -> None:
+    def __init__(self, backend: str, file_path: Path) -> None:
         assert file_path.name.endswith(".ll")
 
-        self.arch = arch
+        self.backend = backend
         self.path = file_path
         self.test_commands = []
         self.code_lines = []
@@ -125,14 +125,14 @@ class LLCTest:
 
 
 def parse_llc_tests(
-    arch_filter: Callable[[str], bool] = lambda _: True,
+    backend_filter: Callable[[str], bool] = lambda _: True,
     verbose: bool = False,
 ) -> Iterable[LLCTest]:
     total = 0
     success = 0
 
     for arch_dir in Path(LLVM, "llvm/test/CodeGen").iterdir():
-        if not arch_dir.is_dir() or not arch_filter(arch_dir.name):
+        if not arch_dir.is_dir() or not backend_filter(arch_dir.name):
             continue
 
         for file_path in arch_dir.rglob("*.ll"):

@@ -33,7 +33,7 @@ class LLCCommand:
             return Triple.parse(match.group(1))
 
         if (match := re.match(r".*-march[= ]\"?([a-z0-9_-]+)", command)) is not None:
-            return Triple(arch_with_sub=match.group(1))
+            return Triple(arch=match.group(1))
 
         return None
 

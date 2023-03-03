@@ -5,7 +5,7 @@ from bitarray import bitarray
 from tap import Tap
 from math import ceil
 
-from lib.archs import ARCH_WITH_SUB_TO_ARCH_MAP
+from lib.arch import ARCH_TO_BACKEND_MAP
 from lib.experiment import Experiment, get_all_experiments
 from lib.matcher_table_sizes import (
     DAGISEL_MATCHER_TABLE_SIZES,
@@ -50,13 +50,13 @@ def get_combined_coverage_map(
     return combined_cvg_map
 
 
-def get_matcher_table_size(arch_with_sub: str, isel: str) -> int:
-    arch = ARCH_WITH_SUB_TO_ARCH_MAP[arch_with_sub]
+def get_matcher_table_size(backend: str, isel: str) -> int:
+    backend = ARCH_TO_BACKEND_MAP[backend]
 
     if isel == "dagisel":
-        return DAGISEL_MATCHER_TABLE_SIZES[arch]
+        return DAGISEL_MATCHER_TABLE_SIZES[backend]
     elif isel == "gisel":
-        return GISEL_MATCHER_TABLE_SIZES[arch]
+        return GISEL_MATCHER_TABLE_SIZES[backend]
     else:
         raise Exception("Invalid ISel")
 
@@ -64,11 +64,11 @@ def get_matcher_table_size(arch_with_sub: str, isel: str) -> int:
 def main():
     args = Args().parse_args()
 
-    for (arch_with_sub, isel), exprs in groupby(
+    for (arch, isel), exprs in groupby(
         get_all_experiments(args.input),
-        lambda expr: (expr.target.triple.arch_with_sub, expr.isel),
+        lambda expr: (expr.target.triple.arch, expr.isel),
     ):
-        matcher_table_size = get_matcher_table_size(arch_with_sub, isel)
+        matcher_table_size = get_matcher_table_size(arch, isel)
         exprs = list(exprs)
 
         initial_cvg_map = get_combined_coverage_map(
@@ -86,7 +86,7 @@ def main():
         assert len(initial_cvg_map) == len(current_cvg_map)
 
         print(
-            arch_with_sub.ljust(10),
+            arch.ljust(10),
             isel.ljust(8),
             f"{matcher_table_size}".ljust(8),
             f"{initial_cvg_map.count(0) / matcher_table_size :.3%}".ljust(6),

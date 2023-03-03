@@ -8,7 +8,7 @@ import docker
 from time import sleep
 
 from collect_seeds import TargetProp, collect_seeds_from_tests
-from lib.archs import ARCH_WITH_SUB_TO_ARCH_MAP
+from lib.arch import ARCH_TO_BACKEND_MAP
 from lib.process_concurrency import MAX_SUBPROCESSES, run_concurrent_subprocesses
 from lib.target import Target
 from lib.matcher_table_sizes import (
@@ -59,12 +59,12 @@ class ExperimentConfig(NamedTuple):
             else DAGISEL_MATCHER_TABLE_SIZES
         )
 
-        arch = self.target.arch
+        backend = self.target.backend
 
-        if arch not in matcher_table_sizes:
+        if backend not in matcher_table_sizes:
             return None
 
-        return matcher_table_sizes[arch]
+        return matcher_table_sizes[backend]
 
     def get_fuzzing_env(self) -> dict[str, str]:
         return {
@@ -171,8 +171,8 @@ class Args(Tap):
     def get_fuzzing_targets(self) -> list[Target]:
         if self.tier == 0:
             return [
-                Target(triple=arch_with_sub)
-                for arch_with_sub in ARCH_WITH_SUB_TO_ARCH_MAP.keys()
+                Target(triple=arch)
+                for arch in ARCH_TO_BACKEND_MAP.keys()
             ]
         elif self.tier == 1:
             return TARGET_LIST_TIER_1

@@ -25,7 +25,7 @@ def classify_wrapper(
     if target.cpu:
         args.append(f"-mcpu={target.cpu}")
 
-    if target.attrs:
+    if len(target.attrs) > 0:
         args.append(f"-mattr={','.join(target.attrs)}")
 
     if global_isel:

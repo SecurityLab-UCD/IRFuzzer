@@ -31,10 +31,12 @@ then
 fi
 export PATH=$PATH:$HOME/clang+llvm/bin
 
-###### Download and compile AFLplusplus
+###### Download submodules
+git submodule update
+
+###### Compile AFLplusplus
 cd $FUZZING_HOME/$AFL; make -j; cd $FUZZING_HOME
 export AFL_LLVM_INSTRUMENT=CLASSIC
-
 
 ###### Build LLVM & AIE
 # Unfortunatelly we have to compile LLVM twice. 

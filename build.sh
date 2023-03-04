@@ -32,18 +32,9 @@ fi
 export PATH=$PATH:$HOME/clang+llvm/bin
 
 ###### Download and compile AFLplusplus
-if [ ! -d $FUZZING_HOME/$AFL ]
-then
-    git clone https://github.com/SecurityLab-UCD/AFLplusplus.git --branch=irfuzzer-0.2 --depth=1 $FUZZING_HOME/$AFL
-fi
 cd $FUZZING_HOME/$AFL; make -j; cd $FUZZING_HOME
 export AFL_LLVM_INSTRUMENT=CLASSIC
 
-###### Download llvm-project
-if [ ! -d $FUZZING_HOME/$LLVM ]
-then
-    git clone --branch irfuzzer-0.2 https://github.com/SecurityLab-UCD/llvm-project.git --depth=1 $FUZZING_HOME/$LLVM
-fi
 
 ###### Build LLVM & AIE
 # Unfortunatelly we have to compile LLVM twice. 

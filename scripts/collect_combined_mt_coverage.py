@@ -3,14 +3,14 @@ from pathlib import Path
 from typing import Iterable
 from bitarray import bitarray
 from tap import Tap
-from common import (
-    MATCHER_TABLE_SIZE_DAGISEL,
-    MATCHER_TABLE_SIZE_GISEL,
-    TRIPLE_ARCH_MAP,
-    ExprimentInfo,
-    for_all_expriments,
-)
 from math import ceil
+
+from lib.arch import ARCH_TO_BACKEND_MAP
+from lib.experiment import Experiment, get_all_experiments
+from lib.matcher_table_sizes import (
+    DAGISEL_MATCHER_TABLE_SIZES,
+    GISEL_MATCHER_TABLE_SIZES,
+)
 
 
 class Args(Tap):
@@ -33,30 +33,30 @@ def read_coverage_map(path: Path, matcher_table_size: int) -> bitarray:
 
 
 def get_combined_coverage_map(
-    experiments: Iterable[ExprimentInfo], matcher_table_size: int, map_rel_path: str
+    experiments: Iterable[Experiment], map_size: int, map_rel_path: str
 ) -> bitarray:
-    combined_cvg_map = bitarray(matcher_table_size)
+    combined_cvg_map = bitarray(map_size)
     combined_cvg_map.setall(1)
 
     for expr in experiments:
-        cvg_map_path = Path(expr.expr_path).joinpath(map_rel_path)
+        cvg_map_path = expr.path.joinpath(map_rel_path)
 
         if not cvg_map_path.exists():
             print(f"WARNING: {cvg_map_path} does not exist. Skipped.")
             continue
 
-        combined_cvg_map &= read_coverage_map(cvg_map_path, matcher_table_size)
+        combined_cvg_map &= read_coverage_map(cvg_map_path, map_size)
 
     return combined_cvg_map
 
 
-def get_matcher_table_size(arch_with_sub: str, isel: str) -> int:
-    arch = TRIPLE_ARCH_MAP[arch_with_sub]
+def get_matcher_table_size(backend: str, isel: str) -> int:
+    backend = ARCH_TO_BACKEND_MAP[backend]
 
     if isel == "dagisel":
-        return MATCHER_TABLE_SIZE_DAGISEL[arch]
+        return DAGISEL_MATCHER_TABLE_SIZES[backend]
     elif isel == "gisel":
-        return MATCHER_TABLE_SIZE_GISEL[arch]
+        return GISEL_MATCHER_TABLE_SIZES[backend]
     else:
         raise Exception("Invalid ISel")
 
@@ -64,11 +64,11 @@ def get_matcher_table_size(arch_with_sub: str, isel: str) -> int:
 def main():
     args = Args().parse_args()
 
-    for (arch_with_sub, isel), exprs in groupby(
-        for_all_expriments(args.input),
-        lambda expr: (expr.arch.split("-")[0], expr.isel),
+    for (arch, isel), exprs in groupby(
+        get_all_experiments(args.input),
+        lambda expr: (expr.target.triple.arch, expr.isel),
     ):
-        matcher_table_size = get_matcher_table_size(arch_with_sub, isel)
+        matcher_table_size = get_matcher_table_size(arch, isel)
         exprs = list(exprs)
 
         initial_cvg_map = get_combined_coverage_map(
@@ -86,7 +86,7 @@ def main():
         assert len(initial_cvg_map) == len(current_cvg_map)
 
         print(
-            arch_with_sub.ljust(8),
+            arch.ljust(10),
             isel.ljust(8),
             f"{matcher_table_size}".ljust(8),
             f"{initial_cvg_map.count(0) / matcher_table_size :.3%}".ljust(6),

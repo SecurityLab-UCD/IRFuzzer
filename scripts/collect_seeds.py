@@ -1,95 +1,91 @@
 from pathlib import Path
-from typing import Iterable, List, Optional, Set
+from typing import Iterable, Literal, Optional
 
 from tap import Tap
 
-from llc_test_parsing import parse_llc_tests
-from common import TRIPLE_ARCH_MAP
+from lib.fs import count_files
+from lib.llc_test import LLCTest, parse_llc_tests
+from lib.target import Target, TargetFilter, TargetProp, create_target_filter
+from lib.triple import Triple
 
 
 class Args(Tap):
-    arch: Optional[str] = None
-    triple: Optional[str] = None
+    triple: str
     cpu: Optional[str] = None
-    attrs: List[str] = []
+    attrs: list[str] = []
     global_isel: bool = False
+    props_to_match: list[TargetProp] = ["triple", "cpu", "attrs"]
+    seed_format: Literal["bc", "ll"] = "bc"
 
     output: str
     """directory for storing seeds (will create if not exist)"""
 
-    def configure(self):
+    def configure(self) -> None:
         self.add_argument("-o", "--output")
 
 
+def get_runnable_llc_tests(
+    backend: str,
+    global_isel: bool,
+    target_filter: TargetFilter = lambda _: True,
+) -> Iterable[LLCTest]:
+    return (
+        test
+        for test in parse_llc_tests(backend_filter=lambda a: a == backend)
+        if any(
+            cmd.global_isel == global_isel and target_filter(cmd.target)
+            for cmd in test.runnable_llc_commands
+        )
+    )
+
+
 def collect_seeds_from_tests(
+    target: Target,
+    global_isel: bool,
     out_dir_parent: Path,
-    arch_with_sub: Optional[str],
-    triple: Optional[str] = None,
-    cpu: Optional[str] = None,
-    attrs: Set[str] = set(),
-    global_isel: bool = False,
+    props_to_match: list[TargetProp] = ["triple", "cpu", "attrs"],
     dump_bc: bool = True,
     symlink_to_ll: bool = False,
 ) -> Path:
-    if arch_with_sub is None:
-        assert triple is not None, f"either arch or triple has to be specified"
-        arch_with_sub = triple.split("-")[0]
+    print(f"Collecting seeds for target {target}...")
 
-    llc_tests = parse_llc_tests(
-        arch_filter=lambda arch: arch == TRIPLE_ARCH_MAP[arch_with_sub]
+    out_dir = out_dir_parent.joinpath(
+        "gisel" if global_isel else "dagisel", str(target)
     )
+    out_dir.mkdir(parents=True)
 
-    out_dir_parent.mkdir(exist_ok=True)
-    out_dir_name = ",".join(get_seeds_dir_name_parts(arch_with_sub, triple, cpu, attrs))
-    out_dir = out_dir_parent.joinpath(out_dir_name)
-    out_dir.mkdir()
+    for test in get_runnable_llc_tests(
+        backend=target.backend,
+        global_isel=global_isel,
+        target_filter=create_target_filter(target, props_to_match),
+    ):
+        if symlink_to_ll:
+            out_dir.joinpath(test.path.name).symlink_to(test.path.absolute())
 
-    for test in llc_tests:
-        if any(
-            cmd.arch_with_sub == arch_with_sub
-            and cmd.triple == triple
-            and cmd.cpu == cpu
-            and cmd.attrs == attrs
-            and cmd.global_isel == global_isel
-            for cmd in test.runnable_llc_commands
-        ):
-            if symlink_to_ll:
-                out_dir.joinpath(test.path.name).symlink_to(test.path.absolute())
+        if dump_bc:
+            test.dump_bc(out_dir)
 
-            if dump_bc:
-                test.dump_bc(out_dir)
+    print(f"{count_files(out_dir)} seeds written to {out_dir}.")
 
     return out_dir
 
 
-def get_seeds_dir_name_parts(
-    arch_with_sub: str,
-    triple: Optional[str] = None,
-    cpu: Optional[str] = None,
-    attrs: Set[str] = set(),
-) -> Iterable[str]:
-    if triple:
-        yield f"triple={triple}"
-    else:
-        yield f"arch={arch_with_sub}"
-
-    if cpu:
-        yield f"cpu={cpu}"
-
-    if len(attrs) > 0:
-        yield f"attrs={','.join(attrs)}"
-
-
 def main() -> None:
-    args = Args().parse_args()
+    args = Args(underscores_to_dashes=True).parse_args()
+
+    target = Target(
+        triple=Triple.parse(args.triple),
+        cpu=args.cpu,
+        attrs=args.attrs[0] if len(args.attrs) == 1 else args.attrs,
+    )
 
     collect_seeds_from_tests(
-        out_dir_parent=Path(args.output),
-        arch_with_sub=args.arch,
-        triple=args.triple,
-        cpu=args.cpu,
-        attrs=set(args.attrs),
+        target=target,
         global_isel=args.global_isel,
+        out_dir_parent=Path(args.output),
+        props_to_match=args.props_to_match,
+        dump_bc=args.seed_format == "bc",
+        symlink_to_ll=args.seed_format == "ll",
     )
 
 

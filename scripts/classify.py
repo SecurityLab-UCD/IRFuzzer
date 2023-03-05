@@ -6,9 +6,8 @@ from typing import Iterable, Iterator, List, Optional, Set, Tuple
 import shutil
 from pathlib import Path
 import tempfile
-from common import parallel_subprocess
 
-MAX_SUBPROCESSES = 64
+from lib.process_concurrency import run_concurrent_subprocesses
 
 
 class StackTrace:
@@ -144,7 +143,8 @@ class CrashError:
         elif self.message_raw.startswith("LLVM ERROR: Cannot select:"):
             self.type = "dag-instruction-selection"
             match = re.match(
-                r"LLVM ERROR: Cannot select:.+ = ([a-zA-Z0-9_:]+(<.+>)?)", message_lines[0]
+                r"LLVM ERROR: Cannot select:.+ = ([a-zA-Z0-9_:]+(<.+>)?)",
+                message_lines[0],
             )
             if match is None:
                 print(f'ERROR: failed to extract instruction from "{message_lines[0]}"')
@@ -193,8 +193,8 @@ class CrashError:
 
 def classify(
     cmd: List[str],
-    input_dir: str,
-    output_dir: str,
+    input_dir: str | Path,
+    output_dir: str | Path,
     force: bool,
     verbose: bool = False,
     create_symlink_to_source: bool = True,
@@ -264,14 +264,13 @@ def classify(
                 os.path.join(folder_path, os.path.basename(ir_bc_path) + ".bc"),
             )
 
-    parallel_subprocess(
+    run_concurrent_subprocesses(
         iter=list(
             filter(
                 lambda file_name: file_name.split(".")[-1] not in ["md", "txt", "s"],
                 os.listdir(input_dir),
             )
         ),
-        jobs=MAX_SUBPROCESSES,
         subprocess_creator=lambda file_name: subprocess.Popen(
             cmd + [os.path.join(input_dir, file_name)],
             stdout=None,

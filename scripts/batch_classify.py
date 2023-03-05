@@ -1,32 +1,32 @@
 import argparse
 import logging
 import subprocess
-from typing import Callable, Optional
 
 from classify import classify
-from os import path
 from pathlib import Path
 
-from common import parallel_subprocess, subdirs_of
+from lib import LLC, LLVM_DIS
+from lib.fs import subdirs_of
+from lib.process_concurrency import run_concurrent_subprocesses
+from lib.target import Target, TargetFilter
 
-LLVM_BIN_PATH = "./llvm-project-fuzzing/build-release/bin"
-LLC = path.join(LLVM_BIN_PATH, "llc")
-LLVM_DIS = path.join(LLVM_BIN_PATH, "llvm-dis")
 TEMP_FILE = "temp.s"
 
 
 def classify_wrapper(
-    input_dir: str,
-    output_dir: str,
-    mtriple: str,
-    mcpu: Optional[str] = None,
+    input_dir: Path,
+    output_dir: Path,
+    target: Target,
     global_isel: bool = False,
     generate_ll_files: bool = True,
 ) -> None:
-    args = [LLC, f"-mtriple={mtriple}"]
+    args = [LLC, f"-mtriple={target.triple}"]
 
-    if mcpu is not None:
-        args.append(f"-mcpu={mcpu}")
+    if target.cpu:
+        args.append(f"-mcpu={target.cpu}")
+
+    if len(target.attrs) > 0:
+        args.append(f"-mattr={','.join(target.attrs)}")
 
     if global_isel:
         args.append("-global-isel")
@@ -56,9 +56,8 @@ def classify_wrapper(
     if generate_ll_files:
         print(f"Generating human-readable IR files for {output_dir}...")
 
-        parallel_subprocess(
+        run_concurrent_subprocesses(
             Path(output_dir).rglob("*.bc"),
-            64,
             lambda ir_bc_path: subprocess.Popen(
                 args=[LLVM_DIS, ir_bc_path],
                 stdout=subprocess.DEVNULL,
@@ -70,33 +69,33 @@ def classify_wrapper(
 
 
 def batch_classify(
-    input_root_dir: str,
-    output_root_dir: str,
+    input_root_dir: Path,
+    output_root_dir: Path,
     global_isel: bool = False,
     generate_ll_files: bool = True,
-    mtriple_filter: Callable[[str], bool] = lambda _: True,
+    target_filter: TargetFilter = lambda _: True,
 ) -> None:
-    for subdir in subdirs_of(input_root_dir):
-        parts = subdir.name.split("-", 1)
+    for target_dir in subdirs_of(input_root_dir):
+        target = Target.parse(target_dir.name)
 
-        mtriple = parts[0]
-        mcpu = parts[1] if len(parts) == 2 else None
-
-        if not mtriple_filter(mtriple):
+        if not target_filter(target):
             continue
 
-        for subsubdir in subdirs_of(subdir.path):
+        for replicate_dir in subdirs_of(target_dir.path):
             try:
                 classify_wrapper(
-                    input_dir=path.join(subsubdir.path, "default", "crashes"),
-                    output_dir=path.join(output_root_dir, subdir.name, subsubdir.name),
-                    mtriple=mtriple,
-                    mcpu=mcpu,
+                    input_dir=Path(replicate_dir.path, "default", "crashes"),
+                    output_dir=output_root_dir.joinpath(
+                        target_dir.name, replicate_dir.name
+                    ),
+                    target=target,
                     global_isel=global_isel,
                     generate_ll_files=generate_ll_files,
                 )
             except Exception:
-                logging.exception(f"Something went wrong when processing {subdir.path}")
+                logging.exception(
+                    f"Something went wrong when processing {target_dir.path}"
+                )
 
 
 def main() -> None:
@@ -125,8 +124,8 @@ def main() -> None:
     for fuzzer_dir in subdirs_of(args.input):
         for isel_dir in subdirs_of(fuzzer_dir.path):
             batch_classify(
-                input_root_dir=path.join(isel_dir.path),
-                output_root_dir=path.join(args.output, fuzzer_dir.name, isel_dir.name),
+                input_root_dir=Path(isel_dir.path),
+                output_root_dir=Path(args.output, fuzzer_dir.name, isel_dir.name),
                 global_isel=isel_dir.name == "gisel",
             )
 

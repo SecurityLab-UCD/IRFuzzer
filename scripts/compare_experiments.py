@@ -1,11 +1,12 @@
 import argparse
 import os
+from pathlib import Path
 from typing import Iterable, Iterator, Tuple
 from matplotlib import pyplot
 import numpy as np
 import pandas as pd
 
-from process_data import read_experiment_data
+from lib.plot_data import read_plot_data
 
 
 def interpolate_data(
@@ -81,8 +82,8 @@ def iterate_plot_data_for_replicates(
     dir: str, n_replicate: int
 ) -> Iterable[pd.DataFrame]:
     return (
-        read_experiment_data(
-            os.path.join(
+        read_plot_data(
+            Path(
                 dir,
                 str(i),
                 "default/plot_data",

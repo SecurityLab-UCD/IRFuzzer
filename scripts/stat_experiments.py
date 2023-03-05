@@ -1,4 +1,5 @@
 from tap import Tap
+from lib.experiment import get_all_experiments
 from process_data import iterate_over_all_experiments
 
 
@@ -11,10 +12,15 @@ class Args(Tap):
 
 
 def print_experiment_statuses(root_dir: str) -> None:
-    for expr, df in iterate_over_all_experiments(root_dir):
+    for expr in get_all_experiments(root_dir):
         print(
-            expr.isel.ljust(8), expr.arch.ljust(40), str(expr.expr_id).ljust(2), end=" "
+            expr.isel.ljust(8),
+            str(expr.target).ljust(40),
+            str(expr.replicate_id).ljust(2),
+            end=" ",
         )
+
+        df = expr.read_plot_data()
 
         if df.shape[0] > 0:
             print(

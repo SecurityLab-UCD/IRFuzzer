@@ -1,70 +1,32 @@
 from pathlib import Path
 import re
 import subprocess
-from typing import Callable, Iterable, List, Optional, Set
+from typing import Callable, Iterable, Optional
+from lib import LLVM, LLVM_AS
 
-
-class LLCCommand:
-    arch_with_sub: str
-    cpu: Optional[str]
-    triple: Optional[str]
-    attrs: Set[str]
-    global_isel: bool
-
-    def __init__(self, command: str, default_triple: Optional[str] = None) -> None:
-        assert "llc" in command
-
-        if (match := re.match(r".*-mtriple[= ]\"?([a-z0-9_-]+)", command)) is not None:
-            self.triple = match.group(1)
-        else:
-            self.triple = default_triple
-
-        if (match := re.match(r".*-march[= ]\"?([a-z0-9_-]+)", command)) is not None:
-            self.arch_with_sub = match.group(1)
-        elif self.triple is not None:
-            self.arch_with_sub = self.triple.split("-")[0]
-        else:
-            raise Exception(f"Failed to determine arch")
-
-        assert self.triple is not None or self.arch_with_sub is not None, f"FATAL"
-
-        if (match := re.match(r".*-mcpu[= ]\"?([a-z0-9-]+)", command)) is not None:
-            self.cpu = match.group(1)
-        else:
-            self.cpu = None
-
-        self.attrs = set(
-            ("+" + attr) if not attr.startswith(("+", "-")) else attr
-            for arg_val in re.findall(r"-mattr[= ]\"?([A-Za-z0-9,\+-]+)", command)
-            for attr in arg_val.split(",")
-        )
-
-        assert all(
-            attr.startswith(("+", "-")) for attr in self.attrs
-        ), f"Invalid attribute"
-
-        self.global_isel = re.match(r".*-global-isel", command) is not None
+from lib.llc_command import LLCCommand
+from lib.triple import Triple
 
 
 class LLCTest:
     path: Path
 
-    arch: str
+    backend: str
 
-    test_commands: List[str]
+    test_commands: list[str]
 
-    runnable_llc_commands: List[LLCCommand]
+    runnable_llc_commands: list[LLCCommand]
     """
     llc commands that can be directly executed without crashing using the test case as an input
     without going through `opt`, `sed`, etc. first.
     """
 
-    code_lines: List[str]
+    code_lines: list[str]
 
-    def __init__(self, arch: str, file_path: Path) -> None:
+    def __init__(self, backend: str, file_path: Path) -> None:
         assert file_path.name.endswith(".ll")
 
-        self.arch = arch
+        self.backend = backend
         self.path = file_path
         self.test_commands = []
         self.code_lines = []
@@ -127,7 +89,7 @@ class LLCTest:
             len(self.runnable_llc_commands) > 0
         ), f"WARNING: {file_path} does not contain any runnable `llc` command."
 
-    def get_default_triple(self) -> Optional[str]:
+    def get_default_triple(self) -> Optional[Triple]:
         lines_with_triple = [
             line for line in self.code_lines if line.startswith("target triple")
         ]
@@ -144,14 +106,14 @@ class LLCTest:
             match is not None
         ), f"UNEXPECTED: failed to extract triple from '{lines_with_triple[0]}'"
 
-        return match.group(1)
+        return Triple.parse(match.group(1))
 
     def dump_bc(self, out_dir: Path) -> None:
         out_path = out_dir.joinpath(self.path.name.removesuffix(".ll") + ".bc")
 
         process = subprocess.run(
             [
-                "./llvm-project/build-release/bin/llvm-as",
+                LLVM_AS,
                 self.path,
                 "-o",
                 out_path,
@@ -163,14 +125,14 @@ class LLCTest:
 
 
 def parse_llc_tests(
-    llvm_root: Path = Path("llvm-project"),
-    arch_filter: Callable[[str], bool] = lambda _: True,
+    backend_filter: Callable[[str], bool] = lambda _: True,
+    verbose: bool = False,
 ) -> Iterable[LLCTest]:
     total = 0
     success = 0
 
-    for arch_dir in llvm_root.joinpath("llvm/test/CodeGen").iterdir():
-        if not arch_dir.is_dir() or not arch_filter(arch_dir.name):
+    for arch_dir in Path(LLVM, "llvm/test/CodeGen").iterdir():
+        if not arch_dir.is_dir() or not backend_filter(arch_dir.name):
             continue
 
         for file_path in arch_dir.rglob("*.ll"):
@@ -178,7 +140,8 @@ def parse_llc_tests(
                 yield LLCTest(arch_dir.name, file_path)
                 success += 1
             except Exception as e:
-                print(e)
+                if verbose:
+                    print(e)
             total += 1
 
     print(f"Successfully parsed {success}/{total} LLC tests.")

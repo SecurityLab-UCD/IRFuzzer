@@ -1,29 +1,29 @@
-from typing import Generator
+from typing import Generator, Tuple
 import pandas as pd
-import os
-from common import *
 import argparse
+
+from lib.experiment import Experiment, get_all_experiments
 
 
 def iterate_over_all_experiments(
     dir: str,
-) -> Generator[Tuple[ExprimentInfo, int], None, None]:
-    for expr_info in for_all_expriments(dir):
+) -> Generator[Tuple[Experiment, int], None, None]:
+    for expr_info in get_all_experiments(dir):
         with open(
-            os.path.join(expr_info.to_expr_path(), "unique_crashes"), "r"
+            expr_info.path.joinpath("unique_crashes"), "r"
         ) as file:
             yield (expr_info, int(file.readline()))
 
 
 def collect_crash_data(dir: str) -> pd.DataFrame:
     return pd.DataFrame(
-        columns=["fuzzer", "isel", "arch", "replicate", "n_unique_crashes"],
+        columns=["fuzzer", "isel", "target", "replicate", "n_unique_crashes"],
         data=(
             [
                 exp.fuzzer,
                 exp.isel,
-                exp.arch,
-                exp.expr_id,
+                str(exp.target),
+                exp.replicate_id,
                 n_unique_crashes,
             ]
             for (exp, n_unique_crashes) in iterate_over_all_experiments(dir)
@@ -48,7 +48,7 @@ def main() -> None:
 
     df_summary = (
         df.drop(columns=["replicate"])
-        .groupby(["fuzzer", "isel", "arch"])
+        .groupby(["fuzzer", "isel", "target"])
         .agg(["min", "max", "count", "mean", "std"])
     )
 
@@ -59,7 +59,7 @@ def main() -> None:
 
     df_comparison = df_irfuzzer.merge(
         df_libfuzzer,
-        on=["isel", "arch", "replicate"],
+        on=["isel", "target", "replicate"],
         suffixes=("_irfuzzer", "_libfuzzer"),
     )
 

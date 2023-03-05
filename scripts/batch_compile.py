@@ -1,10 +1,9 @@
 import argparse
-import multiprocessing
 import os
 import subprocess
 from typing import Iterable, Optional
 
-from common import parallel_subprocess
+from lib.process_concurrency import MAX_SUBPROCESSES, run_concurrent_subprocesses
 
 
 def build_clang_flags(
@@ -35,11 +34,10 @@ def batch_compile(
 
     os.makedirs(out_dir, exist_ok=True)
 
-    parallel_subprocess(
+    run_concurrent_subprocesses(
         iter=[
             file_name for file_name in os.listdir(src_dir) if file_name.endswith(".c")
         ],
-        jobs=(multiprocessing.cpu_count() - 1) if n_jobs is None else n_jobs,
         subprocess_creator=lambda file_name: subprocess.Popen(
             args=[
                 "clang",
@@ -51,6 +49,7 @@ def batch_compile(
             stderr=subprocess.DEVNULL,
             stdout=subprocess.DEVNULL,
         ),
+        max_jobs=MAX_SUBPROCESSES if n_jobs is None else n_jobs,
     )
 
 

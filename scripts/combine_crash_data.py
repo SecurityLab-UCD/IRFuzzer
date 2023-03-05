@@ -4,16 +4,17 @@ from typing import Generator, Set, Tuple
 
 import pandas as pd
 
-from common import ExprimentInfo, for_all_expriments, subdirs_of
+from lib.experiment import Experiment, get_all_experiments
+from lib.fs import subdirs_of
 
 
 def iterate_over_all_experiments(
     dir: str,
-) -> Generator[Tuple[ExprimentInfo, Set[str]], None, None]:
-    for expr_info in for_all_expriments(dir):
+) -> Generator[Tuple[Experiment, Set[str]], None, None]:
+    for expr in get_all_experiments(dir):
         crashes = set()
 
-        for crash_type_dir in subdirs_of(expr_info.to_expr_path()):
+        for crash_type_dir in subdirs_of(expr.path):
             for subdir in subdirs_of(crash_type_dir.path):
                 if subdir.name.startswith("tracedepth_"):
                     crashes.add(subdir.name)
@@ -22,7 +23,7 @@ def iterate_over_all_experiments(
                         assert subsubdir.name.startswith("tracedepth_")
                         crashes.add(subsubdir.name)
 
-        yield (expr_info, crashes)
+        yield (expr, crashes)
 
 
 def main() -> None:
@@ -42,11 +43,11 @@ def main() -> None:
 
     groups = groupby(
         iterate_over_all_experiments(args.input),
-        key=lambda tuple: ([tuple[0].fuzzer, tuple[0].isel, tuple[0].arch]),
+        key=lambda tuple: ([tuple[0].fuzzer, tuple[0].isel, str(tuple[0].target)]),
     )
 
     df = pd.DataFrame(
-        columns=["fuzzer", "isel", "arch", "n_unique_crashes"],
+        columns=["fuzzer", "isel", "target", "n_unique_crashes"],
         data=(
             [
                 *k,

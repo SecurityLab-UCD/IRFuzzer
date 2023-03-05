@@ -1,21 +1,24 @@
-import os
-
-from common import *
 import argparse
 import logging
+import os
 from functools import reduce
+from typing import Callable
+
+from lib import IRFUZZER_DATA_ENV
+from lib.experiment import Experiment, get_all_experiments
+from lib.fs import subdirs_of
 
 
 class BlackList:
     name: str
-    func: Callable[[ExprimentInfo, int], bool]
+    func: Callable[[Experiment, int], bool]
 
     def __init__(self, name, func):
         self.name = name
         self.func = func
 
-    def ignore(self, expr_info: ExprimentInfo, mapped_id: int):
-        do_ignore = self.func(expr_info, mapped_id)
+    def ignore(self, expr: Experiment, mapped_id: int):
+        do_ignore = self.func(expr, mapped_id)
         if do_ignore:
             print("\t", self.name, "Failed")
         return do_ignore
@@ -39,9 +42,9 @@ blacklists = [use_xcore_makeup, max_five_expr, fuzzed_long_enough, ignore_arm64]
 
 def merge_subdirs_by_symlink(src: str, dest: str) -> None:
     for archive_dir in subdirs_of(src):
-        for expr_info in for_all_expriments(archive_dir.path):
+        for expr in get_all_experiments(archive_dir.path):
             symlink_dest_dir = os.path.join(
-                dest, expr_info.fuzzer, expr_info.isel, expr_info.arch
+                dest, expr.fuzzer, expr.isel, str(expr.target)
             )
             os.makedirs(symlink_dest_dir, exist_ok=True)
             mapped_id = 1 + max(
@@ -53,7 +56,7 @@ def merge_subdirs_by_symlink(src: str, dest: str) -> None:
                     ),
                 ]
             )
-            symlink_src = expr_info.to_expr_path()
+            symlink_src = expr.path
             symlink_dest = os.path.join(symlink_dest_dir, str(mapped_id))
             print(
                 symlink_dest,
@@ -64,7 +67,7 @@ def merge_subdirs_by_symlink(src: str, dest: str) -> None:
 
             if reduce(
                 lambda a, b: a or b,
-                [bl.ignore(expr_info, mapped_id) for bl in blacklists],
+                [bl.ignore(expr, mapped_id) for bl in blacklists],
             ):
                 print("NOT USED", flush=True)
             else:

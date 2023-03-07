@@ -17,7 +17,7 @@ class Triple:
 
     @property
     def backend(self) -> str:
-        return ARCH_TO_BACKEND_MAP[self.backend]
+        return ARCH_TO_BACKEND_MAP[self.arch]
 
     def __init__(
         self,

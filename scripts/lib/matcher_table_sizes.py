@@ -15,7 +15,7 @@ DAGISEL_MATCHER_TABLE_SIZES: dict[str, int] = {
     "MSP430": 9103,
     "Mips": 54044,
     "NVPTX": 185247,
-    "PPC": 190302,
+    "PowerPC": 190302,
     "R600": 37558,
     "RISCV": 2349786,
     "Sparc": 6589,
@@ -32,7 +32,7 @@ GISEL_MATCHER_TABLE_SIZES: dict[str, int] = {
     "ARM": 129520,
     "M68k": 2388,
     "Mips": 60449,
-    "PPC": 40160,
+    "PowerPC": 40160,
     "RISCV": 152823,
     "X86": 62440,
 }

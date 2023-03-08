@@ -7,6 +7,7 @@ from pathlib import Path
 
 from lib import LLC, LLVM_DIS
 from lib.fs import subdirs_of
+from lib.llc_command import LLCCommand
 from lib.process_concurrency import run_concurrent_subprocesses
 from lib.target import Target, TargetFilter
 
@@ -20,18 +21,8 @@ def classify_wrapper(
     global_isel: bool = False,
     generate_ll_files: bool = True,
 ) -> None:
-    args = [LLC, f"-mtriple={target.triple}"]
-
-    if target.cpu:
-        args.append(f"-mcpu={target.cpu}")
-
-    if len(target.attrs) > 0:
-        args.append(f"-mattr={','.join(target.attrs)}")
-
-    if global_isel:
-        args.append("-global-isel")
-
-    args += ["-o", TEMP_FILE]
+    llc_command = LLCCommand(target=target, global_isel=global_isel)
+    args = [LLC, *llc_command.get_options(output=TEMP_FILE)]
 
     print(f"Start classifying {input_dir} using '{(' '.join(args))}'...")
 

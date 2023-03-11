@@ -327,6 +327,8 @@ def batch_fuzz(
         fuzzing_command = experiment.get_fuzzing_command(out_dir)
 
         if type == "screen":
+            # If using screen, this script will not be able to detect whether the fuzzing process fails early or did not
+            # complete within the estimated time.
             fuzzing_command = f'screen -S "{experiment.name}" -dm bash -c "{fuzzing_command}" && sleep {experiment.time + 180}'
 
         process = subprocess.Popen(

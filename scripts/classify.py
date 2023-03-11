@@ -219,9 +219,8 @@ def classify(
     crash_hashes: Set[int] = set()
     false_alarms: List[str] = []
 
-    def on_process_exit(p: subprocess.Popen) -> None:
+    def on_process_exit(file_name: str, exit_code: Optional[int], p: subprocess.Popen) -> None:
         ir_bc_path: str = p.args[-1]  # type: ignore
-        file_name = os.path.basename(ir_bc_path)
         stderr_dump_path = os.path.join(temp_dir, file_name + ".stderr")
         stderr_dump_file = open(stderr_dump_path)
 

@@ -78,7 +78,8 @@ class LLCTest:
 
         try:
             self.runnable_llc_commands = [
-                LLCCommand(cmd, default_triple) for cmd in runnable_llc_commands_raw
+                LLCCommand.parse(cmd, default_triple)
+                for cmd in runnable_llc_commands_raw
             ]
         except Exception as e:
             raise Exception(
@@ -108,7 +109,7 @@ class LLCTest:
 
         return Triple.parse(match.group(1))
 
-    def dump_bc(self, out_dir: Path) -> None:
+    def dump_bc(self, out_dir: Path) -> Path:
         out_path = out_dir.joinpath(self.path.name.removesuffix(".ll") + ".bc")
 
         process = subprocess.run(
@@ -122,6 +123,8 @@ class LLCTest:
 
         if process.returncode != 0:
             print(f"WARNING: failed to convert {self.path} to {out_path}")
+        
+        return out_path
 
 
 def parse_llc_tests(
@@ -131,13 +134,13 @@ def parse_llc_tests(
     total = 0
     success = 0
 
-    for arch_dir in Path(LLVM, "llvm/test/CodeGen").iterdir():
-        if not arch_dir.is_dir() or not backend_filter(arch_dir.name):
+    for backend_dir in Path(LLVM, "llvm/test/CodeGen").iterdir():
+        if not backend_dir.is_dir() or not backend_filter(backend_dir.name):
             continue
 
-        for file_path in arch_dir.rglob("*.ll"):
+        for file_path in backend_dir.rglob("*.ll"):
             try:
-                yield LLCTest(arch_dir.name, file_path)
+                yield LLCTest(backend_dir.name, file_path)
                 success += 1
             except Exception as e:
                 if verbose:

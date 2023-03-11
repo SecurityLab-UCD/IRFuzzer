@@ -121,6 +121,12 @@ class Args(Tap):
     (if 'seeding_from_tests' flag is not set, this option as no effect)
     """
 
+    timeout: Optional[float] = 0.1
+    """
+    only include test cases that can be compiled within the specified in seconds.
+    (if 'seeding_from_tests' flag is not set, this option has no effect)
+    """
+
     output: str = "./fuzzing"
     """the output directory"""
 
@@ -170,10 +176,7 @@ class Args(Tap):
 
     def get_fuzzing_targets(self) -> list[Target]:
         if self.tier == 0:
-            return [
-                Target(triple=arch)
-                for arch in ARCH_TO_BACKEND_MAP.keys()
-            ]
+            return [Target(triple=arch) for arch in ARCH_TO_BACKEND_MAP.keys()]
         elif self.tier == 1:
             return TARGET_LIST_TIER_1
         elif self.tier == 2:
@@ -199,7 +202,8 @@ def get_experiment_configs(
     offset: int,
     seed_dir: Path,
     seeding_from_tests: bool,
-    props_to_match: list[TargetProp] = ["triple", "cpu", "attrs"],
+    props_to_match: list[TargetProp],
+    compilation_timout_secs: Optional[float],
 ) -> Iterable[ExperimentConfig]:
     for target in targets:
         expr_seed_dir = seed_dir
@@ -210,6 +214,9 @@ def get_experiment_configs(
                 global_isel=isel == "gisel",
                 out_dir_parent=seed_dir,
                 props_to_match=props_to_match,
+                dump_bc=True,
+                symlink_to_ll=False,
+                timeout_secs=compilation_timout_secs,
             )
 
         for r in range(repeat):
@@ -320,6 +327,8 @@ def batch_fuzz(
         fuzzing_command = experiment.get_fuzzing_command(out_dir)
 
         if type == "screen":
+            # If using screen, this script will not be able to detect whether the fuzzing process fails early or did not
+            # complete within the estimated time.
             fuzzing_command = f'screen -S "{experiment.name}" -dm bash -c "{fuzzing_command}" && sleep {experiment.time + 180}'
 
         process = subprocess.Popen(
@@ -335,7 +344,14 @@ def batch_fuzz(
 
         return process
 
-    run_concurrent_subprocesses(experiment_configs, start_subprocess, None, jobs)
+    run_concurrent_subprocesses(
+        iter=experiment_configs,
+        subprocess_creator=start_subprocess,
+        on_exit=lambda expr_cfg, exit_code, p: print(
+            f"Experiment {expr_cfg.name} exited with code {exit_code}"
+        ),
+        max_jobs=jobs,
+    )
 
 
 def fuzz(expr_config: ExperimentConfig, out_root: Path) -> int:
@@ -376,6 +392,7 @@ def main() -> None:
             seed_dir=Path(args.seeds),
             seeding_from_tests=args.seeding_from_tests,
             props_to_match=args.props_to_match,
+            compilation_timout_secs=args.timeout,
         )
     )
 

@@ -124,7 +124,7 @@ class Args(Tap):
     timeout: Optional[float] = 0.1
     """
     only include test cases that can be compiled within the specified in seconds.
-    (if 'seeding_from_tests' flag is not set, this option as no effect)
+    (if 'seeding_from_tests' flag is not set, this option has no effect)
     """
 
     output: str = "./fuzzing"

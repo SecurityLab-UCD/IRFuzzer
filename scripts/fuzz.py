@@ -15,12 +15,11 @@ from lib.matcher_table_sizes import (
     DAGISEL_MATCHER_TABLE_SIZES,
     GISEL_MATCHER_TABLE_SIZES,
 )
-from lib.target_lists import TARGET_LIST_TIER_1, TARGET_LIST_TIER_2, TARGET_LIST_TIER_3
+from lib.target_lists import TARGET_LISTS
 
 
 Fuzzer = Literal["aflplusplus", "libfuzzer", "irfuzzer"]
 ISel = Literal["dagisel", "gisel"]
-Tier = Literal[0, 1, 2, 3]
 ClutserType = Literal["screen", "docker", "stdout"]
 
 
@@ -136,10 +135,10 @@ class Args(Tap):
     isel: ISel = "dagisel"
     """the LLVM instruction selection method to fuzz"""
 
-    tier: Optional[Tier] = None
+    target_lists: Optional[list[str]] = None
     """
-    the set of targets to fuzz
-    (0: everything, 1: Tier 1, 2: Tier 2, see 'lib/target_lists.py' for details)
+    the name(s) of pre-defined list(s) of targets
+    (see 'lib/target_lists.py' for details)
     (can be overriden by `--targets`)
     """
 
@@ -175,14 +174,8 @@ class Args(Tap):
         self.add_argument("-t", "--time")
 
     def get_fuzzing_targets(self) -> list[Target]:
-        if self.tier == 0:
-            return [Target(triple=arch) for arch in ARCH_TO_BACKEND_MAP.keys()]
-        elif self.tier == 1:
-            return TARGET_LIST_TIER_1
-        elif self.tier == 2:
-            return TARGET_LIST_TIER_2
-        elif self.tier == 3:
-            return TARGET_LIST_TIER_3
+        if self.target_lists is not None:
+            return [target for key in self.target_lists for target in TARGET_LISTS[key]]
         elif self.targets is not None:
             return [Target.parse(s) for s in self.targets]
         else:

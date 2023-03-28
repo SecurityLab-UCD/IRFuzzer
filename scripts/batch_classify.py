@@ -11,8 +11,6 @@ from lib.llc_command import LLCCommand
 from lib.process_concurrency import run_concurrent_subprocesses
 from lib.target import Target, TargetFilter
 
-TEMP_FILE = "temp.s"
-
 
 def classify_wrapper(
     input_dir: Path,
@@ -22,7 +20,7 @@ def classify_wrapper(
     generate_ll_files: bool = True,
 ) -> None:
     llc_command = LLCCommand(target=target, global_isel=global_isel)
-    args = [LLC, *llc_command.get_options(output=TEMP_FILE)]
+    args = [str(LLC), *llc_command.get_options(output="-")]
 
     print(f"Start classifying {input_dir} using '{(' '.join(args))}'...")
 
@@ -38,9 +36,6 @@ def classify_wrapper(
         remove_addr_in_stacktrace=True,
         ignore_undefined_external_symbol=True,
     )
-
-    # remove temp file if exists
-    Path(TEMP_FILE).unlink(missing_ok=True)
 
     print(f"Done classifying {input_dir} using '{(' '.join(args))}'.")
 

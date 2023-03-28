@@ -272,7 +272,7 @@ def classify(
         ),
         subprocess_creator=lambda file_name: subprocess.Popen(
             cmd + [os.path.join(input_dir, file_name)],
-            stdout=None,
+            stdout=subprocess.DEVNULL,
             stderr=open(os.path.join(temp_dir, file_name + ".stderr"), "w"),
         ),
         on_exit=on_process_exit,

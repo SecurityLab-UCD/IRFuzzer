@@ -148,3 +148,9 @@ cd $FUZZING_HOME
 # It will report a `no such process`, that's ok.
 # That process is `grep`, which is also shown in `ps`, which died before `kill` thus doesn't exist.
 # kill -9 $(ps aux | grep isel-fuzzing | awk '{print $2}')
+
+###### Compile mapper.
+mkdir -p mapper/build
+cd mapper/build
+cmake -GNinja .. && ninja -j 4
+cd $FUZZING_HOME

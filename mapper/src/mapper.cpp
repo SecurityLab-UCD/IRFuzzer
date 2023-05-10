@@ -39,7 +39,7 @@ static cl::list<std::string>
                        cl::cat(AnalysisCategory));
 
 static cl::opt<std::string>
-    LookupFilename("lookup", cl::desc("Path to matcher lookup table"),
+    LookupFilename("lookup", cl::desc("Path to pattern lookup table"),
                    cl::Optional, cl::value_desc("infile"),
                    cl::cat(AnalysisCategory));
 

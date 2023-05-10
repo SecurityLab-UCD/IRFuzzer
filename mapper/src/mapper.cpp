@@ -140,8 +140,7 @@ void handleUBCmd() {
   if (UBOutputFile.getNumOccurrences()) {
     exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
   }
-
-  printShadowMapStats(ShadowMap);
+  printShadowMapStats(ShadowMap, "Upper bound");
 }
 
 void handleDiffCmd() {
@@ -156,7 +155,9 @@ void handleDiffCmd() {
   if (DiffOutputFile.getNumOccurrences()) {
     writeShadowMap(Map3, DiffOutputFile);
   } else {
-    printShadowMapStats(Map3, "Map diff");
+    printShadowMapStats(Map1, "Map 1");
+    printShadowMapStats(Map2, "Map 2");
+    printShadowMapStats(Map3, "Map 1 & !(Map 2)");
   }
 }
 
@@ -172,7 +173,9 @@ void handleIntersectCmd() {
   if (IntOutputFile.getNumOccurrences()) {
     writeShadowMap(Map3, IntOutputFile.getValue());
   } else {
-    printShadowMapStats(Map3, "Map intersection");
+    printShadowMapStats(Map1, "Map 1");
+    printShadowMapStats(Map2, "Map 2");
+    printShadowMapStats(Map3, "Map 1 & Map 2");
   }
 }
 

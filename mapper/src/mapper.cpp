@@ -16,90 +16,90 @@ enum class AnalysisMode { UpperBound, Intersect, Diff, Stat };
 
 static cl::OptionCategory AnalysisCategory("Analysis Options");
 
-static cl::opt<AnalysisMode> AnalysisModeCL(
-    cl::desc("Analysis mode"), cl::Required,
-    cl::values(clEnumValN(AnalysisMode::UpperBound, "upperbound",
-                          "Calculate matcher table coverage upper bound"),
-               clEnumValN(AnalysisMode::Intersect, "intersect",
-                          "Calculate shadow map intersection"),
-               clEnumValN(AnalysisMode::Diff, "diff",
-                          "Calculate shadow map difference"),
-               clEnumValN(AnalysisMode::Stat, "stat",
-                          "Print coverage statistics for given map(s)")),
-    cl::cat(AnalysisCategory));
+// ----------------------------------------------------------------
+// upperbound subcommand
+
+static cl::SubCommand UBCmd("upperbound",
+                            "Calculate matcher table coverage upper bound");
 
 static cl::opt<std::string>
-    GenerateShadowMapCL("as-map", cl::desc("Generate analysis as shadow map"),
-                        cl::Optional, cl::value_desc("outfile"),
-                        cl::cat(AnalysisCategory));
+    LookupFilename(cl::Positional, cl::desc("<lookup-table>"), cl::Required,
+                   cl::cat(AnalysisCategory), cl::sub(UBCmd));
 
-static cl::list<std::string>
-    ShadowMapFilenames("map", cl::desc("Shadow map(s) to analyze"),
-                       cl::ZeroOrMore, cl::value_desc("infile"),
-                       cl::cat(AnalysisCategory));
+static cl::list<size_t>
+    UBTruePredIndices(cl::Positional, cl::desc("[true-predicate-indices...]"),
+                      cl::ZeroOrMore, cl::sub(UBCmd),
+                      cl::cat(AnalysisCategory));
 
 static cl::opt<std::string>
-    LookupFilename("lookup", cl::desc("Path to pattern lookup table"),
-                   cl::Optional, cl::value_desc("infile"),
+    UBOutputFile("o", cl::desc("Generate shadow map output"), cl::Optional,
+                 cl::value_desc("outfile"), cl::sub(UBCmd),
+                 cl::cat(AnalysisCategory));
+
+// ----------------------------------------------------------------
+// intersect subcommand
+
+static cl::SubCommand IntersectCmd("intersect",
+                                   "Calculate shadow map intersection");
+
+static cl::opt<size_t> IntTableSize(cl::Positional, cl::desc("<table-size>"),
+                                    cl::Required, cl::sub(IntersectCmd),
+                                    cl::cat(AnalysisCategory));
+
+static cl::opt<std::string>
+    IntLeftMapFilename(cl::Positional, cl::desc("<left-map>"), cl::Required,
+                       cl::sub(IntersectCmd), cl::cat(AnalysisCategory));
+
+static cl::opt<std::string>
+    IntRightMapFilename(cl::Positional, cl::desc("<right-map>"), cl::Required,
+                        cl::sub(IntersectCmd), cl::cat(AnalysisCategory));
+
+static cl::opt<std::string>
+    IntOutputFile("o", cl::desc("Generate shadow map output"), cl::Optional,
+                  cl::value_desc("outfile"), cl::sub(IntersectCmd),
+                  cl::cat(AnalysisCategory));
+
+// ----------------------------------------------------------------
+// diff subcommand
+
+static cl::SubCommand DiffCmd("diff", "Calculate shadow map difference");
+
+static cl::opt<size_t> DiffTableSize(cl::Positional, cl::desc("<table-size>"),
+                                     cl::Required, cl::sub(DiffCmd),
+                                     cl::cat(AnalysisCategory));
+
+static cl::opt<std::string> DiffLeftMapFilename(cl::Positional,
+                                                cl::desc("<left-map>"),
+                                                cl::Required, cl::sub(DiffCmd),
+                                                cl::cat(AnalysisCategory));
+
+static cl::opt<std::string> DiffRightMapFilename(cl::Positional,
+                                                 cl::desc("<right-map>"),
+                                                 cl::Required, cl::sub(DiffCmd),
+                                                 cl::cat(AnalysisCategory));
+
+static cl::opt<std::string>
+    DiffOutputFile("o", cl::desc("Generate shadow map output"), cl::Optional,
+                   cl::value_desc("outfile"), cl::sub(DiffCmd),
                    cl::cat(AnalysisCategory));
 
-static cl::opt<size_t> TableSizeCL("table-size",
-                                   cl::desc("Size of shadow map in bits"),
-                                   cl::Optional, cl::value_desc("bits"),
-                                   cl::cat(AnalysisCategory));
+// ----------------------------------------------------------------
+// stat subcommand
 
-static cl::list<size_t> TruePredicatesCL("pred",
-                                         cl::desc("Indices of true predicates"),
-                                         cl::ZeroOrMore, cl::CommaSeparated,
-                                         cl::value_desc("indices..."),
-                                         cl::cat(AnalysisCategory));
+static cl::SubCommand StatCmd("stat", "Show statistics of shadow map(s)");
 
-/// @brief Verify commandline arguments
-/// @return True if commandline arguments are invalid
-bool gotBadArgs() {
-  switch (AnalysisModeCL.getValue()) {
-  case AnalysisMode::UpperBound:
-    if (ShadowMapFilenames.getNumOccurrences() != 0) {
-      errs() << "Shadow map unexpected for upper bound analysis.\n";
-      return true;
-    }
-    if (!LookupFilename.getNumOccurrences()) {
-      errs() << "Expected lookup table for upper bound analysis.\n";
-      return true;
-    }
-    break;
-  case AnalysisMode::Intersect:
-  case AnalysisMode::Diff:
-    if (!TableSizeCL.getNumOccurrences()) {
-      errs() << "Expected table size for shadow map operations.\n";
-      return true;
-    }
-    if (ShadowMapFilenames.getNumOccurrences() != 2) {
-      errs() << "Expected 2 shadow maps for shadow map operations.\n";
-      return true;
-    }
-    break;
-  case AnalysisMode::Stat:
-    if (!TableSizeCL.getNumOccurrences()) {
-      errs() << "Expected table size for shadow map operations.\n";
-      return true;
-    }
-    if (ShadowMapFilenames.getNumOccurrences() == 0) {
-      errs() << "Expected at least 1 shadow map for printing statistics.\n";
-      return true;
-    }
-    if (GenerateShadowMapCL.getNumOccurrences()) {
-      errs() << "Statistics mode cannot produce shadow maps.\n";
-      return true;
-    }
-    break;
-  default:
-    llvm_unreachable("Unexpected analysis mode");
-  }
-  return false;
-}
+static cl::opt<size_t> StatTableSize(cl::Positional, cl::desc("<table-size>"),
+                                     cl::Required, cl::sub(StatCmd),
+                                     cl::cat(AnalysisCategory));
 
-void analyzeUpperBound() {
+static cl::list<std::string> StatFiles(cl::Positional, cl::desc("<maps...>"),
+                                       cl::OneOrMore, cl::sub(StatCmd),
+                                       cl::cat(AnalysisCategory));
+
+// ----------------------------------------------------------------
+// subcommand handlers
+
+void handleUBCmd() {
   Expected<json::Value> ParseResult = parseLookupTable(LookupFilename);
   json::Object &LookupTable = *ParseResult.get().getAsObject();
 
@@ -117,7 +117,7 @@ void analyzeUpperBound() {
   }
 
   std::set<size_t> TruePredIndices = {TruePredIdx};
-  for (size_t PredIdx : TruePredicatesCL) {
+  for (size_t PredIdx : UBTruePredIndices) {
     TruePredIndices.insert(PredIdx);
   }
 
@@ -137,11 +137,50 @@ void analyzeUpperBound() {
     }
   NextIdx:;
   }
-  if (GenerateShadowMapCL.getNumOccurrences()) {
-    exit(!writeShadowMap(ShadowMap, GenerateShadowMapCL.getValue()));
+  if (UBOutputFile.getNumOccurrences()) {
+    exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
   }
 
   printShadowMapStats(ShadowMap);
+}
+
+void handleDiffCmd() {
+  std::vector<bool> Map1 = readShadowMap(DiffTableSize, DiffLeftMapFilename);
+  std::vector<bool> Map2 = readShadowMap(DiffTableSize, DiffRightMapFilename);
+  std::vector<bool> Map3(Map1.size(), true);
+  for (size_t i = 0; i < Map1.size(); i++) {
+    if (!Map1[i] && Map2[i]) {
+      Map3[i] = false;
+    }
+  }
+  if (DiffOutputFile.getNumOccurrences()) {
+    writeShadowMap(Map3, DiffOutputFile);
+  } else {
+    printShadowMapStats(Map3, "Map diff");
+  }
+}
+
+void handleIntersectCmd() {
+  std::vector<bool> Map1 = readShadowMap(IntTableSize, IntLeftMapFilename);
+  std::vector<bool> Map2 = readShadowMap(IntTableSize, IntRightMapFilename);
+  std::vector<bool> Map3(Map1.size(), true);
+  for (size_t i = 0; i < Map1.size(); i++) {
+    if (!Map1[i] && !Map2[i]) {
+      Map3[i] = false;
+    }
+  }
+  if (IntOutputFile.getNumOccurrences()) {
+    writeShadowMap(Map3, IntOutputFile.getValue());
+  } else {
+    printShadowMapStats(Map3, "Map intersection");
+  }
+}
+
+void handleStatCmd() {
+  for (const std::string &Filename : StatFiles) {
+    std::vector<bool> ShadowMap = readShadowMap(StatTableSize, Filename);
+    printShadowMapStats(ShadowMap, "Coverage", Filename);
+  }
 }
 
 } // end namespace llvm
@@ -153,53 +192,16 @@ int main(int argc, char const *argv[]) {
   cl::HideUnrelatedOptions({&AnalysisCategory, &getColorCategory()});
   cl::ParseCommandLineOptions(argc, argv, "Shadow map analyzer\n");
 
-  if (gotBadArgs())
-    return 1;
-
-  switch (AnalysisModeCL.getValue()) {
-  case AnalysisMode::UpperBound:
-    analyzeUpperBound();
-    break;
-  case AnalysisMode::Diff: {
-    std::vector<bool> Map1 = readShadowMap(TableSizeCL, ShadowMapFilenames[0]);
-    std::vector<bool> Map2 = readShadowMap(TableSizeCL, ShadowMapFilenames[1]);
-    std::vector<bool> Map3(Map1.size(), true);
-    for (size_t i = 0; i < Map1.size(); i++) {
-      if (!Map1[i] && Map2[i]) {
-        Map3[i] = false;
-      }
-    }
-    if (GenerateShadowMapCL.getNumOccurrences()) {
-      writeShadowMap(Map3, GenerateShadowMapCL.getValue());
-    } else {
-      printShadowMapStats(Map3, "Map diff");
-    }
-  } break;
-  case AnalysisMode::Intersect: {
-    std::vector<bool> Map1 = readShadowMap(TableSizeCL, ShadowMapFilenames[0]);
-    std::vector<bool> Map2 = readShadowMap(TableSizeCL, ShadowMapFilenames[1]);
-    std::vector<bool> Map3(Map1.size(), true);
-    for (size_t i = 0; i < Map1.size(); i++) {
-      if (!Map1[i] && !Map2[i]) {
-        Map3[i] = false;
-      }
-    }
-    if (GenerateShadowMapCL.getNumOccurrences()) {
-      writeShadowMap(Map3, GenerateShadowMapCL.getValue());
-    } else {
-      printShadowMapStats(Map3, "Map intersection");
-    }
-  } break;
-  case AnalysisMode::Stat: {
-    for (const std::string &Filename : ShadowMapFilenames) {
-      std::vector<bool> ShadowMap =
-          readShadowMap(TableSizeCL.getValue(), Filename);
-      printShadowMapStats(ShadowMap, "Coverage", Filename);
-    }
-  } break;
-  default:
-    llvm_unreachable("Unknown analysis mode");
+  if (UBCmd) {
+    handleUBCmd();
+  } else if (DiffCmd) {
+    handleDiffCmd();
+  } else if (IntersectCmd) {
+    handleIntersectCmd();
+  } else if (StatCmd) {
+    handleStatCmd();
+  } else {
+    llvm_unreachable("No subcommand specified.");
   }
-
   return 0;
 }

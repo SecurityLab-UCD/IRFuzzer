@@ -16,28 +16,29 @@ maps.
 
 # In mapper build directory
 
-# Calculate coverage upper bound for given pattern lookup table
+# Calculate coverage upper bound for given pattern lookup table (and optionally true predicates)
 # and output it as a shadow map
-./mapper -upperbound -lookup ~/isel.json -pred 4,8,13 -as-map bigger.map
-./mapper -upperbound -lookup ~/isel.json -pred 8,13 -as-map smaller.map
+./mapper upperbound ~/isel.json 4 8 13 -o bigger.map
+./mapper upperbound ~/isel.json 8 13 -o smaller.map
 # optionally just print coverage upper bound as percentage
-./mapper -upperbound -lookup ~/isel.json -pred 4,8,13
-./mapper -upperbound -lookup ~/isel.json -pred 8,13
+./mapper upperbound ~/isel.json 4 8 13
+./mapper upperbound ~/isel.json 8 13
+
+# Get table size from pattern lookup table
+tablesize=$(jq '.table_size' ~/isel.json)
 
 # Show coverage stats for each generated shadow map
-./mapper -stat -map bigger.map -map smaller.map -table-size $(jq '.table_size' ~/isel.json)
+./mapper stat $tablesize bigger.map smaller.map
 
 # Shadow map 1 MINUS shadow map 2
 # (shows indices that are covered by the first map and not the second map)
-./mapper -diff -map bigger.map -map smaller.map -table-size $(jq '.table_size' ~/isel.json)
+./mapper diff $tablesize bigger.map smaller.map
 # optionally output as shadow map
-./mapper -diff -map bigger.map -map smaller.map -as-map diff.map \
-  -table-size $(jq '.table_size' ~/isel.json)
+./mapper diff $tablesize bigger.map smaller.map -o diff.map
 
 # Shadow map 1 AND shadow map 2
 # (shows indices that are covered in both maps)
-./mapper -intersect -map bigger.map -map smaller.map -table-size $(jq '.table_size' ~/isel.json)
+./mapper intersect $tablesize bigger.map smaller.map
 # optionally output as shadow map
-./mapper -intersect -map bigger.map -map smaller.map -as-map intersect.map \
-  -table-size $(jq '.table_size' ~/isel.json)
+./mapper intersect $tablesize bigger.map smaller.map -o intersect.map
 ```

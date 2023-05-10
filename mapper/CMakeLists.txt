@@ -22,25 +22,8 @@ message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
 set(CMAKE_CXX_FLAGS "-std=c++17 -fno-rtti -Wall -pthread")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
-# TODO: remove unnecessary components later
 llvm_map_components_to_libnames(LLVM_LIBS
-    AllTargetsAsmParsers
-    AllTargetsCodeGens
-    AllTargetsDescs
-    AllTargetsInfos
-    Analysis
-    AsmPrinter
-    BitReader
-    BitWriter
-    CodeGen
-    Core
-    FuzzMutate
-    IRReader
-    MC
-    ScalarOpts
-    SelectionDAG
     Support
-    Target
 )
 
 include_directories(

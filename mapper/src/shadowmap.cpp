@@ -1,4 +1,5 @@
 #include "shadowmap.h"
+#include "llvm/Support/raw_ostream.h"
 #include <climits>
 #include <fstream>
 

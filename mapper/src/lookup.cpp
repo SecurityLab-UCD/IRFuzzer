@@ -40,7 +40,6 @@ std::vector<StringRef> getPredicates(const json::Object &LookupTable) {
 }
 
 std::vector<Pattern> getPatterns(const json::Object &LookupTable) {
-  using namespace llvm;
   std::vector<Pattern> Patterns;
   for (const json::Value &PatternObject : *LookupTable.getArray("patterns")) {
     Pattern ThePattern;
@@ -57,7 +56,6 @@ std::vector<Pattern> getPatterns(const json::Object &LookupTable) {
 }
 
 std::vector<Matcher> getMatchers(const json::Object &LookupTable) {
-  using namespace llvm;
   std::vector<Matcher> Matchers;
   for (const json::Value &MatcherObject : *LookupTable.getArray("matchers")) {
     Matcher TheMatcher;

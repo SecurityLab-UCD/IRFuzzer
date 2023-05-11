@@ -24,8 +24,8 @@ static cl::SubCommand
           "Calculate matcher table coverage upper bound given true predicates");
 
 static cl::opt<std::string>
-    LookupFilename(cl::Positional, cl::desc("<lookup-table>"), cl::Required,
-                   cl::cat(AnalysisCategory), cl::sub(UBCmd));
+    UBLookupFile(cl::Positional, cl::desc("<lookup-table>"), cl::Required,
+                 cl::cat(AnalysisCategory), cl::sub(UBCmd));
 
 static cl::list<std::string>
     UBTruePredicates(cl::Positional, cl::desc("[true-pred-name-or-idx...]"),
@@ -105,7 +105,7 @@ static cl::list<std::string> StatFiles(cl::Positional, cl::desc("<maps...>"),
 // subcommand handlers
 
 void handleUBCmd() {
-  Expected<json::Value> ParseResult = parseLookupTable(LookupFilename);
+  Expected<json::Value> ParseResult = parseLookupTable(UBLookupFile);
   json::Object &LookupTable = *ParseResult.get().getAsObject();
 
   std::vector<StringRef> Predicates = getPredicates(LookupTable);

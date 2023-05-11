@@ -4,10 +4,10 @@
 
 using namespace llvm;
 
-bool Matcher::operator<(const Matcher &other) const {
-  if (index < other.index)
+bool Matcher::operator<(const Matcher &M) const {
+  if (Idx < M.Idx)
     return true;
-  return index == other.index && size > other.size;
+  return Idx == M.Idx && Size > M.Size;
 }
 
 // NOTE: exits program if error encountered
@@ -43,12 +43,13 @@ std::vector<Pattern> getPatterns(const json::Object &LookupTable) {
   std::vector<Pattern> Patterns;
   for (const json::Value &PatternObject : *LookupTable.getArray("patterns")) {
     Pattern ThePattern;
-    ThePattern.path = (*PatternObject.getAsObject()).getString("path").value();
-    ThePattern.pattern =
+    ThePattern.IncludePath =
+        (*PatternObject.getAsObject()).getString("path").value();
+    ThePattern.PatternSrc =
         (*PatternObject.getAsObject()).getString("pattern").value();
     for (const json::Value &PredIdx :
          *(*PatternObject.getAsObject()).getArray("predicates")) {
-      ThePattern.predicates.push_back(PredIdx.getAsInteger().value());
+      ThePattern.Predicates.push_back(PredIdx.getAsInteger().value());
     }
     Patterns.push_back(ThePattern);
   }
@@ -59,12 +60,12 @@ std::vector<Matcher> getMatchers(const json::Object &LookupTable) {
   std::vector<Matcher> Matchers;
   for (const json::Value &MatcherObject : *LookupTable.getArray("matchers")) {
     Matcher TheMatcher;
-    TheMatcher.index = MatcherObject.getAsObject()->getInteger("index").value();
-    TheMatcher.size = MatcherObject.getAsObject()->getInteger("size").value();
-    TheMatcher.kind = MatcherObject.getAsObject()->getInteger("kind").value();
+    TheMatcher.Idx = MatcherObject.getAsObject()->getInteger("index").value();
+    TheMatcher.Size = MatcherObject.getAsObject()->getInteger("size").value();
+    TheMatcher.Kind = MatcherObject.getAsObject()->getInteger("kind").value();
 
     if (TheMatcher.hasPattern())
-      TheMatcher.pattern =
+      TheMatcher.PatternIdx =
           MatcherObject.getAsObject()->getInteger("pattern").value();
     Matchers.push_back(TheMatcher);
   }

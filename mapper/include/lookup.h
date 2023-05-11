@@ -5,29 +5,28 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
-#include <cstddef>
 #include <string>
 
 struct Matcher {
-  size_t index;
-  size_t size;
-  int kind; // Matcher::KindTy enum
-  size_t pattern;
+  size_t Idx;
+  size_t Size;
+  int Kind; // Matcher::KindTy enum
+  size_t PatternIdx;
 
-  inline Matcher() : index(0), size(0), kind(0), pattern(0) {}
-  bool operator<(const Matcher &other) const;
-  inline bool hasPattern() const {
+  Matcher() : Idx(0), Size(0), Kind(0), PatternIdx(0) {}
+  bool operator<(const Matcher &M) const;
+  bool hasPattern() const {
     // NOTE: These values must match the enum values of Matcher::CompleteMatch
     // and Matcher::MorphNodeTo. DAG ISel Matcher::KindTy is defined in
     // llvm/utils/TableGen which we don't have access to.
-    return kind == 35 || kind == 36;
+    return Kind == 35 || Kind == 36;
   }
 };
 
 struct Pattern {
-  llvm::StringRef path;
-  llvm::StringRef pattern;
-  llvm::SmallVector<size_t, 3> predicates;
+  llvm::StringRef IncludePath;
+  llvm::StringRef PatternSrc;
+  llvm::SmallVector<size_t, 3> Predicates;
 };
 
 llvm::Expected<llvm::json::Value>

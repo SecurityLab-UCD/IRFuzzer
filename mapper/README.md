@@ -23,6 +23,9 @@ maps.
 # optionally just print coverage upper bound as percentage
 ./mapper upperbound ~/isel.json 4 8 13
 ./mapper upperbound ~/isel.json 8 13
+# Note that predicate names (or a mix of indices and names) are also supported
+# (case-insensitive by default, use -s to override)
+./mapper upperbound ~/isel.json in64bitmode hasfp16
 
 # Get table size from pattern lookup table
 tablesize=$(jq '.table_size' ~/isel.json)

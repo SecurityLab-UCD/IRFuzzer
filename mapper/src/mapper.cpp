@@ -51,13 +51,9 @@ static cl::opt<size_t> IntTableSize(cl::Positional, cl::desc("<table-size>"),
                                     cl::Required, cl::sub(IntersectCmd),
                                     cl::cat(AnalysisCategory));
 
-static cl::opt<std::string>
-    IntLeftMapFilename(cl::Positional, cl::desc("<left-map>"), cl::Required,
-                       cl::sub(IntersectCmd), cl::cat(AnalysisCategory));
-
-static cl::opt<std::string>
-    IntRightMapFilename(cl::Positional, cl::desc("<right-map>"), cl::Required,
-                        cl::sub(IntersectCmd), cl::cat(AnalysisCategory));
+static cl::list<std::string> IntFiles(cl::Positional, cl::desc("<maps...>"),
+                                      cl::OneOrMore, cl::sub(IntersectCmd),
+                                      cl::cat(AnalysisCategory));
 
 static cl::opt<std::string>
     IntOutputFile("o", cl::desc("Generate shadow map output"), cl::Optional,
@@ -73,15 +69,9 @@ static cl::opt<size_t> DiffTableSize(cl::Positional, cl::desc("<table-size>"),
                                      cl::Required, cl::sub(DiffCmd),
                                      cl::cat(AnalysisCategory));
 
-static cl::opt<std::string> DiffLeftMapFilename(cl::Positional,
-                                                cl::desc("<left-map>"),
-                                                cl::Required, cl::sub(DiffCmd),
-                                                cl::cat(AnalysisCategory));
-
-static cl::opt<std::string> DiffRightMapFilename(cl::Positional,
-                                                 cl::desc("<right-map>"),
-                                                 cl::Required, cl::sub(DiffCmd),
-                                                 cl::cat(AnalysisCategory));
+static cl::list<std::string> DiffFiles(cl::Positional, cl::desc("<left-map>"),
+                                       cl::OneOrMore, cl::sub(DiffCmd),
+                                       cl::cat(AnalysisCategory));
 
 static cl::opt<std::string>
     DiffOutputFile("o", cl::desc("Generate shadow map output"), cl::Optional,
@@ -172,54 +162,32 @@ void handleUBCmd() {
 }
 
 void handleDiffCmd() {
-  std::vector<bool> Map1 = readShadowMap(DiffTableSize, DiffLeftMapFilename);
-  std::vector<bool> Map2 = readShadowMap(DiffTableSize, DiffRightMapFilename);
-  std::vector<bool> Map3(Map1.size(), true);
-  for (size_t I = 0; I < Map1.size(); I++) {
-    if (!Map1[I] && Map2[I]) {
-      Map3[I] = false;
-    }
-  }
+  auto Op = [](bool R, bool M) { return R | !M; };
+  std::vector<bool> ResultMap =
+      doMapOp(DiffTableSize, DiffFiles.begin(), DiffFiles.end(), Op);
   if (DiffOutputFile.getNumOccurrences()) {
-    writeShadowMap(Map3, DiffOutputFile);
+    writeShadowMap(ResultMap, DiffOutputFile);
   } else {
-    printShadowMapStats(Map1, "Map 1");
-    printShadowMapStats(Map2, "Map 2");
-    printShadowMapStats(Map3, "Map 1 & !(Map 2)");
+    printShadowMapStats(ResultMap, "Map difference");
   }
 }
 
 void handleIntersectCmd() {
-  std::vector<bool> Map1 = readShadowMap(IntTableSize, IntLeftMapFilename);
-  std::vector<bool> Map2 = readShadowMap(IntTableSize, IntRightMapFilename);
-  std::vector<bool> Map3(Map1.size(), true);
-  for (size_t I = 0; I < Map1.size(); I++) {
-    if (!Map1[I] && !Map2[I]) {
-      Map3[I] = false;
-    }
-  }
+  auto Op = [](bool R, bool M) { return R | M; };
+  std::vector<bool> ResultMap =
+      doMapOp(IntTableSize, IntFiles.begin(), IntFiles.end(), Op);
   if (IntOutputFile.getNumOccurrences()) {
-    writeShadowMap(Map3, IntOutputFile.getValue());
+    writeShadowMap(ResultMap, IntOutputFile.getValue());
   } else {
-    printShadowMapStats(Map1, "Map 1");
-    printShadowMapStats(Map2, "Map 2");
-    printShadowMapStats(Map3, "Map 1 & Map 2");
+    printShadowMapStats(ResultMap, "Map intersection");
   }
 }
 
 void handleUnionCmd() {
   std::vector<std::vector<bool>> Maps;
-  std::vector<bool> ResultMap(UnionTableSize, true);
-
-  for (const std::string &MapFilename : UnionFiles) {
-    Maps.push_back(readShadowMap(UnionTableSize, MapFilename));
-    const std::vector<bool> &Map = *Maps.rbegin();
-    printShadowMapStats(Map, "", MapFilename);
-    for (size_t I = 0; I < UnionTableSize; I++) {
-      if (!Map[I])
-        ResultMap[I] = false;
-    }
-  }
+  auto Op = [](bool R, bool M) { return R & M; };
+  std::vector<bool> ResultMap =
+      doMapOp(UnionTableSize, UnionFiles.begin(), UnionFiles.end(), Op);
   if (UnionOutputFile.getNumOccurrences()) {
     writeShadowMap(ResultMap, UnionOutputFile);
   } else {

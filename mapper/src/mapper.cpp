@@ -227,7 +227,9 @@ int main(int argc, char const *argv[]) {
   } else if (StatCmd) {
     handleStatCmd();
   } else {
-    llvm_unreachable("No subcommand specified.");
+    errs() << "Please specify a subcommand.\n";
+    cl::PrintHelpMessage(false, true);
+    return 1;
   }
   return 0;
 }

@@ -61,8 +61,11 @@ std::vector<Matcher> getMatchers(const json::Object &LookupTable) {
     Matcher TheMatcher;
     TheMatcher.index = MatcherObject.getAsObject()->getInteger("index").value();
     TheMatcher.size = MatcherObject.getAsObject()->getInteger("size").value();
-    TheMatcher.pattern =
-        MatcherObject.getAsObject()->getInteger("pattern").value();
+    TheMatcher.kind = MatcherObject.getAsObject()->getInteger("kind").value();
+
+    if (TheMatcher.hasPattern())
+      TheMatcher.pattern =
+          MatcherObject.getAsObject()->getInteger("pattern").value();
     Matchers.push_back(TheMatcher);
   }
   return Matchers;

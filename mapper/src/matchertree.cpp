@@ -1,5 +1,8 @@
 #include "matchertree.h"
 
+#include "llvm/Support/ErrorHandling.h"
+#include <stack>
+
 bool MatcherNode::overlaps(const MatcherNode &node) const {
   // make a the left-most interval
   const MatcherNode &a = begin <= node.begin ? *this : node;
@@ -16,8 +19,7 @@ MatcherTree::MatcherTree(std::vector<Matcher> &matchers) : root(nullptr) {
 }
 
 void MatcherTree::insert(const Matcher &matcher) {
-  MatcherNode *new_node = new MatcherNode(matcher.pattern, matcher.index,
-                                          matcher.index + matcher.size - 1);
+  MatcherNode *new_node = new MatcherNode(matcher);
   if (!root) {
     root = new_node;
     return;
@@ -38,24 +40,38 @@ void MatcherTree::insert(const Matcher &matcher) {
   node->children.insert(new_node);
 }
 
-std::set<size_t> MatcherTree::getPatternsAt(size_t i) const {
-  std::set<size_t> patterns;
-  if (!root || !root->contains(i)) {
-    return patterns;
-  }
-  MatcherNode *node = root;
-  while (node->children.size()) {
-    patterns.insert(node->pattern);
-    bool found_child = false;
-    for (MatcherNode *child : node->children) {
-      if (child->contains(i)) {
-        node = child;
-        found_child = true;
-        break;
+std::tuple<size_t, std::vector<bool>>
+MatcherTree::getUpperBound(const std::vector<Pattern> &Patterns,
+                           const std::set<size_t> &TruePredIndices) const {
+  if (!root)
+    return std::tuple(0, std::vector<bool>());
+  std::stack<MatcherNode *> Nodes; // BFS
+  std::vector<bool> ShadowMap(root->size());
+  Nodes.push(root);
+  size_t UpperBound = root->size();
+  while (!Nodes.empty()) {
+    MatcherNode *Node = Nodes.top();
+    Nodes.pop();
+
+    if (Node->hasPattern) {
+      for (size_t Pred : Patterns[Node->pattern].predicates) {
+        if (!TruePredIndices.count(Pred)) {
+          UpperBound -= Node->size();
+          for (size_t i = Node->begin; i <= Node->end; i++) {
+            ShadowMap[i] = true;
+          }
+          break;
+        }
       }
+      if (Node->children.size()) {
+        llvm::report_fatal_error("Found supposed leaf node with children!\n");
+      }
+      continue;
     }
-    if (!found_child)
-      break;
+
+    for (MatcherNode *ChildNode : Node->children) {
+      Nodes.push(ChildNode);
+    }
   }
-  return patterns;
+  return std::tuple(UpperBound, ShadowMap);
 }

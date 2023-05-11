@@ -19,22 +19,27 @@ static cl::OptionCategory AnalysisCategory("Analysis Options");
 // ----------------------------------------------------------------
 // upperbound subcommand
 
-static cl::SubCommand UBCmd("upperbound",
-                            "Calculate matcher table coverage upper bound");
+static cl::SubCommand
+    UBCmd("upperbound",
+          "Calculate matcher table coverage upper bound given true predicates");
 
 static cl::opt<std::string>
     LookupFilename(cl::Positional, cl::desc("<lookup-table>"), cl::Required,
                    cl::cat(AnalysisCategory), cl::sub(UBCmd));
 
-static cl::list<size_t>
-    UBTruePredIndices(cl::Positional, cl::desc("[true-predicate-indices...]"),
-                      cl::ZeroOrMore, cl::sub(UBCmd),
-                      cl::cat(AnalysisCategory));
+static cl::list<std::string>
+    UBTruePredicates(cl::Positional, cl::desc("[true-pred-name-or-idx...]"),
+                     cl::ZeroOrMore, cl::sub(UBCmd), cl::cat(AnalysisCategory));
 
 static cl::opt<std::string>
     UBOutputFile("o", cl::desc("Generate shadow map output"), cl::Optional,
                  cl::value_desc("outfile"), cl::sub(UBCmd),
                  cl::cat(AnalysisCategory));
+
+static cl::opt<bool>
+    UBPredCaseSensitive("s", cl::desc("Make predicate name case sensitive"),
+                        cl::init(false), cl::sub(UBCmd),
+                        cl::cat(AnalysisCategory));
 
 // ----------------------------------------------------------------
 // intersect subcommand
@@ -103,21 +108,39 @@ void handleUBCmd() {
   Expected<json::Value> ParseResult = parseLookupTable(LookupFilename);
   json::Object &LookupTable = *ParseResult.get().getAsObject();
 
-  std::vector<llvm::StringRef> Predicates = getPredicates(LookupTable);
+  std::vector<StringRef> Predicates = getPredicates(LookupTable);
   std::vector<Pattern> Patterns = getPatterns(LookupTable);
   std::vector<Matcher> Matchers = getMatchers(LookupTable);
   size_t TableSize = LookupTable.getInteger("table_size").value();
 
-  // Find true predicate index
-  size_t TruePredIdx = 0;
-  for (auto It = Predicates.begin(); It != Predicates.end(); It++) {
-    if (It->starts_with("TruePredicate ")) {
-      TruePredIdx = std::distance(Predicates.begin(), It);
-    }
-  }
+  // Load true predicate indices
+  std::set<size_t> TruePredIndices;
+  UBTruePredicates.push_back("TruePredicate");
+  for (const std::string &PredNameOrIdx : UBTruePredicates) {
+    bool isIdx = !PredNameOrIdx.empty() &&
+                 std::find_if(PredNameOrIdx.begin(), PredNameOrIdx.end(),
+                              [](unsigned char c) {
+                                return !std::isdigit(c);
+                              }) == PredNameOrIdx.end();
 
-  std::set<size_t> TruePredIndices = {TruePredIdx};
-  for (size_t PredIdx : UBTruePredIndices) {
+    size_t PredIdx = std::numeric_limits<size_t>::max();
+    if (isIdx) {
+      PredIdx = std::stoi(PredNameOrIdx);
+    } else {
+      // The number of predicates is small, so linear search is fine.
+      for (auto It = Predicates.begin(); It != Predicates.end(); It++) {
+        if ((UBPredCaseSensitive && It->starts_with(PredNameOrIdx + " ")) ||
+            (!UBPredCaseSensitive &&
+             It->starts_with_insensitive(PredNameOrIdx + " "))) {
+          PredIdx = std::distance(Predicates.begin(), It);
+        }
+      }
+    }
+
+    if (PredIdx >= Predicates.size()) {
+      errs() << "Invalid predicate " << PredNameOrIdx << "\n";
+      exit(1);
+    }
     TruePredIndices.insert(PredIdx);
   }
 

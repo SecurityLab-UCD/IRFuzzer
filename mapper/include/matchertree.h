@@ -3,7 +3,7 @@
 #define SEGMENT_TREE_H_
 #include "lookup.h"
 #include "llvm/ADT/SmallSet.h"
-#include <cstddef>
+#include <set>
 #include <string>
 
 class MatcherTree;
@@ -20,14 +20,19 @@ class MatcherNode {
     }
   };
 
-  size_t pattern;
+  size_t pattern; // Corresponding pattern index if it's a leaf node
+  // The node represents a closed interval [begin, end]
   size_t begin;
   size_t end;
+  // A leaf node is a node that is related to a pattern.
+  // NOTE: Currently not sure if nodes without a child are always leaves.
+  bool hasPattern;
   std::set<MatcherNode *, PtrCmp> children;
 
 public:
-  inline MatcherNode(size_t pattern, size_t begin, size_t end)
-      : pattern(pattern), begin(begin), end(end) {}
+  inline MatcherNode(const Matcher &M)
+      : pattern(M.pattern), begin(M.index), end(M.index + M.size - 1),
+        hasPattern(M.hasPattern()) {}
   MatcherNode(const MatcherNode &) = delete;
   MatcherNode(MatcherNode &&) = delete;
 
@@ -36,6 +41,8 @@ public:
       delete child;
     }
   }
+
+  inline size_t size() const { return end - begin + 1; }
 
   inline bool contains(size_t i) const { return begin <= i && i <= end; }
 
@@ -75,6 +82,8 @@ public:
       delete root;
   }
 
-  std::set<size_t> getPatternsAt(size_t i) const;
+  std::tuple<size_t, std::vector<bool>>
+  getUpperBound(const std::vector<Pattern> &Patterns,
+                const std::set<size_t> &TruePredIndices) const;
 };
 #endif // SEGMENT_TREE_H_

@@ -145,25 +145,12 @@ void handleUBCmd() {
   }
 
   MatcherTree TheMatcherTree(Matchers);
-  std::vector<bool> ShadowMap(TableSize);
-  for (size_t i = 0; i < TableSize; i++) {
-    std::set<size_t> PatternsAtIdx = TheMatcherTree.getPatternsAt(i);
-    for (size_t Pat : PatternsAtIdx) {
-      for (size_t Pred : Patterns[Pat].predicates) {
-        if (!TruePredIndices.count(Pred)) {
-          // If the predicate is not satisfied, then mark current index as
-          // uncovered.
-          ShadowMap[i] = true;
-          goto NextIdx;
-        }
-      }
-    }
-  NextIdx:;
-  }
+  auto [UpperBound, ShadowMap] =
+      TheMatcherTree.getUpperBound(Patterns, TruePredIndices);
   if (UBOutputFile.getNumOccurrences()) {
     exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
   }
-  printShadowMapStats(ShadowMap, "Upper bound");
+  printShadowMapStats(UpperBound, TableSize, "Upper bound");
 }
 
 void handleDiffCmd() {

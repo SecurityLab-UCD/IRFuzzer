@@ -39,18 +39,28 @@ bool writeShadowMap(const std::vector<bool> &Map, const std::string &FileName) {
   return ShadowMapOfs.good();
 }
 
-void printShadowMapStats(const std::vector<bool> &ShadowMap,
+size_t getCoveredIndices(const std::vector<bool> &Map) {
+  return std::count(Map.begin(), Map.end(), false);
+}
+
+void printShadowMapStats(std::vector<bool> &ShadowMap,
                          const std::string &Description,
                          const std::string &FileName) {
-  size_t CoveredIndices = std::count(ShadowMap.begin(), ShadowMap.end(), false);
+  printShadowMapStats(getCoveredIndices(ShadowMap), ShadowMap.size(),
+                      Description, FileName);
+}
+
+void printShadowMapStats(size_t CoveredIndices, size_t MapSize,
+                         const std::string &Description,
+                         const std::string &FileName) {
   double Coverage = CoveredIndices;
-  Coverage /= ShadowMap.size();
+  Coverage /= MapSize;
   Coverage *= 100;
 
-  llvm::outs() << Description << ": " << CoveredIndices << " out of "
-               << ShadowMap.size() << " (" << std::to_string(Coverage) << "%)";
   if (!FileName.empty()) {
-    llvm::outs() << " : " << FileName;
+    llvm::outs() << "[" << FileName << "] ";
   }
+  llvm::outs() << Description << ": " << CoveredIndices << " out of " << MapSize
+               << " (" << std::to_string(Coverage) << "%)";
   llvm::outs() << '\n';
 }

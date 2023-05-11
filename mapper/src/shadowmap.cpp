@@ -1,7 +1,10 @@
 #include "shadowmap.h"
+
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <climits>
 #include <fstream>
+#include <sstream>
 
 std::vector<bool> readShadowMap(size_t MapBitSize,
                                 const std::string &FileName) {
@@ -10,12 +13,27 @@ std::vector<bool> readShadowMap(size_t MapBitSize,
   ShadowMap.reserve(MapBitSize);
 
   char Data;
-  while (ShadowMapIfs.read(&Data, 1)) {
+  // This size check lets us know later if there are more data in the shadow map
+  while (ShadowMap.size() < MapBitSize && ShadowMapIfs.read(&Data, 1)) {
+    // Check size to ensure we are pushing the right number of bits. We can't
+    // know if the table size incorrectly includes padding bits at the end.
     for (int I = 0; I < CHAR_BIT && ShadowMap.size() < MapBitSize; I++) {
       // NOTE: 1 bit in shadow map means MT index not covered; reading as is
       // here
       ShadowMap.push_back(((Data >> I) & 1) != 0);
     }
+  }
+  if (ShadowMapIfs.read(&Data, 1)) {
+    std::stringstream Message;
+    Message << "Expected map size of " << MapBitSize << ", but " << FileName
+            << " has more.\n";
+    llvm::report_fatal_error(Message.str());
+  }
+  if (ShadowMap.size() != MapBitSize) {
+    std::stringstream Message;
+    Message << "Expected map size of " << MapBitSize << ", but got "
+            << ShadowMap.size() << " in " << FileName << ".\n";
+    llvm::report_fatal_error(Message.str());
   }
   return ShadowMap;
 }

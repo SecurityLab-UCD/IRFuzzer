@@ -89,6 +89,24 @@ static cl::opt<std::string>
                    cl::cat(AnalysisCategory));
 
 // ----------------------------------------------------------------
+// union subcommand
+
+static cl::SubCommand UnionCmd("union", "Calculate shadow map union");
+
+static cl::opt<size_t> UnionTableSize(cl::Positional, cl::desc("<table-size>"),
+                                      cl::Required, cl::sub(UnionCmd),
+                                      cl::cat(AnalysisCategory));
+
+static cl::list<std::string> UnionFiles(cl::Positional, cl::desc("<maps...>"),
+                                        cl::OneOrMore, cl::sub(UnionCmd),
+                                        cl::cat(AnalysisCategory));
+
+static cl::opt<std::string>
+    UnionOutputFile("o", cl::desc("Generate shadow map output"), cl::Optional,
+                    cl::value_desc("outfile"), cl::sub(UnionCmd),
+                    cl::cat(AnalysisCategory));
+
+// ----------------------------------------------------------------
 // stat subcommand
 
 static cl::SubCommand StatCmd("stat", "Show statistics of shadow map(s)");
@@ -157,9 +175,9 @@ void handleDiffCmd() {
   std::vector<bool> Map1 = readShadowMap(DiffTableSize, DiffLeftMapFilename);
   std::vector<bool> Map2 = readShadowMap(DiffTableSize, DiffRightMapFilename);
   std::vector<bool> Map3(Map1.size(), true);
-  for (size_t i = 0; i < Map1.size(); i++) {
-    if (!Map1[i] && Map2[i]) {
-      Map3[i] = false;
+  for (size_t I = 0; I < Map1.size(); I++) {
+    if (!Map1[I] && Map2[I]) {
+      Map3[I] = false;
     }
   }
   if (DiffOutputFile.getNumOccurrences()) {
@@ -175,9 +193,9 @@ void handleIntersectCmd() {
   std::vector<bool> Map1 = readShadowMap(IntTableSize, IntLeftMapFilename);
   std::vector<bool> Map2 = readShadowMap(IntTableSize, IntRightMapFilename);
   std::vector<bool> Map3(Map1.size(), true);
-  for (size_t i = 0; i < Map1.size(); i++) {
-    if (!Map1[i] && !Map2[i]) {
-      Map3[i] = false;
+  for (size_t I = 0; I < Map1.size(); I++) {
+    if (!Map1[I] && !Map2[I]) {
+      Map3[I] = false;
     }
   }
   if (IntOutputFile.getNumOccurrences()) {
@@ -186,6 +204,26 @@ void handleIntersectCmd() {
     printShadowMapStats(Map1, "Map 1");
     printShadowMapStats(Map2, "Map 2");
     printShadowMapStats(Map3, "Map 1 & Map 2");
+  }
+}
+
+void handleUnionCmd() {
+  std::vector<std::vector<bool>> Maps;
+  std::vector<bool> ResultMap(UnionTableSize, true);
+
+  for (const std::string &MapFilename : UnionFiles) {
+    Maps.push_back(readShadowMap(UnionTableSize, MapFilename));
+    const std::vector<bool> &Map = *Maps.rbegin();
+    printShadowMapStats(Map, "", MapFilename);
+    for (size_t I = 0; I < UnionTableSize; I++) {
+      if (!Map[I])
+        ResultMap[I] = false;
+    }
+  }
+  if (UnionOutputFile.getNumOccurrences()) {
+    writeShadowMap(ResultMap, UnionOutputFile);
+  } else {
+    printShadowMapStats(ResultMap, "Map union");
   }
 }
 
@@ -213,6 +251,8 @@ int main(int argc, char const *argv[]) {
     handleIntersectCmd();
   } else if (StatCmd) {
     handleStatCmd();
+  } else if (UnionCmd) {
+    handleUnionCmd();
   } else {
     errs() << "Please specify a subcommand.\n";
     cl::PrintHelpMessage(false, true);

@@ -11,7 +11,7 @@ bool writeShadowMap(const std::vector<bool> &Map, const std::string &FileName);
 
 size_t getCoveredIndices(const std::vector<bool> &Map);
 
-void printShadowMapStats(std::vector<bool> &ShadowMap,
+void printShadowMapStats(const std::vector<bool> &ShadowMap,
                          const std::string &Description,
                          const std::string &FileName = "");
 

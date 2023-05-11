@@ -1,6 +1,6 @@
 #pragma once
-#ifndef SEGMENT_TREE_H_
-#define SEGMENT_TREE_H_
+#ifndef MATCHER_TREE_H_
+#define MATCHER_TREE_H_
 #include "lookup.h"
 #include "llvm/ADT/SmallSet.h"
 #include <set>
@@ -13,77 +13,73 @@ class MatcherNode {
   friend class MatcherTree;
 
   struct PtrCmp {
-    inline bool operator()(const MatcherNode *lhs,
-                           const MatcherNode *rhs) const {
-      return lhs->begin < rhs->begin ||
-             (lhs->begin == rhs->begin && lhs->end > rhs->end);
+    bool operator()(const MatcherNode *L, const MatcherNode *R) const {
+      return L->Begin < R->Begin || (L->Begin == R->Begin && L->End > R->End);
     }
   };
 
-  size_t pattern; // Corresponding pattern index if it's a leaf node
-  // The node represents a closed interval [begin, end]
-  size_t begin;
-  size_t end;
+  size_t PatternIdx; // Corresponding pattern index if it's a leaf node
+  // The node represents a closed interval [Begin, End]
+  size_t Begin;
+  size_t End;
   // A leaf node is a node that is related to a pattern.
   // NOTE: Currently not sure if nodes without a child are always leaves.
   bool hasPattern;
-  std::set<MatcherNode *, PtrCmp> children;
+  std::set<MatcherNode *, PtrCmp> Children;
 
 public:
-  inline MatcherNode(const Matcher &M)
-      : pattern(M.pattern), begin(M.index), end(M.index + M.size - 1),
+  MatcherNode(const Matcher &M)
+      : PatternIdx(M.PatternIdx), Begin(M.Idx), End(M.Idx + M.Size - 1),
         hasPattern(M.hasPattern()) {}
   MatcherNode(const MatcherNode &) = delete;
   MatcherNode(MatcherNode &&) = delete;
 
-  inline ~MatcherNode() {
-    for (MatcherNode *child : children) {
-      delete child;
+  ~MatcherNode() {
+    for (MatcherNode *Child : Children) {
+      delete Child;
     }
   }
 
-  inline size_t size() const { return end - begin + 1; }
+  size_t Size() const { return End - Begin + 1; }
 
-  inline bool contains(size_t i) const { return begin <= i && i <= end; }
+  bool Contains(size_t i) const { return Begin <= i && i <= End; }
 
-  inline bool contains(const MatcherNode &node) const {
-    return begin <= node.begin && node.end <= end;
+  bool Contains(const MatcherNode &N) const {
+    return Begin <= N.Begin && N.End <= End;
   }
 
-  inline bool operator==(const MatcherNode &rhs) const {
-    return begin == rhs.begin && end == rhs.end;
+  bool operator==(const MatcherNode &N) const {
+    return Begin == N.Begin && End == N.End;
   }
 
-  inline bool operator!=(const MatcherNode &rhs) const {
-    return !(*this == rhs);
-  }
+  bool operator!=(const MatcherNode &N) const { return !(*this == N); }
 
   /// Returns true if the intervals only overlap (but not contained within
   /// another or identical)
-  bool overlaps(const MatcherNode &node) const;
+  bool Overlaps(const MatcherNode &N) const;
 };
 
 class MatcherTree {
 private:
-  MatcherNode *root;
+  MatcherNode *Root;
 
   void insert(const Matcher &matcher);
 
 public:
   /// @brief Sorts the matcher list by index and populates the tree
-  /// @param matchers list of matchers
-  MatcherTree(std::vector<Matcher> &matchers);
+  /// @param Matchers list of matchers
+  MatcherTree(std::vector<Matcher> &Matchers);
   MatcherTree() = delete;
   MatcherTree(const MatcherTree &) = delete;
-  MatcherTree(MatcherTree &&mt) : root(mt.root) { mt.root = nullptr; }
+  MatcherTree(MatcherTree &&MT) : Root(MT.Root) { MT.Root = nullptr; }
 
-  inline ~MatcherTree() {
-    if (root)
-      delete root;
+  ~MatcherTree() {
+    if (Root)
+      delete Root;
   }
 
   std::tuple<size_t, std::vector<bool>>
   getUpperBound(const std::vector<Pattern> &Patterns,
                 const std::set<size_t> &TruePredIndices) const;
 };
-#endif // SEGMENT_TREE_H_
+#endif // MATCHER_TREE_H_

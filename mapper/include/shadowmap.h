@@ -2,8 +2,6 @@
 #ifndef SHADOW_MAP_H_
 #define SHADOW_MAP_H_
 #include "llvm/Support/raw_ostream.h"
-#include <algorithm>
-#include <cstddef>
 #include <string>
 #include <vector>
 

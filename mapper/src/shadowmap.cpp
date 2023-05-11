@@ -8,12 +8,12 @@ std::vector<bool> readShadowMap(size_t MapBitSize,
   std::vector<bool> ShadowMap;
   ShadowMap.reserve(MapBitSize);
 
-  char data;
-  while (ShadowMapIfs.read(&data, 1)) {
-    for (int i = 0; i < CHAR_BIT && ShadowMap.size() < MapBitSize; i++) {
+  char Data;
+  while (ShadowMapIfs.read(&Data, 1)) {
+    for (int I = 0; I < CHAR_BIT && ShadowMap.size() < MapBitSize; I++) {
       // NOTE: 1 bit in shadow map means MT index not covered; reading as is
       // here
-      ShadowMap.push_back(((data >> i) & 1) != 0);
+      ShadowMap.push_back(((Data >> I) & 1) != 0);
     }
   }
   return ShadowMap;
@@ -23,18 +23,18 @@ bool writeShadowMap(const std::vector<bool> &Map, const std::string &FileName) {
   std::ofstream ShadowMapOfs(FileName, std::ios::binary);
   if (!ShadowMapOfs)
     return false;
-  unsigned char bytebuf = 0;
-  for (size_t i = 0; i < Map.size(); i++) {
-    if (i % 8 == 0 && i) {
-      ShadowMapOfs << bytebuf;
-      bytebuf = 0;
+  unsigned char ByteBuffer = 0;
+  for (size_t I = 0; I < Map.size(); I++) {
+    if (I % 8 == 0 && I) {
+      ShadowMapOfs << ByteBuffer;
+      ByteBuffer = 0;
     }
-    if (!Map[i])
+    if (!Map[I])
       continue;
-    bytebuf |= 1 << (7 - (i % 8));
+    ByteBuffer |= 1 << (7 - (I % 8));
   }
   if (Map.size() % 8 != 0) {
-    ShadowMapOfs << bytebuf;
+    ShadowMapOfs << ByteBuffer;
   }
   return ShadowMapOfs.good();
 }

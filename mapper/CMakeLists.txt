@@ -37,6 +37,7 @@ add_executable(mapper
     src/lookup.cpp
     src/matchertree.cpp
     src/shadowmap.cpp
+    src/predicate.cpp
 )
 
 target_link_libraries(mapper

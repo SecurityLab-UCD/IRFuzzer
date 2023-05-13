@@ -22,12 +22,14 @@ void printShadowMapStats(size_t CoveredIndices, size_t MapSize,
 template <typename ConstIterator>
 std::vector<bool> doMapOp(size_t TableSize, ConstIterator MapFilesBegin,
                           ConstIterator MapFilesEnd,
-                          std::function<bool(bool, bool)> Op) {
+                          std::function<bool(bool, bool)> Op,
+                          bool PrintStats = false) {
   std::vector<std::vector<bool>> Maps;
   for (auto It = MapFilesBegin; It != MapFilesEnd; It++) {
     const std::string &MapFile = *It;
     Maps.push_back(readShadowMap(TableSize, MapFile));
-    printShadowMapStats(*Maps.rbegin(), "", MapFile);
+    if (PrintStats)
+      printShadowMapStats(*Maps.rbegin(), "", MapFile);
   }
   std::vector<bool> ResultMap(Maps[0]);
   for (size_t M = 1; M < Maps.size(); M++) {

@@ -18,19 +18,23 @@ class MatcherNode {
     }
   };
 
-  size_t PatternIdx; // Corresponding pattern index if it's a leaf node
+  std::optional<size_t> PatternIdx; // pattern index if it's a leaf node
+  std::optional<size_t> PatPredIdx; // pattern predicate if it's a check node
+
   // The node represents a closed interval [Begin, End]
   size_t Begin;
   size_t End;
+
+  Matcher::KindTy Kind;
+
   // A leaf node is a node that is related to a pattern.
   // NOTE: Currently not sure if nodes without a child are always leaves.
-  bool hasPattern;
   std::set<MatcherNode *, PtrCmp> Children;
 
 public:
   MatcherNode(const Matcher &M)
-      : PatternIdx(M.PatternIdx), Begin(M.Idx), End(M.Idx + M.Size - 1),
-        hasPattern(M.hasPattern()) {}
+      : PatternIdx(M.PatternIdx), PatPredIdx(M.PatPredIdx), Begin(M.Idx),
+        End(M.Idx + M.Size - 1), Kind(M.Kind) {}
   MatcherNode(const MatcherNode &) = delete;
   MatcherNode(MatcherNode &&) = delete;
 
@@ -59,27 +63,34 @@ public:
   bool Overlaps(const MatcherNode &N) const;
 };
 
+struct LookupTable;
+
 class MatcherTree {
 private:
   MatcherNode *Root;
+  const LookupTable &LT;
 
   void insert(const Matcher &matcher);
 
 public:
   /// @brief Sorts the matcher list by index and populates the tree
   /// @param Matchers list of matchers
-  MatcherTree(std::vector<Matcher> &Matchers);
+  MatcherTree(const LookupTable &_LT);
   MatcherTree() = delete;
   MatcherTree(const MatcherTree &) = delete;
-  MatcherTree(MatcherTree &&MT) : Root(MT.Root) { MT.Root = nullptr; }
+  MatcherTree(MatcherTree &&MT) : Root(MT.Root), LT(MT.LT) {
+    MT.Root = nullptr;
+  }
 
   ~MatcherTree() {
     if (Root)
       delete Root;
   }
 
-  std::tuple<size_t, std::vector<bool>>
-  getUpperBound(const std::vector<Pattern> &Patterns,
-                const std::set<size_t> &TruePredIndices) const;
+  std::tuple<size_t, std::vector<bool>> getUpperBound() const;
+
+private:
+  void visit(MatcherNode *N, size_t &UpperBound,
+             std::vector<bool> &ShadowMap) const;
 };
 #endif // MATCHER_TREE_H_

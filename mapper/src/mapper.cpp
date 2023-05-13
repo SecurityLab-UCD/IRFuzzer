@@ -69,7 +69,7 @@ static cl::opt<size_t> DiffTableSize(cl::Positional, cl::desc("<table-size>"),
                                      cl::Required, cl::sub(DiffCmd),
                                      cl::cat(AnalysisCategory));
 
-static cl::list<std::string> DiffFiles(cl::Positional, cl::desc("<left-map>"),
+static cl::list<std::string> DiffFiles(cl::Positional, cl::desc("<maps...>"),
                                        cl::OneOrMore, cl::sub(DiffCmd),
                                        cl::cat(AnalysisCategory));
 
@@ -113,85 +113,67 @@ static cl::list<std::string> StatFiles(cl::Positional, cl::desc("<maps...>"),
 // subcommand handlers
 
 void handleUBCmd() {
-  Expected<json::Value> ParseResult = parseLookupTable(UBLookupFile);
-  json::Object &LookupTable = *ParseResult.get().getAsObject();
-
-  std::vector<StringRef> Predicates = getPredicates(LookupTable);
-  std::vector<Pattern> Patterns = getPatterns(LookupTable);
-  std::vector<Matcher> Matchers = getMatchers(LookupTable);
-  size_t TableSize = LookupTable.getInteger("table_size").value();
+  LookupTable Table = LookupTable::fromFile(UBLookupFile, UBPredCaseSensitive);
 
   // Load true predicate indices
   std::set<size_t> TruePredIndices;
   UBTruePredicates.push_back("TruePredicate");
-  for (const std::string &PredNameOrIdx : UBTruePredicates) {
-    bool isIdx = !PredNameOrIdx.empty() &&
-                 std::find_if(PredNameOrIdx.begin(), PredNameOrIdx.end(),
-                              [](unsigned char c) {
-                                return !std::isdigit(c);
-                              }) == PredNameOrIdx.end();
+  for (const std::string &Pred : UBTruePredicates) {
+    if (Pred.empty())
+      continue;
+    auto NotNumeric = [](unsigned char c) { return !std::isdigit(c); };
+    auto FirstNonDigit = std::find_if(Pred.begin(), Pred.end(), NotNumeric);
 
-    size_t PredIdx = std::numeric_limits<size_t>::max();
-    if (isIdx) {
-      PredIdx = std::stoi(PredNameOrIdx);
+    // TODO: gracefully exit if index or name does not exist
+    if (FirstNonDigit == Pred.end()) {
+      Table.PK.enable(std::stoi(Pred));
     } else {
-      // The number of predicates is small, so linear search is fine.
-      for (auto It = Predicates.begin(); It != Predicates.end(); It++) {
-        if ((UBPredCaseSensitive && It->starts_with(PredNameOrIdx + " ")) ||
-            (!UBPredCaseSensitive &&
-             It->starts_with_insensitive(PredNameOrIdx + " "))) {
-          PredIdx = std::distance(Predicates.begin(), It);
-        }
-      }
+      Table.PK.enable(Pred);
     }
-
-    if (PredIdx >= Predicates.size()) {
-      errs() << "Invalid predicate " << PredNameOrIdx << "\n";
-      exit(1);
-    }
-    TruePredIndices.insert(PredIdx);
   }
+  Table.PK.resolve();
 
-  MatcherTree TheMatcherTree(Matchers);
-  auto [UpperBound, ShadowMap] =
-      TheMatcherTree.getUpperBound(Patterns, TruePredIndices);
+  MatcherTree TheMatcherTree(Table);
+  auto [UpperBound, ShadowMap] = TheMatcherTree.getUpperBound();
   if (UBOutputFile.getNumOccurrences()) {
     exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
   }
-  printShadowMapStats(UpperBound, TableSize, "Upper bound");
+  printShadowMapStats(UpperBound, Table.MatcherTableSize, "Upper bound");
 }
 
 void handleDiffCmd() {
   auto Op = [](bool R, bool M) { return R | !M; };
-  std::vector<bool> ResultMap =
-      doMapOp(DiffTableSize, DiffFiles.begin(), DiffFiles.end(), Op);
-  if (DiffOutputFile.getNumOccurrences()) {
-    writeShadowMap(ResultMap, DiffOutputFile);
-  } else {
+  bool PrintOutput = DiffOutputFile.getNumOccurrences() == 0;
+  std::vector<bool> ResultMap = doMapOp(DiffTableSize, DiffFiles.begin(),
+                                        DiffFiles.end(), Op, PrintOutput);
+  if (PrintOutput) {
     printShadowMapStats(ResultMap, "Map difference");
+  } else {
+    writeShadowMap(ResultMap, DiffOutputFile);
   }
 }
 
 void handleIntersectCmd() {
   auto Op = [](bool R, bool M) { return R | M; };
+  bool PrintOutput = IntOutputFile.getNumOccurrences() == 0;
   std::vector<bool> ResultMap =
-      doMapOp(IntTableSize, IntFiles.begin(), IntFiles.end(), Op);
-  if (IntOutputFile.getNumOccurrences()) {
-    writeShadowMap(ResultMap, IntOutputFile.getValue());
-  } else {
+      doMapOp(IntTableSize, IntFiles.begin(), IntFiles.end(), Op, PrintOutput);
+  if (PrintOutput) {
     printShadowMapStats(ResultMap, "Map intersection");
+  } else {
+    writeShadowMap(ResultMap, IntOutputFile.getValue());
   }
 }
 
 void handleUnionCmd() {
-  std::vector<std::vector<bool>> Maps;
   auto Op = [](bool R, bool M) { return R & M; };
-  std::vector<bool> ResultMap =
-      doMapOp(UnionTableSize, UnionFiles.begin(), UnionFiles.end(), Op);
-  if (UnionOutputFile.getNumOccurrences()) {
-    writeShadowMap(ResultMap, UnionOutputFile);
-  } else {
+  bool PrintOutput = UnionOutputFile.getNumOccurrences() == 0;
+  std::vector<bool> ResultMap = doMapOp(UnionTableSize, UnionFiles.begin(),
+                                        UnionFiles.end(), Op, PrintOutput);
+  if (PrintOutput) {
     printShadowMapStats(ResultMap, "Map union");
+  } else {
+    writeShadowMap(ResultMap, UnionOutputFile);
   }
 }
 

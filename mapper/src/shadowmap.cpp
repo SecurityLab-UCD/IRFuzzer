@@ -82,7 +82,11 @@ void printShadowMapStats(size_t CoveredIndices, size_t MapSize,
   if (!Description.empty()) {
     llvm::outs() << Description << ": ";
   }
-  llvm::outs() << CoveredIndices << " out of " << MapSize << " ("
+
+  std::string CIStr = std::to_string(CoveredIndices);
+  size_t PadLen = std::to_string(MapSize).size();
+  CIStr.insert(CIStr.begin(), PadLen - CIStr.size(), ' ');
+  llvm::outs() << CIStr << " out of " << MapSize << " ("
                << std::to_string(Coverage) << "%)";
   llvm::outs() << '\n';
 }

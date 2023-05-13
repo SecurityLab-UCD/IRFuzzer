@@ -5,9 +5,7 @@
 using namespace llvm;
 
 bool Matcher::operator<(const Matcher &M) const {
-  if (Idx < M.Idx)
-    return true;
-  return Idx == M.Idx && Size > M.Size;
+  return Idx == M.Idx ? Size > M.Size : Idx < M.Idx;
 }
 
 // NOTE: exits program if error encountered
@@ -63,8 +61,10 @@ std::vector<Matcher> getMatchers(const json::Object &TableJSON) {
     Matcher TheMatcher;
     TheMatcher.Idx = MatcherObject.getAsObject()->getInteger("index").value();
     TheMatcher.Size = MatcherObject.getAsObject()->getInteger("size").value();
-    int KindInt = MatcherObject.getAsObject()->getInteger("kind").value();
-    TheMatcher.Kind = static_cast<Matcher::KindTy>(KindInt);
+    std::optional<int> KindOpt =
+        MatcherObject.getAsObject()->getInteger("kind");
+    TheMatcher.Kind =
+        static_cast<Matcher::KindTy>(KindOpt.value_or(Matcher::Child));
 
     if (TheMatcher.hasPattern()) {
       TheMatcher.PatternIdx =
@@ -89,6 +89,7 @@ LookupTable LookupTable::fromFile(const std::string &Filename,
   Table.Patterns = getPatterns(TableJSON);
   std::sort(Table.Matchers.begin(), Table.Matchers.end());
 
+  Table.PK.IsCaseSensitive = NameCaseSensitive;
   Table.PK.addNamedPredicates(getStringArray(TableJSON, "predicates"));
   Table.PK.addPatternPredicates(getStringArray(TableJSON, "pat_predicates"));
   Table.MatcherTableSize = TableJSON.getInteger("table_size").value();

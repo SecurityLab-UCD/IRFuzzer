@@ -3,11 +3,9 @@
 #define LOOKUP_H_
 
 #include "predicate.h"
-#include "llvm/ADT/MapVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/JSON.h"
-#include <map>
 #include <string>
 
 struct Matcher {
@@ -57,6 +55,8 @@ struct Matcher {
     EmitNodeXForm,        // Run a SDNodeXForm
     CompleteMatch,        // Finish a match and update the results.
     MorphNodeTo,          // Build a node, finish a match and update results.
+
+    Child, // Custom kind representing a switch / scope child
 
     // Highest enum value; watch out when adding more.
     HighestKind = MorphNodeTo

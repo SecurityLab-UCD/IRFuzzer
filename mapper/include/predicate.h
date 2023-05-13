@@ -1,9 +1,10 @@
 #ifndef PREDICATE_H_
 #define PREDICATE_H_
 
-#include "llvm/ADT/MapVector.h"
-#include "llvm/Support/raw_ostream.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include <regex>
+#include <unordered_map>
 #include <vector>
 
 class PredicateKeeper;
@@ -102,13 +103,13 @@ class PredicateKeeper {
 
   // Used for memory management
   std::vector<Predicate *> AllPredicates;
-  // Parsed from record dump
-  // MapVector doesn't like strings
+  // Parsed from record dump (.predicates)
   std::vector<Predicate *> NamedPredicates;
-  std::map<std::string, size_t> NamedPredLookup;
+  // Predicate name to NamedPredicates index. MapVector doesn't like strings.
+  std::unordered_map<std::string, size_t> NamedPredLookup;
   // C++ expression -> predicate name (named predicates only)
-  std::map<std::string, std::string> LiteralExpressions;
-  // Parsed from C++ expressions
+  std::unordered_map<std::string, std::string> LiteralExpressions;
+  // Parsed from C++ expressions (.pat_predicates)
   std::vector<Predicate *> PatternPredicates;
 
 public:

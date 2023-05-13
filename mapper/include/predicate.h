@@ -25,6 +25,7 @@ struct Predicate {
   virtual bool satisfied() { return _Value; }
   // Recalculate value after literals have been updated.
   virtual bool resolve() = 0;
+  virtual bool resolve(bool NewValue) = 0;
 
   KindTy getKind() const { return Kind; }
 
@@ -43,18 +44,21 @@ struct LiteralPredicate : Predicate {
   }
   bool satisfied() override { return _Value; }
   bool resolve() override { return _Value; }
+  bool resolve(bool NewValue) override { return _Value = NewValue; }
 };
 
 struct TruePredicate : LiteralPredicate {
   TruePredicate() : LiteralPredicate(true) {}
   bool satisfied() override { return _Value = true; }
   bool resolve() override { return _Value = true; }
+  bool resolve(bool) override { return _Value = true; }
 };
 
 struct FalsePredicate : LiteralPredicate {
   FalsePredicate() : LiteralPredicate(false) {}
   bool satisfied() override { return _Value = false; }
   bool resolve() override { return _Value = false; }
+  bool resolve(bool) override { return _Value = false; }
 };
 
 struct NotPredicate : Predicate {
@@ -62,6 +66,9 @@ struct NotPredicate : Predicate {
 
   NotPredicate(Predicate *Pred) : Predicate(Predicate::Not), Pred(Pred) {}
   bool resolve() override { return _Value = !Pred->satisfied(); }
+  bool resolve(bool NewValue) override {
+    return _Value = Pred->resolve(!NewValue);
+  }
 };
 
 struct AndPredicate : Predicate {
@@ -79,6 +86,12 @@ struct AndPredicate : Predicate {
     }
     return _Value = true;
   }
+  bool resolve(bool NewValue) override {
+    for (Predicate *Predicate : Children) {
+      Predicate->resolve(NewValue);
+    }
+    return _Value = true;
+  }
 };
 
 struct OrPredicate : Predicate {
@@ -90,11 +103,18 @@ struct OrPredicate : Predicate {
       : Predicate(Predicate::Or), Children(std::move(Predicates)) {}
 
   bool resolve() override {
-    for (Predicate *Predicate : Children) {
-      if (Predicate->satisfied())
+    for (Predicate *C : Children) {
+      if (C->satisfied())
         return _Value = true;
     }
     return _Value = false;
+  }
+  bool resolve(bool NewValue) override {
+    if (NewValue)
+      return Children[0]->resolve(true);
+    for (Predicate *C : Children)
+      C->resolve(false);
+    return false;
   }
 };
 
@@ -161,19 +181,19 @@ public:
   void addPatternPredicates(const std::vector<std::string> &Expressions);
 
   void enable(const std::string &Name) {
-    name(Name)->_Value = true;
+    name(Name)->resolve(true);
     Dirty = true;
   }
   void enable(size_t I) {
-    name(I)->_Value = true;
+    name(I)->resolve(true);
     Dirty = true;
   }
   void disable(const std::string &Name) {
-    name(Name)->_Value = false;
+    name(Name)->resolve(false);
     Dirty = true;
   }
   void disable(size_t I) {
-    name(I)->_Value = false;
+    name(I)->resolve(false);
     Dirty = true;
   }
 

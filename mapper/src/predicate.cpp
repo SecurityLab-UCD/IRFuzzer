@@ -172,9 +172,13 @@ Predicate *PredicateKeeper::parseLiteral(const std::string &CondString,
   CurIndex += Expr.size();
   if (LiteralExpressions.count(Expr) == 0) {
     if (Verbosity)
-      errs() << "WARNING: Found literal with unknown value: " << Expr
-             << ". Defaulting to false.\n";
-    LiteralExpressions[Expr] = "FalsePredicate";
+      errs() << "WARNING: Found unnamed predicate literal: " << Expr << ".\n";
+    Predicate *P = new LiteralPredicate(false);
+    AllPredicates.push_back(P);
+    std::string LookupName = IsCaseSensitive ? Expr : StringRef(Expr).lower();
+    NamedPredLookup.insert(std::make_pair(LookupName, NamedPredicates.size()));
+    NamedPredicates.push_back(P);
+    LiteralExpressions.insert(std::make_pair(Expr, LookupName));
   }
   return name(LiteralExpressions.at(Expr));
 }

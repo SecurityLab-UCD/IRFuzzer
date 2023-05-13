@@ -115,6 +115,7 @@ class PredicateKeeper {
 public:
   Predicate *True = new TruePredicate();
   Predicate *False = new FalsePredicate();
+  size_t Verbosity = 0;
 
   PredicateKeeper() {
     AllPredicates.push_back(True);

@@ -156,7 +156,10 @@ void handleUBCmd() {
   if (UBShowBlameList.getValue()) {
     size_t N = 0;
     outs() << '\n';
-    outs() << "Loss from pattern predicate indices:\n";
+    outs() << "Loss from pattern predicate indices";
+    if (UBMaxBlameEntries.getNumOccurrences())
+      outs() << " (top " << UBMaxBlameEntries.getValue() << ")";
+    outs() << ":\n";
     size_t LossSum = 0;
     size_t IdxPadLen = std::to_string(Table.PK.getPadPredSize()).size();
     for (const auto [Loss, PatPredIdx] : BlameMap) {
@@ -169,7 +172,8 @@ void handleUBCmd() {
           N == UBMaxBlameEntries.getValue())
         break;
     }
-    printShadowMapStats(LossSum, Table.MatcherTableSize, "Total listed loss");
+    outs() << '\n';
+    printShadowMapStats(LossSum, Table.MatcherTableSize, "Sum");
   }
 }
 

@@ -25,19 +25,19 @@ void PredicateKeeper::addNamedPredicates(
     std::smatch Match;
 
     if (!std::regex_search(Record, Match, MatchCondString)) {
-      errs() << "Failed to extract condition for predicate " << Name << "\n";
-#ifndef NDEBUG
-      errs() << Record << "\n";
-#endif
+      errs() << "FATAL ERROR: Failed to extract condition for predicate "
+             << Name << "\n";
+      if (Verbosity)
+        errs() << Record << "\n";
       exit(1);
     }
 
     std::string CondString = Match.str(1);
     if (CondString.empty()) {
-      errs() << "Got empty condition for predicate " << Name << "\n";
-#ifndef NDEBUG
-      errs() << Record << "\n";
-#endif
+      errs() << "FATAL ERROR: Got empty condition for predicate " << Name
+             << "\n";
+      if (Verbosity)
+        errs() << Record << "\n";
       exit(1);
     }
     Predicate *P = nullptr;
@@ -58,10 +58,10 @@ void PredicateKeeper::addNamedPredicates(
   for (const auto &[Name, CondString] : NamedPredsToParse) {
     Predicate *P = parsePredicate(CondString);
     if (!P) {
-      errs() << "Failed to parse condition for predicate " << Name << ".\n";
-#ifndef NDEBUG
-      errs() << "CondString = " << CondString << "\n";
-#endif
+      errs() << "FATAL ERROR: Failed to parse condition for predicate " << Name
+             << ".\n";
+      if (Verbosity)
+        errs() << "CondString = " << CondString << "\n";
       exit(1);
     }
     NamedPredicates[NamedPredLookup[Name]] = P;
@@ -171,10 +171,9 @@ Predicate *PredicateKeeper::parseLiteral(const std::string &CondString,
   std::string Expr = SMatch.str(0);
   CurIndex += Expr.size();
   if (LiteralExpressions.count(Expr) == 0) {
-#ifndef NDEBUG
-    errs() << "Found literal with unknown value: " << Expr
-           << ". Defaulting to false.\n";
-#endif
+    if (Verbosity)
+      errs() << "WARNING: Found literal with unknown value: " << Expr
+             << ". Defaulting to false.\n";
     LiteralExpressions[Expr] = "FalsePredicate";
   }
   return name(LiteralExpressions.at(Expr));
@@ -184,7 +183,7 @@ Predicate *PredicateKeeper::parseLiteral(const std::string &CondString,
 [[noreturn]] void PredicateKeeper::notFound(const std::string &Str,
                                             const std::string &CondString,
                                             size_t CurIndex) {
-  llvm::errs() << "Expected `" << Str << "` at char " << CurIndex + 1 << " in '"
-               << CondString << "'.\n";
+  llvm::errs() << "FATAL ERROR: Expected `" << Str << "` at char "
+               << CurIndex + 1 << " in '" << CondString << "'.\n";
   exit(1);
 }

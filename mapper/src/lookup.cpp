@@ -50,6 +50,7 @@ std::vector<Pattern> getPatterns(const json::Object &TableJSON) {
          *(*PatternObject.getAsObject()).getArray("predicates")) {
       ThePattern.NamedPredicates.push_back(PredIdx.getAsInteger().value());
     }
+    ThePattern.Index = Patterns.size();
     Patterns.push_back(ThePattern);
   }
   return Patterns;
@@ -80,7 +81,7 @@ std::vector<Matcher> getMatchers(const json::Object &TableJSON) {
 }
 
 LookupTable LookupTable::fromFile(const std::string &Filename,
-                                  bool NameCaseSensitive) {
+                                  bool NameCaseSensitive, size_t Verbosity) {
   Expected<json::Value> ExpectedTable = readJSON(Filename);
   LookupTable Table;
   json::Object &TableJSON = *ExpectedTable.get().getAsObject();
@@ -89,6 +90,7 @@ LookupTable LookupTable::fromFile(const std::string &Filename,
   Table.Patterns = getPatterns(TableJSON);
   std::sort(Table.Matchers.begin(), Table.Matchers.end());
 
+  Table.PK.Verbosity = Verbosity;
   Table.PK.IsCaseSensitive = NameCaseSensitive;
   Table.PK.addNamedPredicates(getStringArray(TableJSON, "predicates"));
   Table.PK.addPatternPredicates(getStringArray(TableJSON, "pat_predicates"));

@@ -77,17 +77,19 @@ void MatcherTree::visit(MatcherNode *N, size_t &UpperBound,
                         std::vector<bool> &ShadowMap,
                         std::unordered_map<size_t, size_t> &BlameMap) const {
   if (N->Children.size() == 0) {
+    if (!LT.PK.Verbosity)
+      return;
     if (N->Kind != Matcher::CompleteMatch && N->Kind != Matcher::MorphNodeTo)
       return;
     const Pattern &Pat = LT.Patterns[N->PatternIdx.value()];
     for (size_t Pred : Pat.NamedPredicates) {
+      // Supposedly this named predicate was checked as part of the
+      // pattern predicate.
       if (!LT.PK.name(Pred)->satisfied()) {
-        // Supposedly this named predicate was implicitly checked through the
-        // pattern predicate. This is bad.
-        errs() << "Failed named predicate check " << Pred << " at " << N->Begin
-               << ".\n";
-        errs() << "Traversed to leaf with unsatisfied pattern predicate.\n";
-        exit(1);
+        // This is bad.
+        errs() << "ERROR: Failed named predicate check " << Pred << " at "
+               << N->Begin << ".\n";
+        errs() << "ERROR: Reached leaf when named predicate is unsatisfied!\n";
       }
     }
     return;
@@ -95,29 +97,26 @@ void MatcherTree::visit(MatcherNode *N, size_t &UpperBound,
 
   size_t FailedIndex = N->End + 1;
   for (MatcherNode *C : N->Children) {
-#ifndef NDEBUG
-    if (C->Kind == Matcher::CheckPatternPredicate &&
+    if (LT.PK.Verbosity > 1 && C->Kind == Matcher::CheckPatternPredicate &&
         LT.PK.pat(C->PatPredIdx.value())->satisfied()) {
-      dbgs() << "Passed pattern predicate check " << C->PatPredIdx.value()
-             << " at " << C->Begin << ".\n";
+      dbgs() << "DEBUG: Passed pattern predicate check "
+             << C->PatPredIdx.value() << " at " << C->Begin << ".\n";
     }
-#endif
     if (C->Kind == Matcher::CheckPatternPredicate &&
         !LT.PK.pat(C->PatPredIdx.value())->satisfied()) {
       FailedIndex = C->End + 1;
-#ifndef NDEBUG
-      dbgs() << "Failed pattern predicate check " << C->PatPredIdx.value()
-             << " at " << C->Begin << " (-" << (N->End - FailedIndex + 1)
-             << ").\n";
-#endif
+      if (LT.PK.Verbosity > 1)
+        errs() << "DEBUG: Failed pattern predicate check "
+               << C->PatPredIdx.value() << " at " << C->Begin << " (-"
+               << (N->End - FailedIndex + 1) << ").\n";
       BlameMap[C->PatPredIdx.value()] += N->End - FailedIndex + 1;
       // CheckPatternPredicate is accessed, but not the rest
       UpperBound -= N->End - FailedIndex + 1;
       for (size_t I = FailedIndex; I <= N->End; I++) {
-#ifndef NDEBUG
-        if (ShadowMap[I])
-          errs() << "Shadow map at i=" << I << " is already set to true.\n";
-#endif
+        if (LT.PK.Verbosity && ShadowMap[I]) {
+          dbgs() << "ERROR: Shadow map at i=" << I
+                 << " is already set to true.\n";
+        }
         ShadowMap[I] = true;
       }
       break;

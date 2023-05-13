@@ -92,7 +92,8 @@ struct LookupTable {
   PredicateKeeper PK;
 
   static LookupTable fromFile(const std::string &Filename,
-                              bool NameCaseSensitive = false);
+                              bool NameCaseSensitive = false,
+                              size_t Verbosity = 0);
 };
 
 #endif // LOOKUP_H_

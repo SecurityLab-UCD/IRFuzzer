@@ -23,6 +23,10 @@ static cl::SubCommand
     UBCmd("upperbound",
           "Calculate matcher table coverage upper bound given true predicates");
 
+static cl::opt<bool> UBVerbosity("v", cl::desc("Increase verbosity (max 2)"),
+                                 cl::init(false), cl::sub(UBCmd),
+                                 cl::cat(AnalysisCategory));
+
 static cl::opt<std::string>
     UBLookupFile(cl::Positional, cl::desc("<lookup-table>"), cl::Required,
                  cl::cat(AnalysisCategory), cl::sub(UBCmd));
@@ -121,7 +125,9 @@ static cl::list<std::string> StatFiles(cl::Positional, cl::desc("<maps...>"),
 // subcommand handlers
 
 void handleUBCmd() {
-  LookupTable Table = LookupTable::fromFile(UBLookupFile, UBPredCaseSensitive);
+  size_t Verbosity = UBVerbosity.getNumOccurrences();
+  LookupTable Table =
+      LookupTable::fromFile(UBLookupFile, UBPredCaseSensitive, Verbosity);
 
   // Load true predicate indices
   std::set<size_t> TruePredIndices;

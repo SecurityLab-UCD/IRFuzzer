@@ -88,7 +88,8 @@ public:
 
   /// @brief Calculate matcher table coverage upper bound
   /// @return (covered indices, shadow map, coverage loss -> pat pred idx)
-  std::tuple<size_t, std::vector<bool>, std::multimap<size_t, size_t>>
+  std::tuple<size_t, std::vector<bool>,
+             std::multimap<size_t, size_t, std::greater<size_t>>>
   getUpperBound() const;
 
 private:

@@ -53,17 +53,19 @@ std::pair<B, A> FlipPair(const std::pair<A, B> &p) {
 // flips an associative container of A,B pairs to B,A pairs
 template <typename A, typename B, template <class, class, class...> class M,
           class... Args>
-std::multimap<B, A> FlipMap(const M<A, B, Args...> &Src) {
-  std::multimap<B, A> Dst;
+std::multimap<B, A, std::greater<B>> FlipMap(const M<A, B, Args...> &Src) {
+  std::multimap<B, A, std::greater<B>> Dst;
   std::transform(Src.begin(), Src.end(), std::inserter(Dst, Dst.begin()),
                  FlipPair<A, B>);
   return Dst;
 }
 
-std::tuple<size_t, std::vector<bool>, std::multimap<size_t, size_t>>
+std::tuple<size_t, std::vector<bool>,
+           std::multimap<size_t, size_t, std::greater<size_t>>>
 MatcherTree::getUpperBound() const {
   if (!Root)
-    return std::tuple(0, std::vector<bool>(), std::multimap<size_t, size_t>());
+    return std::tuple(0, std::vector<bool>(),
+                      std::multimap<size_t, size_t, std::greater<size_t>>());
   std::vector<bool> ShadowMap(Root->Size());
   size_t UpperBound = Root->Size();
   std::unordered_map<size_t, size_t> BlameMap;
@@ -82,7 +84,8 @@ void MatcherTree::visit(MatcherNode *N, size_t &UpperBound,
       if (!LT.PK.name(Pred)->satisfied()) {
         // Supposedly this named predicate was implicitly checked through the
         // pattern predicate. This is bad.
-        errs() << "Failed named predicate check " << Pred << ".\n";
+        errs() << "Failed named predicate check " << Pred << " at " << N->Begin
+               << ".\n";
         errs() << "Traversed to leaf with unsatisfied pattern predicate.\n";
         exit(1);
       }

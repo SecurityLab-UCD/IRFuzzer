@@ -41,6 +41,14 @@ static cl::opt<bool>
                         cl::init(false), cl::sub(UBCmd),
                         cl::cat(AnalysisCategory));
 
+static cl::opt<bool>
+    UBShowBlameList("b", cl::desc("Show matcher coverage blame list"),
+                    cl::init(false), cl::sub(UBCmd), cl::cat(AnalysisCategory));
+
+static cl::opt<size_t>
+    UBMaxBlameEntries("l", cl::desc("Limit blame list entries printed"),
+                      cl::sub(UBCmd), cl::cat(AnalysisCategory));
+
 // ----------------------------------------------------------------
 // intersect subcommand
 
@@ -139,6 +147,24 @@ void handleUBCmd() {
     exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
   }
   printShadowMapStats(UpperBound, Table.MatcherTableSize, "Upper bound");
+  if (UBShowBlameList.getValue()) {
+    size_t N = 0;
+    outs() << '\n';
+    outs() << "Loss from pattern predicate indices:\n";
+    size_t LossSum = 0;
+    size_t IdxPadLen = std::to_string(Table.PK.getPadPredSize()).size();
+    for (const auto [Loss, PatPredIdx] : BlameMap) {
+      LossSum += Loss;
+      std::string IdxStr = std::to_string(PatPredIdx);
+      IdxStr.insert(IdxStr.begin(), IdxPadLen - IdxStr.size(), ' ');
+      printShadowMapStats(Loss, Table.MatcherTableSize, IdxStr);
+      N++;
+      if (UBMaxBlameEntries.getNumOccurrences() &&
+          N == UBMaxBlameEntries.getValue())
+        break;
+    }
+    printShadowMapStats(LossSum, Table.MatcherTableSize, "Total listed loss");
+  }
 }
 
 void handleDiffCmd() {

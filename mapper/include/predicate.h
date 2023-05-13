@@ -185,6 +185,8 @@ public:
 
   bool isDirty() const { return Dirty; }
 
+  size_t getPadPredSize() const { return PatternPredicates.size(); }
+
 private:
   // Whether or not predicate literals have been modified. For debugging
   // purposes only.

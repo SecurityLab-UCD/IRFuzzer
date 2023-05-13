@@ -97,7 +97,7 @@ void MatcherTree::visit(MatcherNode *N, size_t &UpperBound,
 
   size_t FailedIndex = N->End + 1;
   for (MatcherNode *C : N->Children) {
-    if (LT.PK.Verbosity > 1 && C->Kind == Matcher::CheckPatternPredicate &&
+    if (LT.PK.Verbosity > 2 && C->Kind == Matcher::CheckPatternPredicate &&
         LT.PK.pat(C->PatPredIdx.value())->satisfied()) {
       dbgs() << "DEBUG: Passed pattern predicate check "
              << C->PatPredIdx.value() << " at " << C->Begin << ".\n";
@@ -105,7 +105,7 @@ void MatcherTree::visit(MatcherNode *N, size_t &UpperBound,
     if (C->Kind == Matcher::CheckPatternPredicate &&
         !LT.PK.pat(C->PatPredIdx.value())->satisfied()) {
       FailedIndex = C->End + 1;
-      if (LT.PK.Verbosity > 1)
+      if (LT.PK.Verbosity > 2)
         errs() << "DEBUG: Failed pattern predicate check "
                << C->PatPredIdx.value() << " at " << C->Begin << " (-"
                << (N->End - FailedIndex + 1) << ").\n";

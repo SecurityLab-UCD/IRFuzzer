@@ -92,9 +92,11 @@ LookupTable LookupTable::fromFile(const std::string &Filename,
 
   Table.PK.Verbosity = Verbosity;
   Table.PK.IsCaseSensitive = NameCaseSensitive;
+  if (Table.PK.Verbosity > 1)
+    errs() << "NOTE: Adding named predicates.\n";
   Table.PK.addNamedPredicates(getStringArray(TableJSON, "predicates"));
   if (Table.PK.Verbosity > 1)
-    errs() << "DEBUG: Adding pattern predicates.\n";
+    errs() << "NOTE: Adding pattern predicates.\n";
   Table.PK.addPatternPredicates(getStringArray(TableJSON, "pat_predicates"));
   Table.MatcherTableSize = TableJSON.getInteger("table_size").value();
 

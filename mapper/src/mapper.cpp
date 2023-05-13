@@ -23,9 +23,10 @@ static cl::SubCommand
     UBCmd("upperbound",
           "Calculate matcher table coverage upper bound given true predicates");
 
-static cl::opt<bool> UBVerbosity("v", cl::desc("Increase verbosity (max 2)"),
+static cl::opt<bool> UBVerbosity("v", cl::desc("Set verbosity (-v, -vv, -vvv)"),
                                  cl::init(false), cl::sub(UBCmd),
-                                 cl::cat(AnalysisCategory));
+                                 cl::cat(AnalysisCategory),
+                                 cl::ValueDisallowed);
 
 static cl::opt<std::string>
     UBLookupFile(cl::Positional, cl::desc("<lookup-table>"), cl::Required,
@@ -59,6 +60,11 @@ static cl::opt<size_t>
 static cl::SubCommand IntersectCmd("intersect",
                                    "Calculate shadow map intersection");
 
+static cl::opt<bool> IntVerbosity("v", cl::desc("Increase verbosity"),
+                                  cl::init(false), cl::sub(IntersectCmd),
+                                  cl::cat(AnalysisCategory),
+                                  cl::ValueDisallowed);
+
 static cl::opt<size_t> IntTableSize(cl::Positional, cl::desc("<table-size>"),
                                     cl::Required, cl::sub(IntersectCmd),
                                     cl::cat(AnalysisCategory));
@@ -77,6 +83,11 @@ static cl::opt<std::string>
 
 static cl::SubCommand DiffCmd("diff", "Calculate shadow map difference");
 
+static cl::opt<bool> DiffVerbosity("v", cl::desc("Increase verbosity"),
+                                   cl::init(false), cl::sub(DiffCmd),
+                                   cl::cat(AnalysisCategory),
+                                   cl::ValueDisallowed);
+
 static cl::opt<size_t> DiffTableSize(cl::Positional, cl::desc("<table-size>"),
                                      cl::Required, cl::sub(DiffCmd),
                                      cl::cat(AnalysisCategory));
@@ -94,6 +105,11 @@ static cl::opt<std::string>
 // union subcommand
 
 static cl::SubCommand UnionCmd("union", "Calculate shadow map union");
+
+static cl::opt<bool> UnionVerbosity("v", cl::desc("Increase verbosity"),
+                                    cl::init(false), cl::sub(UnionCmd),
+                                    cl::cat(AnalysisCategory),
+                                    cl::ValueDisallowed);
 
 static cl::opt<size_t> UnionTableSize(cl::Positional, cl::desc("<table-size>"),
                                       cl::Required, cl::sub(UnionCmd),
@@ -124,14 +140,26 @@ static cl::list<std::string> StatFiles(cl::Positional, cl::desc("<maps...>"),
 // ----------------------------------------------------------------
 // subcommand handlers
 
+size_t getVerbosity(const cl::opt<bool> &VerbosityCL,
+                    const cl::opt<std::string> &OutputFileCL) {
+  if (VerbosityCL.getNumOccurrences()) {
+    return VerbosityCL.getNumOccurrences();
+  } else if (OutputFileCL.getNumOccurrences()) {
+    return 0;
+  } else {
+    return 1;
+  }
+}
+
 void handleUBCmd() {
-  size_t Verbosity = UBVerbosity.getNumOccurrences();
+  size_t Verbosity = getVerbosity(UBVerbosity, UBOutputFile);
   LookupTable Table =
       LookupTable::fromFile(UBLookupFile, UBPredCaseSensitive, Verbosity);
 
   // Load true predicate indices
-  std::set<size_t> TruePredIndices;
-  UBTruePredicates.push_back("TruePredicate");
+
+  // index -> name
+  std::map<size_t, std::string> TruePredicates;
   for (const std::string &Pred : UBTruePredicates) {
     if (Pred.empty())
       continue;
@@ -139,21 +167,40 @@ void handleUBCmd() {
     auto FirstNonDigit = std::find_if(Pred.begin(), Pred.end(), NotNumeric);
 
     // TODO: gracefully exit if index or name does not exist
+    size_t Idx = 0;
     if (FirstNonDigit == Pred.end()) {
-      Table.PK.enable(std::stoi(Pred));
+      Idx = std::stoul(Pred);
+      Table.PK.enable(Idx);
+      std::string Name;
+      // Maybe we should use a bimap?
+      for (const auto &[PredName, PredIdx] : Table.PK.NamedPredLookup) {
+        if (Idx == PredIdx) {
+          Name = PredName;
+        }
+      }
+      TruePredicates[Idx] = Name;
     } else {
       Table.PK.enable(Pred);
+      Idx = Table.PK.NamedPredLookup[Pred];
+      TruePredicates[Idx] =
+          UBPredCaseSensitive ? Pred : StringRef(Pred).lower();
     }
   }
   Table.PK.resolve();
+  for (const auto &[I, Name] : TruePredicates) {
+    if (!Table.PK.name(I)->satisfied()) {
+      if (Verbosity)
+        errs() << "ERROR: Failed to satisfy named predicate " << I << " ("
+               << Name << ").\n";
+    }
+  }
 
   MatcherTree TheMatcherTree(Table);
   auto [UpperBound, ShadowMap, BlameMap] = TheMatcherTree.getUpperBound();
-  if (UBOutputFile.getNumOccurrences()) {
-    exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
+  if (Verbosity || UBShowBlameList) {
+    printShadowMapStats(UpperBound, Table.MatcherTableSize, "Upper bound");
   }
-  printShadowMapStats(UpperBound, Table.MatcherTableSize, "Upper bound");
-  if (UBShowBlameList.getValue()) {
+  if (UBShowBlameList) {
     size_t N = 0;
     outs() << '\n';
     outs() << "Loss from pattern predicate indices";
@@ -175,48 +222,54 @@ void handleUBCmd() {
     outs() << '\n';
     printShadowMapStats(LossSum, Table.MatcherTableSize, "Sum");
   }
+  if (UBOutputFile.getNumOccurrences()) {
+    exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
+  }
 }
 
 void handleDiffCmd() {
   auto Op = [](bool R, bool M) { return R | !M; };
-  bool PrintOutput = DiffOutputFile.getNumOccurrences() == 0;
+  bool PrintOutput = getVerbosity(DiffVerbosity, DiffOutputFile);
   std::vector<bool> ResultMap = doMapOp(DiffTableSize, DiffFiles.begin(),
                                         DiffFiles.end(), Op, PrintOutput);
   if (PrintOutput) {
     printShadowMapStats(ResultMap, "Map difference");
-  } else {
-    writeShadowMap(ResultMap, DiffOutputFile);
+  }
+  if (DiffOutputFile.getNumOccurrences()) {
+    exit(!writeShadowMap(ResultMap, DiffOutputFile));
   }
 }
 
 void handleIntersectCmd() {
   auto Op = [](bool R, bool M) { return R | M; };
-  bool PrintOutput = IntOutputFile.getNumOccurrences() == 0;
+  bool PrintOutput = getVerbosity(IntVerbosity, IntOutputFile);
   std::vector<bool> ResultMap =
       doMapOp(IntTableSize, IntFiles.begin(), IntFiles.end(), Op, PrintOutput);
   if (PrintOutput) {
     printShadowMapStats(ResultMap, "Map intersection");
-  } else {
-    writeShadowMap(ResultMap, IntOutputFile.getValue());
+  }
+  if (IntOutputFile.getNumOccurrences()) {
+    exit(!writeShadowMap(ResultMap, IntOutputFile.getValue()));
   }
 }
 
 void handleUnionCmd() {
   auto Op = [](bool R, bool M) { return R & M; };
-  bool PrintOutput = UnionOutputFile.getNumOccurrences() == 0;
+  bool PrintOutput = getVerbosity(UnionVerbosity, UnionOutputFile);
   std::vector<bool> ResultMap = doMapOp(UnionTableSize, UnionFiles.begin(),
                                         UnionFiles.end(), Op, PrintOutput);
   if (PrintOutput) {
     printShadowMapStats(ResultMap, "Map union");
-  } else {
-    writeShadowMap(ResultMap, UnionOutputFile);
+  }
+  if (UnionOutputFile.getNumOccurrences()) {
+    exit(!writeShadowMap(ResultMap, UnionOutputFile));
   }
 }
 
 void handleStatCmd() {
   for (const std::string &Filename : StatFiles) {
     std::vector<bool> ShadowMap = readShadowMap(StatTableSize, Filename);
-    printShadowMapStats(ShadowMap, "Coverage", Filename);
+    printShadowMapStats(ShadowMap, "", Filename);
   }
 }
 

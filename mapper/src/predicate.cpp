@@ -171,7 +171,7 @@ Predicate *PredicateKeeper::parseLiteral(const std::string &CondString,
   std::string Expr = SMatch.str(0);
   CurIndex += Expr.size();
   if (LiteralExpressions.count(Expr) == 0) {
-    if (Verbosity)
+    if (Verbosity > 1)
       errs() << "WARNING: Found unnamed predicate literal: " << Expr << ".\n";
     Predicate *P = new LiteralPredicate(false);
     AllPredicates.push_back(P);

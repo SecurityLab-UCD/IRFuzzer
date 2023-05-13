@@ -118,7 +118,7 @@ struct OrPredicate : Predicate {
   }
 };
 
-class PredicateKeeper {
+struct PredicateKeeper {
   friend class LookupTable;
 
   // Used for memory management
@@ -132,7 +132,6 @@ class PredicateKeeper {
   // Parsed from C++ expressions (.pat_predicates)
   std::vector<Predicate *> PatternPredicates;
 
-public:
   Predicate *True = new TruePredicate();
   Predicate *False = new FalsePredicate();
   size_t Verbosity = 0;

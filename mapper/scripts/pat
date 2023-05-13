@@ -1,0 +1,10 @@
+#!/bin/bash
+if [[ ! $1 ]]; then
+  echo "Usage: $0 <pat-idx>"
+  exit 1
+fi
+file=isel.json
+if [[ $2 ]]; then
+  file="$2"
+fi
+jq ".patterns | .[$1]" $file

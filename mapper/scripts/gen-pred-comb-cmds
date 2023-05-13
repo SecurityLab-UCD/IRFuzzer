@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+import os
+import json
+
+table_size = int(os.environ.get("TABLE_SIZE"))
+pred_comb_str = open("./pred_combinations.json")
+pred_combinations = json.load(pred_comb_str)
+pred_combinations = [set(combination) for combination in pred_combinations]
+
+for combination in pred_combinations:
+    if any(
+        combination.issubset(other) and combination != other
+        for other in pred_combinations
+    ):
+        pred_combinations.remove(combination)
+
+comb_map_commands = ""
+remove_base_commands = ""
+rm_comb_map_commands = ""
+mv_map_commands = ""
+for combination in pred_combinations:
+    if len(combination) == 0:
+        continue
+    combination = sorted(combination)
+    true_preds = " ".join(map(str, combination))
+    map_file = "./preds/c/" + "-".join(map(str, combination)) + ".map"
+    comb_map_commands += f"mapper upperbound isel.json {true_preds} -o {map_file} &\n"
+
+    xmap_file = "./preds/c/x" + "-".join(map(str, combination)) + ".map"
+    remove_base_commands += (
+        f"mapper diff {table_size} {map_file} base.map -o {xmap_file} &\n"
+    )
+
+    rm_comb_map_commands += f"rm -f {map_file}\n"
+    mv_map_commands += f"mv {xmap_file} {map_file}\n"
+
+print("#!/bin/bash\n")
+print('trap "killall mapper; echo Map generation failed; exit 1" ERR')
+print("mkdir -p ./preds/c/\n")
+print(comb_map_commands)
+print("wait\n")
+print(remove_base_commands)
+print("wait\n")
+print(rm_comb_map_commands)
+print(mv_map_commands)

@@ -134,7 +134,7 @@ void handleUBCmd() {
   Table.PK.resolve();
 
   MatcherTree TheMatcherTree(Table);
-  auto [UpperBound, ShadowMap] = TheMatcherTree.getUpperBound();
+  auto [UpperBound, ShadowMap, BlameMap] = TheMatcherTree.getUpperBound();
   if (UBOutputFile.getNumOccurrences()) {
     exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
   }

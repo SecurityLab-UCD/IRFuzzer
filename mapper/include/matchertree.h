@@ -3,6 +3,7 @@
 #define MATCHER_TREE_H_
 #include "lookup.h"
 #include "llvm/ADT/SmallSet.h"
+#include <map>
 #include <set>
 #include <string>
 
@@ -27,8 +28,6 @@ class MatcherNode {
 
   Matcher::KindTy Kind;
 
-  // A leaf node is a node that is related to a pattern.
-  // NOTE: Currently not sure if nodes without a child are always leaves.
   std::set<MatcherNode *, PtrCmp> Children;
 
 public:
@@ -87,10 +86,13 @@ public:
       delete Root;
   }
 
-  std::tuple<size_t, std::vector<bool>> getUpperBound() const;
+  /// @brief Calculate matcher table coverage upper bound
+  /// @return (covered indices, shadow map, coverage loss -> pat pred idx)
+  std::tuple<size_t, std::vector<bool>, std::multimap<size_t, size_t>>
+  getUpperBound() const;
 
 private:
-  void visit(MatcherNode *N, size_t &UpperBound,
-             std::vector<bool> &ShadowMap) const;
+  void visit(MatcherNode *N, size_t &UpperBound, std::vector<bool> &ShadowMap,
+             std::unordered_map<size_t, size_t> &BlameMap) const;
 };
 #endif // MATCHER_TREE_H_

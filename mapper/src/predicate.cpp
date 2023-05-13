@@ -1,6 +1,5 @@
 #include "predicate.h"
 
-#include "llvm/ADT/StringRef.h"
 #include "llvm/Support/raw_ostream.h"
 #include <regex>
 
@@ -74,6 +73,7 @@ void PredicateKeeper::addPatternPredicates(
   for (const std::string &P : Expressions) {
     PatternPredicates.push_back(parsePredicate(P));
   }
+  resolve();
 }
 
 // Poor man's parser for simple C++ expressions found in predicates

@@ -6,6 +6,8 @@
 #include <fstream>
 #include <sstream>
 
+using namespace llvm;
+
 std::vector<bool> readShadowMap(size_t MapBitSize,
                                 const std::string &FileName) {
   std::ifstream ShadowMapIfs(FileName, std::ios::binary);
@@ -27,13 +29,13 @@ std::vector<bool> readShadowMap(size_t MapBitSize,
     std::stringstream Message;
     Message << "Expected map size of " << MapBitSize << ", but " << FileName
             << " has more.\n";
-    llvm::report_fatal_error(Message.str());
+    report_fatal_error(Message.str());
   }
   if (ShadowMap.size() != MapBitSize) {
     std::stringstream Message;
     Message << "Expected map size of " << MapBitSize << ", but got "
             << ShadowMap.size() << " in " << FileName << ".\n";
-    llvm::report_fatal_error(Message.str());
+    report_fatal_error(Message.str());
   }
   return ShadowMap;
 }
@@ -109,7 +111,7 @@ std::string MapStatPrinter::format(const MapStatPrinter::StatTy &Stat) const {
 
 void MapStatPrinter::print() const {
   for (const StatTy &Stat : Stats) {
-    llvm::outs() << format(Stat) << '\n';
+    outs() << format(Stat) << '\n';
   }
 }
 

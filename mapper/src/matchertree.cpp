@@ -1,6 +1,7 @@
 #include "matchertree.h"
 #include "lookup.h"
 
+#include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -27,7 +28,7 @@ MatcherTree::getUpperBound() const {
   if (MT.empty())
     return std::tuple(0, std::vector<bool>(),
                       std::multimap<size_t, size_t, std::greater<size_t>>());
-  std::vector<bool> ShadowMap(MT[0].Size());
+  std::vector<bool> ShadowMap(MT[0].size());
   size_t UpperBound = ShadowMap.size();
   std::unordered_map<size_t, size_t> BlameMap;
   size_t I = 0;
@@ -78,7 +79,7 @@ bool MatcherTree::visit(size_t &I, size_t &UpperBound,
   size_t PI = I; // parent index
   I++;
   bool Failed = false;
-  for (; I < MT.size() && MT[PI].Contains(MT[I]);) {
+  for (; I < MT.size() && MT[PI].contains(MT[I]);) {
     if (!Failed) {
       Failed = visit(I, UpperBound, ShadowMap, BlameMap);
     } else { // Previous pattern predicate check failed
@@ -94,7 +95,7 @@ bool MatcherTree::visit(size_t &I, size_t &UpperBound,
                 ShadowMap.begin() + MT[PI].End + 1, true);
 
       // Fast-forward out of the parent
-      while (I < MT.size() && MT[PI].Contains(MT[I]))
+      while (I < MT.size() && MT[PI].contains(MT[I]))
         I++;
       return false;
     }

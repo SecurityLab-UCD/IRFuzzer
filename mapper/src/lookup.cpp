@@ -1,6 +1,7 @@
 #include "lookup.h"
 
 #include "simdjson.h"
+#include "llvm/Support/raw_ostream.h"
 #include <fstream>
 
 using namespace llvm;
@@ -9,6 +10,31 @@ using namespace simdjson;
 bool Matcher::operator<(const Matcher &M) const {
   return Begin == M.Begin ? End > M.End : Begin < M.Begin;
 }
+
+bool Matcher::contains(size_t i) const { return Begin <= i && i <= End; }
+
+bool Matcher::contains(const Matcher &N) const {
+  return Begin <= N.Begin && N.End <= End;
+}
+
+bool Matcher::operator==(const Matcher &N) const {
+  return Begin == N.Begin && End == N.End;
+}
+
+bool Matcher::operator!=(const Matcher &N) const { return !(*this == N); }
+
+bool Matcher::hasPattern() const {
+  return Kind == CompleteMatch || Kind == MorphNodeTo;
+}
+
+bool Matcher::isLeaf() const {
+  return Kind != Scope && Kind != SwitchOpcode && Kind != SwitchType &&
+         Kind != Child;
+}
+
+bool Matcher::hasPatPred() const { return Kind == CheckPatternPredicate; }
+
+size_t Matcher::size() const { return End - Begin + 1; }
 
 // NOTE: exits program if error encountered
 std::string readFile(const std::string &Filename) {

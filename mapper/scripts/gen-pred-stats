@@ -64,7 +64,7 @@ gen-pred-comb-cmds | bash
 echo Generating coverage report...
 cov_report="$BASE/c-coverage.txt"
 pushd preds/c
-mapper stat $TABLE_SIZE * -sort desc >> "$cov_report"
+mapper stat $TABLE_SIZE * -sort desc > "$cov_report"
 popd # preds/c -> BASE
 popd # BASE -> original
-echo Generated report in $BASE/c-coverage.txt
+echo Generated report in $cov_report

@@ -8,7 +8,8 @@ popd () {
 }
 
 if [[ -z $1 ]]; then
-    echo "Usage: $0 <save-dir>"
+    echo "Usage: $0 <save-dir> [-f]"
+    echo "  -f: Force regeneration of lookup table"
     exit 1
 fi
 
@@ -16,7 +17,7 @@ BASE=$(realpath "$1")
 mkdir -p "$BASE"
 pushd "$BASE" 
 
-if [[ ! -f isel.json ]]; then
+if [[ ! -f isel.json || $2 = -f ]]; then
     gen-lookup $PWD
 fi
 
@@ -33,15 +34,13 @@ export TABLE_SIZE=$(jq .table_size isel.json)
 N_PREDS=$(jq '.predicates | length' isel.json)
 export PRED_MAX=$(($N_PREDS - 1))
 
-if [[ ! -f base.map ]]; then
-    echo Generating base.map...
-    mapper upperbound isel.json -o base.map
-fi
+echo Generating base.map...
+mapper upperbound isel.json -o base.map
 
 rm -rf ./preds/{p,x,c}
 mkdir -p ./preds/p # single predicate coverage
-mkdir -p ./preds/x # 
-mkdir -p ./preds/c
+mkdir -p ./preds/x # diff predicate base
+mkdir -p ./preds/c # diff pred-combination base
 
 # Generate predicate maps
 echo Generating predicate maps...
@@ -63,14 +62,9 @@ gen-pred-comb-cmds | bash
 
 # Generate coverage report for combinations
 echo Generating coverage report...
-pushd preds
-echo -e "File\tCovered\tTotal\tCoverage" > c-coverage.txt
-pushd c
-mapper stat $TABLE_SIZE * | sort -k3 -rn | sed 's/Coverage: //;s/\[//;s/\]//;s/ out of / /;s/ /\t/g;' >> ../c-coverage.txt
-popd # c -> preds
-column -t c-coverage.txt > c-coverage.txt.new
-mv c-coverage.txt{.new,}
-popd # preds -> BASE
-
-popd # BASE
-echo Generated report in $BASE/preds/c-coverage.txt
+cov_report="$BASE/c-coverage.txt"
+pushd preds/c
+mapper stat $TABLE_SIZE * -sort desc >> "$cov_report"
+popd # preds/c -> BASE
+popd # BASE -> original
+echo Generated report in $BASE/c-coverage.txt

@@ -3,9 +3,7 @@
 #define SHADOW_MAP_H_
 #include "llvm/Support/raw_ostream.h"
 #include <functional>
-#include <iomanip>
 #include <limits>
-#include <sstream>
 #include <string>
 #include <vector>
 

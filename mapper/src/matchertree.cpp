@@ -84,7 +84,7 @@ bool MatcherTree::visit(size_t &I, size_t &UpperBound,
       Failed = visit(I, UpperBound, ShadowMap, BlameMap);
     } else { // Previous pattern predicate check failed
       size_t Loss = MT[PI].End - MT[I].Begin + 1;
-      BlameMap[MT[I].PIdx] += Loss;
+      BlameMap[MT[I - 1].PIdx] += Loss;
       UpperBound -= Loss;
 
       if (LT.PK.Verbosity > 2)

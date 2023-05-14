@@ -12,8 +12,6 @@
 
 namespace llvm {
 
-enum class AnalysisMode { UpperBound, Intersect, Diff, Stat };
-
 static cl::OptionCategory AnalysisCategory("Analysis Options");
 
 // ----------------------------------------------------------------
@@ -52,7 +50,9 @@ static cl::opt<bool>
 
 static cl::opt<size_t>
     UBMaxBlameEntries("l", cl::desc("Limit blame list entries printed"),
-                      cl::sub(UBCmd), cl::cat(AnalysisCategory));
+                      cl::value_desc("entries"), cl::sub(UBCmd),
+                      cl::init(std::numeric_limits<size_t>::max()),
+                      cl::cat(AnalysisCategory));
 
 // ----------------------------------------------------------------
 // intersect subcommand
@@ -137,6 +137,16 @@ static cl::list<std::string> StatFiles(cl::Positional, cl::desc("<maps...>"),
                                        cl::OneOrMore, cl::sub(StatCmd),
                                        cl::cat(AnalysisCategory));
 
+static cl::opt<MapStatPrinter::SortTy>
+    StatSort("sort", cl::desc("Sort by covered indices"),
+             cl::init(MapStatPrinter::None),
+             cl::values(clEnumValN(MapStatPrinter::None, "none", "Do not sort"),
+                        clEnumValN(MapStatPrinter::Asc, "asc",
+                                   "Sort in ascending order"),
+                        clEnumValN(MapStatPrinter::Desc, "desc",
+                                   "Sort in descending order")),
+             cl::sub(StatCmd), cl::cat(AnalysisCategory));
+
 // ----------------------------------------------------------------
 // subcommand handlers
 
@@ -198,79 +208,79 @@ void handleUBCmd() {
   MatcherTree TheMatcherTree(Table);
   auto [UpperBound, ShadowMap, BlameMap] = TheMatcherTree.getUpperBound();
   if (Verbosity || UBShowBlameList) {
-    printShadowMapStats(UpperBound, Table.MatcherTableSize, "Upper bound");
+    MapStatPrinter MSP;
+    MSP.summarize("Upper bound", ShadowMap, true);
+    MSP.print();
   }
   if (UBShowBlameList) {
-    size_t N = 0;
     outs() << '\n';
     outs() << "Loss from pattern predicate indices";
     if (UBMaxBlameEntries.getNumOccurrences())
       outs() << " (top " << UBMaxBlameEntries.getValue() << ")";
     outs() << ":\n";
+
+    MapStatPrinter MSP;
+    MSP.limit(UBMaxBlameEntries);
     size_t LossSum = 0;
-    size_t IdxPadLen = std::to_string(Table.PK.getPadPredSize()).size();
     for (const auto [Loss, PatPredIdx] : BlameMap) {
       LossSum += Loss;
-      std::string IdxStr = std::to_string(PatPredIdx);
-      IdxStr.insert(IdxStr.begin(), IdxPadLen - IdxStr.size(), ' ');
-      printShadowMapStats(Loss, Table.MatcherTableSize, IdxStr);
-      N++;
-      if (UBMaxBlameEntries.getNumOccurrences() &&
-          N == UBMaxBlameEntries.getValue())
+      MSP.addStat(std::to_string(PatPredIdx), Loss, Table.MatcherTableSize);
+      if (MSP.atLimit())
         break;
     }
-    outs() << '\n';
-    printShadowMapStats(LossSum, Table.MatcherTableSize, "Sum");
+    MSP.summarize("Sum", LossSum, Table.MatcherTableSize, true);
+    MSP.print();
   }
   if (UBOutputFile.getNumOccurrences()) {
     exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
   }
 }
 
+void handleMapOpCmd(const std::string &OpName,
+                    const std::vector<std::string> &Files,
+                    std::function<bool(bool, bool)> Op, size_t TableSize,
+                    const cl::opt<std::string> &OutputFile,
+                    const cl::opt<bool> &VerbosityCL) {
+  auto Maps = readShadowMaps(TableSize, Files);
+  std::vector<bool> ResultMap = doMapOp(Maps, Op);
+  if (getVerbosity(VerbosityCL, OutputFile)) {
+    MapStatPrinter MSP;
+    for (size_t I = 0; I < Maps.size(); I++) {
+      MSP.addFile(Files[I], Maps[I]);
+    }
+    MSP.summarize(OpName, ResultMap);
+    MSP.print();
+  }
+  if (OutputFile.getNumOccurrences()) {
+    exit(!writeShadowMap(ResultMap, OutputFile));
+  }
+}
+
 void handleDiffCmd() {
   auto Op = [](bool R, bool M) { return R | !M; };
-  bool PrintOutput = getVerbosity(DiffVerbosity, DiffOutputFile);
-  std::vector<bool> ResultMap = doMapOp(DiffTableSize, DiffFiles.begin(),
-                                        DiffFiles.end(), Op, PrintOutput);
-  if (PrintOutput) {
-    printShadowMapStats(ResultMap, "Map difference");
-  }
-  if (DiffOutputFile.getNumOccurrences()) {
-    exit(!writeShadowMap(ResultMap, DiffOutputFile));
-  }
+  handleMapOpCmd("Diff", DiffFiles, Op, DiffTableSize, DiffOutputFile,
+                 DiffVerbosity);
 }
 
 void handleIntersectCmd() {
   auto Op = [](bool R, bool M) { return R | M; };
-  bool PrintOutput = getVerbosity(IntVerbosity, IntOutputFile);
-  std::vector<bool> ResultMap =
-      doMapOp(IntTableSize, IntFiles.begin(), IntFiles.end(), Op, PrintOutput);
-  if (PrintOutput) {
-    printShadowMapStats(ResultMap, "Map intersection");
-  }
-  if (IntOutputFile.getNumOccurrences()) {
-    exit(!writeShadowMap(ResultMap, IntOutputFile.getValue()));
-  }
+  handleMapOpCmd("Intersection", IntFiles, Op, IntTableSize, IntOutputFile,
+                 IntVerbosity);
 }
 
 void handleUnionCmd() {
   auto Op = [](bool R, bool M) { return R & M; };
-  bool PrintOutput = getVerbosity(UnionVerbosity, UnionOutputFile);
-  std::vector<bool> ResultMap = doMapOp(UnionTableSize, UnionFiles.begin(),
-                                        UnionFiles.end(), Op, PrintOutput);
-  if (PrintOutput) {
-    printShadowMapStats(ResultMap, "Map union");
-  }
-  if (UnionOutputFile.getNumOccurrences()) {
-    exit(!writeShadowMap(ResultMap, UnionOutputFile));
-  }
+  handleMapOpCmd("Union", UnionFiles, Op, UnionTableSize, UnionOutputFile,
+                 UnionVerbosity);
 }
 
 void handleStatCmd() {
+  MapStatPrinter MSP;
   for (const std::string &Filename : StatFiles) {
-    std::vector<bool> ShadowMap = readShadowMap(StatTableSize, Filename);
-    printShadowMapStats(ShadowMap, "", Filename);
+    MSP.addFile(Filename, StatTableSize);
   }
+  MSP.sort(StatSort);
+  MSP.print();
 }
 
 } // end namespace llvm

@@ -4,6 +4,7 @@
 #include "llvm/Support/raw_ostream.h"
 #include <climits>
 #include <fstream>
+#include <iomanip>
 #include <sstream>
 
 using namespace llvm;

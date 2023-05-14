@@ -90,6 +90,7 @@ LookupTable LookupTable::fromFile(const std::string &Filename,
   Table.Matchers = getMatchers(TableJSON);
   Table.Patterns = getPatterns(TableJSON);
   std::sort(Table.Matchers.begin(), Table.Matchers.end());
+  Table.Matchers[0].End++;
 
   Table.PK.Verbosity = Verbosity;
   Table.PK.IsCaseSensitive = NameCaseSensitive;

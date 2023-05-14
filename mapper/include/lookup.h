@@ -69,6 +69,16 @@ struct Matcher {
   size_t PIdx = 0;
 
   bool operator<(const Matcher &M) const;
+  bool Contains(size_t i) const { return Begin <= i && i <= End; }
+
+  bool Contains(const Matcher &N) const {
+    return Begin <= N.Begin && N.End <= End;
+  }
+  bool operator==(const Matcher &N) const {
+    return Begin == N.Begin && End == N.End;
+  }
+  bool operator!=(const Matcher &N) const { return !(*this == N); }
+
   bool hasPattern() const {
     return Kind == CompleteMatch || Kind == MorphNodeTo;
   }

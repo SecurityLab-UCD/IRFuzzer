@@ -2,6 +2,11 @@
 Mapper is a tool for analyzing matcher table coverage and manipulating shadow
 maps.
 
+Since LLVM's JSON parser uses way too much memory, we use
+[simdjson](https://github.com/simdjson/simdjson) (distributed under [Apache
+License 2.0](http://www.apache.org/licenses/LICENSE-2.0)) to parse the pattern
+lookup table. 
+
 ## Examples
 ```shell
 # In Security Lab LLVM source tree (with llvm-tblgen -pattern-lookup feature)

@@ -5,7 +5,7 @@
 using namespace llvm;
 
 bool Matcher::operator<(const Matcher &M) const {
-  return Idx == M.Idx ? Size > M.Size : Idx < M.Idx;
+  return Begin == M.Begin ? End > M.End : Begin < M.Begin;
 }
 
 // NOTE: exits program if error encountered
@@ -42,15 +42,15 @@ std::vector<Pattern> getPatterns(const json::Object &TableJSON) {
   std::vector<Pattern> Patterns;
   for (const json::Value &PatternObject : *TableJSON.getArray("patterns")) {
     Pattern ThePattern;
-    ThePattern.IncludePath =
-        (*PatternObject.getAsObject()).getString("path").value();
-    ThePattern.PatternSrc =
-        (*PatternObject.getAsObject()).getString("pattern").value();
+    // ThePattern.IncludePath =
+    //     (*PatternObject.getAsObject()).getString("path").value();
+    // ThePattern.PatternSrc =
+    //     (*PatternObject.getAsObject()).getString("pattern").value();
+    // ThePattern.Index = Patterns.size();
     for (const json::Value &PredIdx :
          *(*PatternObject.getAsObject()).getArray("predicates")) {
       ThePattern.NamedPredicates.push_back(PredIdx.getAsInteger().value());
     }
-    ThePattern.Index = Patterns.size();
     Patterns.push_back(ThePattern);
   }
   return Patterns;
@@ -60,18 +60,19 @@ std::vector<Matcher> getMatchers(const json::Object &TableJSON) {
   std::vector<Matcher> Matchers;
   for (const json::Value &MatcherObject : *TableJSON.getArray("matchers")) {
     Matcher TheMatcher;
-    TheMatcher.Idx = MatcherObject.getAsObject()->getInteger("index").value();
-    TheMatcher.Size = MatcherObject.getAsObject()->getInteger("size").value();
+    TheMatcher.Begin = MatcherObject.getAsObject()->getInteger("index").value();
+    size_t Size = MatcherObject.getAsObject()->getInteger("size").value();
+    TheMatcher.End = TheMatcher.Begin + Size - 1;
     std::optional<int> KindOpt =
         MatcherObject.getAsObject()->getInteger("kind");
     TheMatcher.Kind =
         static_cast<Matcher::KindTy>(KindOpt.value_or(Matcher::Child));
 
     if (TheMatcher.hasPattern()) {
-      TheMatcher.PatternIdx =
+      TheMatcher.PIdx =
           MatcherObject.getAsObject()->getInteger("pattern").value();
     } else if (TheMatcher.Kind == Matcher::CheckPatternPredicate) {
-      TheMatcher.PatPredIdx =
+      TheMatcher.PIdx =
           MatcherObject.getAsObject()->getInteger("predicate").value();
     }
 

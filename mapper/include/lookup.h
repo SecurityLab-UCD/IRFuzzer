@@ -96,6 +96,7 @@ struct Pattern {
   // std::string IncludePath;
   // std::string PatternSrc;
   llvm::SmallVector<size_t, 3> NamedPredicates;
+  size_t Index; // Index in the lookup table array
 };
 
 struct LookupTable {

@@ -32,12 +32,16 @@ include_directories(
 )
 add_definitions(${LLVM_DEFINITIONS})
 
+file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.h ${CMAKE_SOURCE_DIR}/include/simdjson.h)
+file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.cpp ${CMAKE_SOURCE_DIR}/src/simdjson.cpp)
+
 add_executable(mapper
     src/mapper.cpp
     src/lookup.cpp
     src/matchertree.cpp
     src/shadowmap.cpp
     src/predicate.cpp
+    src/simdjson.cpp
 )
 
 target_link_libraries(mapper

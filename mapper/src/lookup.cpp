@@ -1,15 +1,17 @@
 #include "lookup.h"
 
+#include "simdjson.h"
 #include <fstream>
 
 using namespace llvm;
+using namespace simdjson;
 
 bool Matcher::operator<(const Matcher &M) const {
   return Begin == M.Begin ? End > M.End : Begin < M.Begin;
 }
 
 // NOTE: exits program if error encountered
-Expected<json::Value> readJSON(const std::string &Filename) {
+std::string readFile(const std::string &Filename) {
   std::ifstream LookupIfs(Filename);
   if (!LookupIfs) {
     errs() << "Failed to open lookup file!\n";
@@ -21,61 +23,45 @@ Expected<json::Value> readJSON(const std::string &Filename) {
     errs() << "Empty lookup table!\n";
     exit(1);
   }
-  Expected<json::Value> ParseResult = json::parse(LookupTableStr);
-  if (!ParseResult) {
-    errs() << "Error parsing lookup table.\n";
-    exit(1);
-  }
-  return ParseResult;
+  return LookupTableStr;
 }
 
-std::vector<std::string> getStringArray(const json::Object &LookupTable,
+std::vector<std::string> getStringArray(ondemand::document &TableJSON,
                                         const std::string &Key) {
   std::vector<std::string> V;
-  for (const auto &Predicate : *LookupTable.getArray(Key)) {
-    V.push_back(Predicate.getAsString().value().str());
+  ondemand::array Arr = TableJSON[Key].get_array();
+  for (auto Predicate : Arr) {
+    V.push_back(std::string(Predicate.get_string().value()));
   }
   return V;
 }
 
-std::vector<Pattern> getPatterns(const json::Object &TableJSON) {
+std::vector<Pattern> getPatterns(ondemand::document &TableJSON) {
   std::vector<Pattern> Patterns;
-  for (const json::Value &PatternObject : *TableJSON.getArray("patterns")) {
+  for (ondemand::object PatternObject : TableJSON["patterns"]) {
     Pattern ThePattern;
-    // ThePattern.IncludePath =
-    //     (*PatternObject.getAsObject()).getString("path").value();
-    // ThePattern.PatternSrc =
-    //     (*PatternObject.getAsObject()).getString("pattern").value();
-    // ThePattern.Index = Patterns.size();
-    for (const json::Value &PredIdx :
-         *(*PatternObject.getAsObject()).getArray("predicates")) {
-      ThePattern.NamedPredicates.push_back(PredIdx.getAsInteger().value());
+    ThePattern.Index = Patterns.size();
+    for (uint64_t PredIdx : PatternObject["predicates"].get_array()) {
+      ThePattern.NamedPredicates.push_back(PredIdx);
     }
     Patterns.push_back(ThePattern);
   }
   return Patterns;
 }
 
-std::vector<Matcher> getMatchers(const json::Object &TableJSON) {
+std::vector<Matcher> getMatchers(ondemand::document &TableJSON) {
   std::vector<Matcher> Matchers;
-  for (const json::Value &MatcherObject : *TableJSON.getArray("matchers")) {
+  for (ondemand::object MatcherObject : TableJSON["matchers"]) {
     Matcher TheMatcher;
-    TheMatcher.Begin = MatcherObject.getAsObject()->getInteger("index").value();
-    size_t Size = MatcherObject.getAsObject()->getInteger("size").value();
+    TheMatcher.Begin = MatcherObject["index"];
+    TheMatcher.Kind = (Matcher::KindTy)(int)MatcherObject["kind"].get_int64();
+    size_t Size = MatcherObject["size"];
     TheMatcher.End = TheMatcher.Begin + Size - 1;
-    std::optional<int> KindOpt =
-        MatcherObject.getAsObject()->getInteger("kind");
-    TheMatcher.Kind =
-        static_cast<Matcher::KindTy>(KindOpt.value_or(Matcher::Child));
-
     if (TheMatcher.hasPattern()) {
-      TheMatcher.PIdx =
-          MatcherObject.getAsObject()->getInteger("pattern").value();
-    } else if (TheMatcher.Kind == Matcher::CheckPatternPredicate) {
-      TheMatcher.PIdx =
-          MatcherObject.getAsObject()->getInteger("predicate").value();
+      TheMatcher.PIdx = MatcherObject["pattern"];
+    } else if (TheMatcher.hasPatPred()) {
+      TheMatcher.PIdx = MatcherObject["predicate"];
     }
-
     Matchers.push_back(TheMatcher);
   }
   return Matchers;
@@ -83,9 +69,10 @@ std::vector<Matcher> getMatchers(const json::Object &TableJSON) {
 
 LookupTable LookupTable::fromFile(const std::string &Filename,
                                   bool NameCaseSensitive, size_t Verbosity) {
-  Expected<json::Value> ExpectedTable = readJSON(Filename);
+  padded_string TablePaddedStr = padded_string::load(Filename);
+  ondemand::parser Parser;
+  ondemand::document TableJSON = Parser.iterate(TablePaddedStr);
   LookupTable Table;
-  json::Object &TableJSON = *ExpectedTable.get().getAsObject();
 
   Table.Matchers = getMatchers(TableJSON);
   Table.Patterns = getPatterns(TableJSON);
@@ -100,7 +87,7 @@ LookupTable LookupTable::fromFile(const std::string &Filename,
   if (Table.PK.Verbosity > 1)
     errs() << "NOTE: Adding pattern predicates.\n";
   Table.PK.addPatternPredicates(getStringArray(TableJSON, "pat_predicates"));
-  Table.MatcherTableSize = TableJSON.getInteger("table_size").value();
+  Table.MatcherTableSize = TableJSON["table_size"];
 
   return Table;
 }

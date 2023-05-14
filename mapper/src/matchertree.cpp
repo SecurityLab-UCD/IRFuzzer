@@ -7,10 +7,10 @@ using namespace llvm;
 
 bool MatcherNode::Overlaps(const MatcherNode &N) const {
   // make a the left-most interval
-  const MatcherNode &A = Begin <= N.Begin ? *this : N;
-  const MatcherNode &B = Begin <= N.Begin ? N : *this;
+  const MatcherNode &A = M.Begin <= N.M.Begin ? *this : N;
+  const MatcherNode &B = M.Begin <= N.M.Begin ? N : *this;
 
-  return A != B && !A.Contains(B) && !B.Contains(A) && A.End <= B.Begin;
+  return A != B && !A.Contains(B) && !B.Contains(A) && A.M.End <= B.M.Begin;
 }
 
 MatcherTree::MatcherTree(const LookupTable &_LT) : Root(nullptr), LT(_LT) {
@@ -41,7 +41,7 @@ void MatcherTree::insert(const Matcher &M) {
   if (!Node->Contains(*NewNode)) {
     llvm::report_fatal_error("Insertion interval does not encompass new node.");
   }
-  Node->Children.insert(NewNode);
+  Node->Children.push_back(NewNode);
 }
 
 template <typename A, typename B>
@@ -66,8 +66,8 @@ MatcherTree::getUpperBound() const {
   if (!Root)
     return std::tuple(0, std::vector<bool>(),
                       std::multimap<size_t, size_t, std::greater<size_t>>());
-  std::vector<bool> ShadowMap(Root->Size());
-  size_t UpperBound = Root->Size();
+  std::vector<bool> ShadowMap(Root->M.Size());
+  size_t UpperBound = Root->M.Size();
   std::unordered_map<size_t, size_t> BlameMap;
   visit(Root, UpperBound, ShadowMap, BlameMap);
   return std::tuple(UpperBound, ShadowMap, FlipMap(BlameMap));
@@ -79,40 +79,39 @@ void MatcherTree::visit(MatcherNode *N, size_t &UpperBound,
   if (N->Children.size() == 0) {
     if (!LT.PK.Verbosity)
       return;
-    if (N->Kind != Matcher::CompleteMatch && N->Kind != Matcher::MorphNodeTo)
+    if (!N->M.hasPattern())
       return;
-    const Pattern &Pat = LT.Patterns[N->PatternIdx.value()];
+    const Pattern &Pat = LT.Patterns[N->M.PIdx];
     for (size_t Pred : Pat.NamedPredicates) {
       // Supposedly this named predicate was checked as part of the
       // pattern predicate.
       if (!LT.PK.name(Pred)->satisfied()) {
         // This is bad.
         errs() << "ERROR: Failed named predicate check " << Pred << " at "
-               << N->Begin << ".\n";
+               << N->M.Begin << ".\n";
         errs() << "ERROR: Reached leaf when named predicate is unsatisfied!\n";
       }
     }
     return;
   }
 
-  size_t FailedIndex = N->End + 1;
+  size_t FailedIndex = N->M.End + 1;
   for (MatcherNode *C : N->Children) {
-    if (LT.PK.Verbosity > 2 && C->Kind == Matcher::CheckPatternPredicate &&
-        LT.PK.pat(C->PatPredIdx.value())->satisfied()) {
-      dbgs() << "DEBUG: Passed pattern predicate check "
-             << C->PatPredIdx.value() << " at " << C->Begin << ".\n";
+    if (LT.PK.Verbosity > 2 && C->M.hasPatPred() &&
+        LT.PK.pat(C->M.PIdx)->satisfied()) {
+      dbgs() << "DEBUG: Passed pattern predicate check " << C->M.PIdx << " at "
+             << C->M.Begin << ".\n";
     }
-    if (C->Kind == Matcher::CheckPatternPredicate &&
-        !LT.PK.pat(C->PatPredIdx.value())->satisfied()) {
-      FailedIndex = C->End + 1;
+    if (C->M.hasPatPred() && !LT.PK.pat(C->M.PIdx)->satisfied()) {
+      FailedIndex = C->M.End + 1;
       if (LT.PK.Verbosity > 2)
-        errs() << "DEBUG: Failed pattern predicate check "
-               << C->PatPredIdx.value() << " at " << C->Begin << " (-"
-               << (N->End - FailedIndex + 1) << ").\n";
-      BlameMap[C->PatPredIdx.value()] += N->End - FailedIndex + 1;
+        errs() << "DEBUG: Failed pattern predicate check " << C->M.PIdx
+               << " at " << C->M.Begin << " (-" << (N->M.End - FailedIndex + 1)
+               << ").\n";
+      BlameMap[C->M.PIdx] += N->M.End - FailedIndex + 1;
       // CheckPatternPredicate is accessed, but not the rest
-      UpperBound -= N->End - FailedIndex + 1;
-      for (size_t I = FailedIndex; I <= N->End; I++) {
+      UpperBound -= N->M.End - FailedIndex + 1;
+      for (size_t I = FailedIndex; I <= N->M.End; I++) {
         if (LT.PK.Verbosity && ShadowMap[I]) {
           dbgs() << "ERROR: Shadow map at i=" << I
                  << " is already set to true.\n";

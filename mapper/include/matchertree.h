@@ -13,27 +13,12 @@ class MatcherTree;
 class MatcherNode {
   friend class MatcherTree;
 
-  struct PtrCmp {
-    bool operator()(const MatcherNode *L, const MatcherNode *R) const {
-      return L->Begin < R->Begin || (L->Begin == R->Begin && L->End > R->End);
-    }
-  };
+  const Matcher &M;
 
-  std::optional<size_t> PatternIdx; // pattern index if it's a leaf node
-  std::optional<size_t> PatPredIdx; // pattern predicate if it's a check node
-
-  // The node represents a closed interval [Begin, End]
-  size_t Begin;
-  size_t End;
-
-  Matcher::KindTy Kind;
-
-  std::set<MatcherNode *, PtrCmp> Children;
+  std::vector<MatcherNode *> Children;
 
 public:
-  MatcherNode(const Matcher &M)
-      : PatternIdx(M.PatternIdx), PatPredIdx(M.PatPredIdx), Begin(M.Idx),
-        End(M.Idx + M.Size - 1), Kind(M.Kind) {}
+  MatcherNode(const Matcher &M) : M(M) {}
   MatcherNode(const MatcherNode &) = delete;
   MatcherNode(MatcherNode &&) = delete;
 
@@ -43,16 +28,14 @@ public:
     }
   }
 
-  size_t Size() const { return End - Begin + 1; }
-
-  bool Contains(size_t i) const { return Begin <= i && i <= End; }
+  bool Contains(size_t i) const { return M.Begin <= i && i <= M.End; }
 
   bool Contains(const MatcherNode &N) const {
-    return Begin <= N.Begin && N.End <= End;
+    return M.Begin <= N.M.Begin && N.M.End <= M.End;
   }
 
   bool operator==(const MatcherNode &N) const {
-    return Begin == N.Begin && End == N.End;
+    return M.Begin == N.M.Begin && M.End == N.M.End;
   }
 
   bool operator!=(const MatcherNode &N) const { return !(*this == N); }

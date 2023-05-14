@@ -62,26 +62,30 @@ struct Matcher {
     HighestKind = MorphNodeTo
   };
 
-  size_t Idx;
-  size_t Size;
-  KindTy Kind;
-  std::optional<size_t> PatternIdx;
-  std::optional<size_t> PatPredIdx;
+  size_t Begin = 0;
+  size_t End = 0;
+  KindTy Kind = Scope;
+  // To save space, this may either be a pattern or a pattern predicate index
+  size_t PIdx = 0;
 
-  Matcher() : Idx(), Size(), Kind() {}
   bool operator<(const Matcher &M) const;
   bool hasPattern() const {
     return Kind == CompleteMatch || Kind == MorphNodeTo;
   }
+  bool isLeaf() const {
+    return Kind != Scope && Kind != SwitchOpcode && Kind != SwitchType &&
+           Kind != Child;
+  }
+  bool hasPatPred() const { return Kind == CheckPatternPredicate; }
+
+  size_t Size() const { return End - Begin + 1; }
 };
 
 struct Pattern {
-  std::string IncludePath;
-  std::string PatternSrc;
+  // We can but don't need to store them for now:
+  // std::string IncludePath;
+  // std::string PatternSrc;
   llvm::SmallVector<size_t, 3> NamedPredicates;
-
-  // Index of this pattern in lookup table (for debugging purposes)
-  size_t Index;
 };
 
 struct LookupTable {

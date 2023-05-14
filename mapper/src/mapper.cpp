@@ -181,27 +181,24 @@ void handleUBCmd() {
     if (FirstNonDigit == Pred.end()) {
       Idx = std::stoul(Pred);
       Table.PK.enable(Idx);
-      std::string Name;
-      // Maybe we should use a bimap?
-      for (const auto &[PredName, PredIdx] : Table.PK.NamedPredLookup) {
-        if (Idx == PredIdx) {
-          Name = PredName;
-        }
-      }
-      TruePredicates[Idx] = Name;
+      TruePredicates[Idx] = "";
     } else {
       Table.PK.enable(Pred);
-      Idx = Table.PK.NamedPredLookup[Pred];
-      TruePredicates[Idx] =
-          UBPredCaseSensitive ? Pred : StringRef(Pred).lower();
+      Idx = Table.PK.NamedPredLookup[Table.PK.IsCaseSensitive
+                                         ? Pred
+                                         : StringRef(Pred).lower()];
+      TruePredicates[Idx] = Pred;
     }
   }
   Table.PK.resolve();
-  for (const auto &[I, Name] : TruePredicates) {
-    if (!Table.PK.name(I)->satisfied()) {
-      if (Verbosity)
-        errs() << "ERROR: Failed to satisfy named predicate " << I << " ("
-               << Name << ").\n";
+  if (Verbosity) {
+    for (const auto &[I, Name] : TruePredicates) {
+      if (!Table.PK.name(I)->satisfied()) {
+        errs() << "ERROR: Failed to satisfy named predicate " << I;
+        if (Name.size())
+          errs() << " (" << Name << ")";
+        errs() << ".\n";
+      }
     }
   }
 
@@ -209,7 +206,7 @@ void handleUBCmd() {
   auto [UpperBound, ShadowMap, BlameMap] = TheMatcherTree.getUpperBound();
   if (Verbosity || UBShowBlameList) {
     MapStatPrinter MSP;
-    MSP.summarize("Upper bound", ShadowMap, true);
+    MSP.summarize("Upper bound", UpperBound, ShadowMap.size(), true);
     MSP.print();
   }
   if (UBShowBlameList) {

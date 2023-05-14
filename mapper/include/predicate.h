@@ -1,8 +1,6 @@
 #ifndef PREDICATE_H_
 #define PREDICATE_H_
 
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/ErrorHandling.h"
 #include <regex>
 #include <unordered_map>
 #include <vector>
@@ -25,15 +23,14 @@ struct Predicate {
   virtual bool satisfied() { return _Value; }
   // Recalculate value after literals have been updated.
   virtual bool resolve() = 0;
+  // Make this predicate take a new value.
   virtual bool resolve(bool NewValue) = 0;
 
   KindTy getKind() const { return Kind; }
 
 protected:
-  // All predicates cache their resolved values.
-  // It is the user's responsibility to determine when
-  // to resolve() and when to satisfied(). Only LiteralPredicate
-  // resolves upon initialization.
+  // All predicates cache their resolved values.  It is the user's
+  // responsibility to determine when to resolve() and when to call satisfied().
   bool _Value = false;
   KindTy Kind;
 };
@@ -65,10 +62,9 @@ struct NotPredicate : Predicate {
   Predicate *Pred;
 
   NotPredicate(Predicate *Pred) : Predicate(Predicate::Not), Pred(Pred) {}
+
   bool resolve() override { return _Value = !Pred->satisfied(); }
-  bool resolve(bool NewValue) override {
-    return _Value = Pred->resolve(!NewValue);
-  }
+  bool resolve(bool NewValue) override;
 };
 
 struct AndPredicate : Predicate {
@@ -79,19 +75,8 @@ struct AndPredicate : Predicate {
   AndPredicate(std::vector<Predicate *> &&Predicates)
       : Predicate(Predicate::And), Children(std::move(Predicates)) {}
 
-  bool resolve() override {
-    for (Predicate *Predicate : Children) {
-      if (!Predicate->satisfied())
-        return _Value = false;
-    }
-    return _Value = true;
-  }
-  bool resolve(bool NewValue) override {
-    for (Predicate *Predicate : Children) {
-      Predicate->resolve(NewValue);
-    }
-    return _Value = true;
-  }
+  bool resolve() override;
+  bool resolve(bool NewValue) override;
 };
 
 struct OrPredicate : Predicate {
@@ -102,20 +87,8 @@ struct OrPredicate : Predicate {
   OrPredicate(std::vector<Predicate *> &&Predicates)
       : Predicate(Predicate::Or), Children(std::move(Predicates)) {}
 
-  bool resolve() override {
-    for (Predicate *C : Children) {
-      if (C->satisfied())
-        return _Value = true;
-    }
-    return _Value = false;
-  }
-  bool resolve(bool NewValue) override {
-    if (NewValue)
-      return Children[0]->resolve(true);
-    for (Predicate *C : Children)
-      C->resolve(false);
-    return false;
-  }
+  bool resolve() override;
+  bool resolve(bool NewValue) override;
 };
 
 struct PredicateKeeper {
@@ -132,79 +105,40 @@ struct PredicateKeeper {
   // Parsed from C++ expressions (.pat_predicates)
   std::vector<Predicate *> PatternPredicates;
 
-  Predicate *True = new TruePredicate();
-  Predicate *False = new FalsePredicate();
-  size_t Verbosity = 0;
-
-  PredicateKeeper() {
-    AllPredicates.push_back(True);
-    AllPredicates.push_back(False);
-  }
   // Whether named predicates are case-sensitive.
   // If false, all names will be in lower case, and queries will be converted to
   // lower case.
   bool IsCaseSensitive = false;
+  Predicate *True = new TruePredicate();
+  Predicate *False = new FalsePredicate();
+  size_t Verbosity = 0;
 
-  // Access a named predicate by name
-  Predicate *name(const std::string &Name) const {
-    if (Name == "TruePredicate")
-      return True;
-    if (Name == "FalsePredicate")
-      return False;
-    return NamedPredicates[NamedPredLookup.at(
-        IsCaseSensitive ? Name : llvm::StringRef(Name).lower())];
-  }
+  PredicateKeeper();
+  ~PredicateKeeper();
 
-  // Access a named predicate by insertion index
+  // Access a named predicate by name or index
+  Predicate *name(const std::string &Name) const;
   Predicate *name(size_t Idx) const { return NamedPredicates[Idx]; }
-
+  // Access a pattern predicate by index
   Predicate *pat(size_t Idx) const { return PatternPredicates[Idx]; }
 
-  void resolve() {
-    for (Predicate *P : AllPredicates) {
-      if (!P)
-#ifndef NDEBUG
-        llvm::report_fatal_error("Nullptr found in predicate list");
-#else
-        continue;
-#endif
-      P->resolve();
-    }
-    Dirty = false;
-  }
+  // Recalculate all predicate values.
+  void resolve();
 
   auto begin() const { return NamedPredicates.begin(); }
   auto end() const { return NamedPredicates.end(); }
 
+  // Add named predicates before adding pattern predicates
   void addNamedPredicates(const std::vector<std::string> &Records);
   void addPatternPredicates(const std::vector<std::string> &Expressions);
 
-  void enable(const std::string &Name) {
-    name(Name)->resolve(true);
-    Dirty = true;
-  }
-  void enable(size_t I) {
-    name(I)->resolve(true);
-    Dirty = true;
-  }
-  void disable(const std::string &Name) {
-    name(Name)->resolve(false);
-    Dirty = true;
-  }
-  void disable(size_t I) {
-    name(I)->resolve(false);
-    Dirty = true;
-  }
-
-  ~PredicateKeeper() {
-    for (Predicate *P : AllPredicates) {
-      if (P)
-        delete P;
-    }
-  }
+  // Set a named predicate to true orfalse.
+  void enable(const std::string &Name);
+  void enable(size_t I);
+  void disable(const std::string &Name);
+  void disable(size_t I);
 
   bool isDirty() const { return Dirty; }
-
   size_t getPadPredSize() const { return PatternPredicates.size(); }
 
 private:

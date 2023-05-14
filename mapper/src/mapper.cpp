@@ -4,11 +4,7 @@
 
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/InitLLVM.h"
-#include "llvm/Support/JSON.h"
 #include "llvm/Support/WithColor.h"
-#include <fstream>
-#include <set>
-#include <sstream>
 
 namespace llvm {
 
@@ -152,13 +148,7 @@ static cl::opt<MapStatPrinter::SortTy>
 
 size_t getVerbosity(const cl::opt<bool> &VerbosityCL,
                     const cl::opt<std::string> &OutputFileCL) {
-  if (VerbosityCL.getNumOccurrences()) {
-    return VerbosityCL.getNumOccurrences();
-  } else if (OutputFileCL.getNumOccurrences()) {
-    return 0;
-  } else {
-    return 1;
-  }
+  return 1 + VerbosityCL.getNumOccurrences() - OutputFileCL.getNumOccurrences();
 }
 
 void handleUBCmd() {

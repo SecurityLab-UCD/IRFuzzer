@@ -32,10 +32,10 @@ class MapStatPrinter {
 public:
   enum SortTy { None, Asc, Desc };
 
-  // Set row description
+  // Set default row description
   MapStatPrinter(const std::string &Description)
       : Description(Description), MaxDescLen(Description.size()) {}
-  // No description
+  // No default row description
   MapStatPrinter() = default;
 
   static inline size_t getIdxCovered(const std::vector<bool> &Map) {
@@ -60,7 +60,10 @@ public:
   void desc();
   void sort(SortTy S);
 
+  // Set maximum entries allowed. Entries beyond the limit will not be added.
+  // Summary entries do not count towards the limit.
   void limit(size_t L);
+  // Check if printer has printed all entries within limit.
   bool atLimit() const;
 
 private:

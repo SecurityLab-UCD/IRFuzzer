@@ -1,9 +1,100 @@
 #include "predicate.h"
 
+#include "llvm/ADT/StringRef.h"
+#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <regex>
 
 using namespace llvm;
+
+bool NotPredicate::resolve(bool NewValue) {
+  return _Value = Pred->resolve(!NewValue);
+}
+
+bool AndPredicate::resolve() {
+  for (Predicate *Predicate : Children) {
+    if (!Predicate->satisfied())
+      return _Value = false;
+  }
+  return _Value = true;
+}
+
+bool AndPredicate::resolve(bool NewValue) {
+  for (Predicate *Predicate : Children) {
+    Predicate->resolve(NewValue);
+  }
+  return _Value = true;
+}
+
+bool OrPredicate::resolve() {
+  for (Predicate *C : Children) {
+    if (C->satisfied())
+      return _Value = true;
+  }
+  return _Value = false;
+}
+
+bool OrPredicate::resolve(bool NewValue) {
+  if (NewValue)
+    return Children[0]->resolve(true);
+  for (Predicate *C : Children)
+    C->resolve(false);
+  return false;
+}
+
+PredicateKeeper::PredicateKeeper() {
+  AllPredicates.push_back(True);
+  AllPredicates.push_back(False);
+}
+
+PredicateKeeper::~PredicateKeeper() {
+  for (Predicate *P : AllPredicates) {
+    if (P)
+      delete P;
+  }
+}
+
+Predicate *PredicateKeeper::name(const std::string &Name) const {
+  if (Name == "TruePredicate")
+    return True;
+  if (Name == "FalsePredicate")
+    return False;
+  return NamedPredicates[NamedPredLookup.at(
+      IsCaseSensitive ? Name : StringRef(Name).lower())];
+}
+
+void PredicateKeeper::resolve() {
+  for (Predicate *P : AllPredicates) {
+    if (!P)
+#ifndef NDEBUG
+      report_fatal_error("Nullptr found in predicate list");
+#else
+      continue;
+#endif
+    P->resolve();
+  }
+  Dirty = false;
+}
+
+void PredicateKeeper::enable(const std::string &Name) {
+  name(Name)->resolve(true);
+  Dirty = true;
+}
+
+void PredicateKeeper::enable(size_t I) {
+  name(I)->resolve(true);
+  Dirty = true;
+}
+
+void PredicateKeeper::disable(const std::string &Name) {
+  name(Name)->resolve(false);
+  Dirty = true;
+}
+
+void PredicateKeeper::disable(size_t I) {
+  name(I)->resolve(false);
+  Dirty = true;
+}
 
 void PredicateKeeper::addNamedPredicates(
     const std::vector<std::string> &Records) {
@@ -187,7 +278,7 @@ Predicate *PredicateKeeper::parseLiteral(const std::string &CondString,
 [[noreturn]] void PredicateKeeper::notFound(const std::string &Str,
                                             const std::string &CondString,
                                             size_t CurIndex) {
-  llvm::errs() << "FATAL ERROR: Expected `" << Str << "` at char "
-               << CurIndex + 1 << " in '" << CondString << "'.\n";
+  errs() << "FATAL ERROR: Expected `" << Str << "` at char " << CurIndex + 1
+         << " in '" << CondString << "'.\n";
   exit(1);
 }

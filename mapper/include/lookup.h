@@ -4,8 +4,6 @@
 
 #include "predicate.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/JSON.h"
 #include <string>
 
 struct Matcher {
@@ -69,26 +67,15 @@ struct Matcher {
   size_t PIdx = 0;
 
   bool operator<(const Matcher &M) const;
-  bool Contains(size_t i) const { return Begin <= i && i <= End; }
+  bool operator==(const Matcher &N) const;
+  bool operator!=(const Matcher &N) const;
 
-  bool Contains(const Matcher &N) const {
-    return Begin <= N.Begin && N.End <= End;
-  }
-  bool operator==(const Matcher &N) const {
-    return Begin == N.Begin && End == N.End;
-  }
-  bool operator!=(const Matcher &N) const { return !(*this == N); }
-
-  bool hasPattern() const {
-    return Kind == CompleteMatch || Kind == MorphNodeTo;
-  }
-  bool isLeaf() const {
-    return Kind != Scope && Kind != SwitchOpcode && Kind != SwitchType &&
-           Kind != Child;
-  }
-  bool hasPatPred() const { return Kind == CheckPatternPredicate; }
-
-  size_t Size() const { return End - Begin + 1; }
+  bool contains(size_t i) const;
+  bool contains(const Matcher &N) const;
+  bool hasPattern() const;
+  bool hasPatPred() const;
+  bool isLeaf() const;
+  size_t size() const;
 };
 
 struct Pattern {

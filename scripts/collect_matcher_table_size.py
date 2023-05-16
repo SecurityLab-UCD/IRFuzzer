@@ -110,6 +110,7 @@ def main() -> None:
     f = open(args.output, "w") if args.output and args.output != "-" else None
 
     dump_py("DAGISEL_MATCHER_TABLE_SIZES", dag_isel_table_sizes, file=f)
+    print(file=f)
     dump_py("GISEL_MATCHER_TABLE_SIZES", global_isel_table_sizes, file=f)
 
     if f:

@@ -11,13 +11,32 @@ namespace llvm {
 static cl::OptionCategory AnalysisCategory("Analysis Options");
 
 // ----------------------------------------------------------------
+// analyze subcommand
+
+static cl::SubCommand
+    AnalyzeCmd("analyze", "Analyze coverage loss in experimental shadow map");
+
+static cl::opt<bool> AnVerbosity("v", cl::desc("Increase verbosity"),
+                                 cl::init(false), cl::sub(AnalyzeCmd),
+                                 cl::cat(AnalysisCategory),
+                                 cl::ValueDisallowed);
+
+static cl::opt<std::string>
+    AnLookupFile(cl::Positional, cl::desc("<lookup-table>"), cl::Required,
+                 cl::cat(AnalysisCategory), cl::sub(AnalyzeCmd));
+
+static cl::opt<std::string> AnMapFile(cl::Positional, cl::desc("<map>"),
+                                      cl::Required, cl::cat(AnalysisCategory),
+                                      cl::sub(AnalyzeCmd));
+
+// ----------------------------------------------------------------
 // upperbound subcommand
 
 static cl::SubCommand
     UBCmd("upperbound",
           "Calculate matcher table coverage upper bound given true predicates");
 
-static cl::opt<bool> UBVerbosity("v", cl::desc("Set verbosity (-v, -vv, -vvv)"),
+static cl::opt<bool> UBVerbosity("v", cl::desc("Increase verbosity"),
                                  cl::init(false), cl::sub(UBCmd),
                                  cl::cat(AnalysisCategory),
                                  cl::ValueDisallowed);
@@ -29,6 +48,10 @@ static cl::opt<std::string>
 static cl::list<std::string>
     UBTruePredicates(cl::Positional, cl::desc("[true-pred-name-or-idx...]"),
                      cl::ZeroOrMore, cl::sub(UBCmd), cl::cat(AnalysisCategory));
+
+static cl::opt<std::string>
+    UBPatPredStr("p", cl::desc("Manually set pattern predicate values"),
+                 cl::init(""), cl::sub(UBCmd), cl::cat(AnalysisCategory));
 
 static cl::opt<std::string>
     UBOutputFile("o", cl::desc("Generate shadow map output"), cl::Optional,
@@ -146,6 +169,42 @@ static cl::opt<MapStatPrinter::SortTy>
 // ----------------------------------------------------------------
 // subcommand handlers
 
+void handleAnalyzeCmd() {
+  size_t Verbosity = 1 + AnVerbosity.getNumOccurrences();
+  LookupTable Table = LookupTable::fromFile(AnLookupFile, false, Verbosity);
+  MatcherTree TheMatcherTree(Table);
+  std::vector<bool> ShadowMap =
+      readBitVector(Table.MatcherTableSize, AnMapFile);
+  auto [MatcherBlame, PatPredBlame] = TheMatcherTree.analyzeMap(ShadowMap);
+
+  MapStatPrinter MSP;
+  MSP.addFile(AnMapFile, ShadowMap);
+  MSP.print();
+  outs() << '\n';
+
+  outs() << "Top coverage loss cause by matcher kind:\n";
+  size_t LossSum = 0;
+  for (const auto &[Kind, Loss] : MatcherBlame) {
+    // TODO: display matcher kind enum names instead of indices
+    MSP.addStat(Matcher::getKindAsString(Kind), Loss, ShadowMap.size());
+    LossSum += Loss;
+  }
+  MSP.summarize("Sum", LossSum, ShadowMap.size(), true);
+  MSP.print();
+  outs() << '\n';
+
+  outs() << "Loss from pattern predicate indices:\n";
+  LossSum = 0;
+  for (const auto &[PatPredIdx, Loss] : PatPredBlame) {
+    LossSum += Loss;
+    MSP.addStat(std::to_string(PatPredIdx), Loss, Table.MatcherTableSize);
+    if (MSP.atLimit())
+      break;
+  }
+  MSP.summarize("Sum", LossSum, ShadowMap.size(), true);
+  MSP.print();
+}
+
 size_t getVerbosity(const cl::opt<bool> &VerbosityCL,
                     const cl::opt<std::string> &OutputFileCL) {
   return 1 + VerbosityCL.getNumOccurrences() - OutputFileCL.getNumOccurrences();
@@ -192,6 +251,19 @@ void handleUBCmd() {
     }
   }
 
+  if (UBPatPredStr.getNumOccurrences()) {
+    std::vector<bool> NewPatPreds;
+    size_t PatPredCount = Table.PK.PatternPredicates.size();
+    if (UBPatPredStr.getValue().size() == PatPredCount) {
+      for (size_t i = 0; i < PatPredCount; i++) {
+        NewPatPreds.push_back(NewPatPreds[i] == '1');
+      }
+    } else {
+      NewPatPreds = readBitVector(PatPredCount, UBPatPredStr);
+    }
+    Table.PK.updatePatternPredicates(NewPatPreds);
+  }
+
   MatcherTree TheMatcherTree(Table);
   auto [UpperBound, ShadowMap, BlameMap] = TheMatcherTree.getUpperBound();
   if (Verbosity || UBShowBlameList) {
@@ -209,7 +281,7 @@ void handleUBCmd() {
     MapStatPrinter MSP;
     MSP.limit(UBMaxBlameEntries);
     size_t LossSum = 0;
-    for (const auto [Loss, PatPredIdx] : BlameMap) {
+    for (const auto &[PatPredIdx, Loss] : BlameMap) {
       LossSum += Loss;
       MSP.addStat(std::to_string(PatPredIdx), Loss, Table.MatcherTableSize);
       if (MSP.atLimit())
@@ -219,7 +291,7 @@ void handleUBCmd() {
     MSP.print();
   }
   if (UBOutputFile.getNumOccurrences()) {
-    exit(!writeShadowMap(ShadowMap, UBOutputFile.getValue()));
+    exit(!writeBitVector(ShadowMap, UBOutputFile.getValue()));
   }
 }
 
@@ -228,7 +300,7 @@ void handleMapOpCmd(const std::string &OpName,
                     std::function<bool(bool, bool)> Op, size_t TableSize,
                     const cl::opt<std::string> &OutputFile,
                     const cl::opt<bool> &VerbosityCL) {
-  auto Maps = readShadowMaps(TableSize, Files);
+  auto Maps = readBitVectors(TableSize, Files);
   std::vector<bool> ResultMap = doMapOp(Maps, Op);
   if (getVerbosity(VerbosityCL, OutputFile)) {
     MapStatPrinter MSP;
@@ -239,7 +311,7 @@ void handleMapOpCmd(const std::string &OpName,
     MSP.print();
   }
   if (OutputFile.getNumOccurrences()) {
-    exit(!writeShadowMap(ResultMap, OutputFile));
+    exit(!writeBitVector(ResultMap, OutputFile));
   }
 }
 
@@ -279,7 +351,9 @@ int main(int argc, char const *argv[]) {
   cl::HideUnrelatedOptions({&AnalysisCategory, &getColorCategory()});
   cl::ParseCommandLineOptions(argc, argv, "Shadow map analyzer\n");
 
-  if (UBCmd) {
+  if (AnalyzeCmd) {
+    handleAnalyzeCmd();
+  } else if (UBCmd) {
     handleUBCmd();
   } else if (DiffCmd) {
     handleDiffCmd();

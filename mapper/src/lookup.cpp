@@ -28,13 +28,72 @@ bool Matcher::hasPattern() const {
 }
 
 bool Matcher::isLeaf() const {
-  return Kind != Scope && Kind != SwitchOpcode && Kind != SwitchType &&
-         Kind != Child;
+  switch (Kind) {
+  default:
+    return true;
+  case Scope:
+  case SwitchOpcode:
+  case SwitchType:
+  case Group:
+    return false;
+  }
 }
 
 bool Matcher::hasPatPred() const { return Kind == CheckPatternPredicate; }
 
 size_t Matcher::size() const { return End - Begin + 1; }
+
+#define ENUM_TO_STR(name)                                                      \
+  case name:                                                                   \
+    return #name;
+
+std::string Matcher::getKindAsString(KindTy Kind) {
+  switch (Kind) {
+    ENUM_TO_STR(Scope)
+    ENUM_TO_STR(RecordNode)
+    ENUM_TO_STR(RecordChild)
+    ENUM_TO_STR(RecordMemRef)
+    ENUM_TO_STR(CaptureGlueInput)
+    ENUM_TO_STR(MoveChild)
+    ENUM_TO_STR(MoveParent)
+    ENUM_TO_STR(CheckSame)
+    ENUM_TO_STR(CheckChildSame)
+    ENUM_TO_STR(CheckPatternPredicate)
+    ENUM_TO_STR(CheckPredicate)
+    ENUM_TO_STR(CheckOpcode)
+    ENUM_TO_STR(SwitchOpcode)
+    ENUM_TO_STR(CheckType)
+    ENUM_TO_STR(SwitchType)
+    ENUM_TO_STR(CheckChildType)
+    ENUM_TO_STR(CheckInteger)
+    ENUM_TO_STR(CheckChildInteger)
+    ENUM_TO_STR(CheckCondCode)
+    ENUM_TO_STR(CheckChild2CondCode)
+    ENUM_TO_STR(CheckValueType)
+    ENUM_TO_STR(CheckComplexPat)
+    ENUM_TO_STR(CheckAndImm)
+    ENUM_TO_STR(CheckOrImm)
+    ENUM_TO_STR(CheckImmAllOnesV)
+    ENUM_TO_STR(CheckImmAllZerosV)
+    ENUM_TO_STR(CheckFoldableChainNode)
+    ENUM_TO_STR(EmitInteger)
+    ENUM_TO_STR(EmitStringInteger)
+    ENUM_TO_STR(EmitRegister)
+    ENUM_TO_STR(EmitConvertToTarget)
+    ENUM_TO_STR(EmitMergeInputChains)
+    ENUM_TO_STR(EmitCopyToReg)
+    ENUM_TO_STR(EmitNode)
+    ENUM_TO_STR(EmitNodeXForm)
+    ENUM_TO_STR(CompleteMatch)
+    ENUM_TO_STR(MorphNodeTo)
+    ENUM_TO_STR(Group)
+  default:
+    return "Unknown";
+  }
+}
+#undef ENUM_TO_STR
+
+std::string Matcher::getKindAsString() const { return getKindAsString(Kind); }
 
 // NOTE: exits program if error encountered
 std::string readFile(const std::string &Filename) {

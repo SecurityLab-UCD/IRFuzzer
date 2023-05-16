@@ -8,13 +8,14 @@ if(NOT CMAKE_BUILD_TYPE)
 endif(NOT CMAKE_BUILD_TYPE)
 
 IF(CMAKE_BUILD_TYPE MATCHES Release)
-    find_package(LLVM REQUIRED PATHS $ENV{FUZZING_HOME}/$ENV{LLVM}/build-release/lib/cmake/llvm NO_DEFAULT_PATH)
+    set(LLVM_DIR $ENV{FUZZING_HOME}/$ENV{LLVM}/build-release/lib/cmake/llvm)
 ENDIF(CMAKE_BUILD_TYPE MATCHES Release)
 
-
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
-    find_package(LLVM REQUIRED PATHS $ENV{FUZZING_HOME}/$ENV{LLVM}/build-debug/lib/cmake/llvm NO_DEFAULT_PATH)
+    set(LLVM_DIR $ENV{FUZZING_HOME}/$ENV{LLVM}/build-debug/lib/cmake/llvm)
 ENDIF(CMAKE_BUILD_TYPE MATCHES Debug)
+
+find_package(LLVM REQUIRED CONFIG)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")

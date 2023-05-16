@@ -9,8 +9,11 @@
 
 struct LookupTable;
 
+typedef std::vector<std::pair<size_t, size_t>> PatPredBlameList;
+typedef std::vector<std::pair<Matcher::KindTy, size_t>> MatcherBlameList;
+
 class MatcherTree {
-private:
+
   const LookupTable &LT;
   // The Matchers vector in lookup table for easy access
   const std::vector<Matcher> &MT;
@@ -22,13 +25,18 @@ public:
   MatcherTree(MatcherTree &&M) : LT(M.LT), MT(M.MT) {}
 
   /// @brief Calculate matcher table coverage upper bound
-  /// @return (covered indices, shadow map, coverage loss -> pat pred idx)
-  std::tuple<size_t, std::vector<bool>,
-             std::multimap<size_t, size_t, std::greater<size_t>>>
-  getUpperBound() const;
+  /// @return (covered indices, shadow map, pat pred idx -> coverage loss)
+  std::tuple<size_t, std::vector<bool>, PatPredBlameList> getUpperBound() const;
+
+  std::tuple<MatcherBlameList, PatPredBlameList>
+  analyzeMap(const std::vector<bool> &ShadowMap);
 
 private:
-  bool visit(size_t &I, size_t &UpperBound, std::vector<bool> &ShadowMap,
-             std::unordered_map<size_t, size_t> &BlameMap) const;
+  bool getUpperBound(size_t &I, size_t &UpperBound,
+                     std::vector<bool> &ShadowMap,
+                     std::unordered_map<size_t, size_t> &BlameMap) const;
+  bool analyzeMap(size_t &I, const std::vector<bool> &ShadowMap,
+                  std::unordered_map<Matcher::KindTy, size_t> &MatcherBlame,
+                  std::unordered_map<size_t, size_t> &PatPredBlame);
 };
 #endif // MATCHER_TREE_H_

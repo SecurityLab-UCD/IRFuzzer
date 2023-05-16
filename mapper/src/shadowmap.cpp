@@ -9,65 +9,56 @@
 
 using namespace llvm;
 
-std::vector<bool> readShadowMap(size_t MapBitSize,
-                                const std::string &FileName) {
+std::vector<bool> readBitVector(size_t BitSize, const std::string &FileName) {
   std::ifstream ShadowMapIfs(FileName, std::ios::binary);
-  std::vector<bool> ShadowMap;
-  ShadowMap.reserve(MapBitSize);
+  std::vector<bool> Vec;
+  Vec.reserve(BitSize);
 
   char Data;
-  // This size check lets us know later if there are more data in the shadow map
-  while (ShadowMap.size() < MapBitSize && ShadowMapIfs.read(&Data, 1)) {
-    // Check size to ensure we are pushing the right number of bits. We can't
-    // know if the table size incorrectly includes padding bits at the end.
-    for (int I = 0; I < CHAR_BIT && ShadowMap.size() < MapBitSize; I++) {
+  while (ShadowMapIfs.read(&Data, 1)) {
+    // Check vector size to ensure we ignore the padding bits.
+    for (int I = 0; I < CHAR_BIT && Vec.size() < BitSize; I++) {
       // NOTE: 1 bit in shadow map means MT index not covered; reading as is
       // here
-      ShadowMap.push_back(((Data >> I) & 1) != 0);
+      Vec.push_back(((Data >> (CHAR_BIT - 1 - I)) & 1) != 0);
     }
   }
-  if (ShadowMapIfs.read(&Data, 1)) {
+  if (Vec.size() != BitSize) {
     std::stringstream Message;
-    Message << "Expected map size of " << MapBitSize << ", but " << FileName
-            << " has more.\n";
+    Message << "Expected size of " << BitSize << " bits, but got " << Vec.size()
+            << " bits in " << FileName << ".\n";
     report_fatal_error(Message.str());
   }
-  if (ShadowMap.size() != MapBitSize) {
-    std::stringstream Message;
-    Message << "Expected map size of " << MapBitSize << ", but got "
-            << ShadowMap.size() << " in " << FileName << ".\n";
-    report_fatal_error(Message.str());
-  }
-  return ShadowMap;
+  return Vec;
 }
 
 std::vector<std::vector<bool>>
-readShadowMaps(size_t MapBitSize, const std::vector<std::string> &FileNames) {
+readBitVectors(size_t BitSize, const std::vector<std::string> &FileNames) {
   std::vector<std::vector<bool>> Result;
   for (const auto &FileName : FileNames) {
-    Result.push_back(readShadowMap(MapBitSize, FileName));
+    Result.push_back(readBitVector(BitSize, FileName));
   }
   return Result;
 }
 
-bool writeShadowMap(const std::vector<bool> &Map, const std::string &FileName) {
-  std::ofstream ShadowMapOfs(FileName, std::ios::binary);
-  if (!ShadowMapOfs)
+bool writeBitVector(const std::vector<bool> &Vec, const std::string &FileName) {
+  std::ofstream Ofs(FileName, std::ios::binary);
+  if (!Ofs)
     return false;
   unsigned char ByteBuffer = 0;
-  for (size_t I = 0; I < Map.size(); I++) {
-    if (I % 8 == 0 && I) {
-      ShadowMapOfs << ByteBuffer;
+  for (size_t I = 0; I < Vec.size(); I++) {
+    if (I % CHAR_BIT == 0 && I) {
+      Ofs << ByteBuffer;
       ByteBuffer = 0;
     }
-    if (!Map[I])
+    if (!Vec[I])
       continue;
-    ByteBuffer |= 1 << (7 - (I % 8));
+    ByteBuffer |= 1 << (CHAR_BIT - 1 - (I % CHAR_BIT));
   }
-  if (Map.size() % 8 != 0) {
-    ShadowMapOfs << ByteBuffer;
+  if (Vec.size() % CHAR_BIT != 0) {
+    Ofs << ByteBuffer;
   }
-  return ShadowMapOfs.good();
+  return Ofs.good();
 }
 
 std::vector<bool> doMapOp(const std::vector<std::vector<bool>> &Maps,
@@ -81,6 +72,11 @@ std::vector<bool> doMapOp(const std::vector<std::vector<bool>> &Maps,
     }
   }
   return ResultMap;
+}
+
+void MapStatPrinter::setRowDescription(const std::string &Desc) {
+  Description = Desc;
+  MaxDescLen = Description.size();
 }
 
 std::string MapStatPrinter::format(const MapStatPrinter::StatTy &Stat) const {
@@ -110,10 +106,16 @@ std::string MapStatPrinter::format(const MapStatPrinter::StatTy &Stat) const {
   return Result.str();
 }
 
-void MapStatPrinter::print() const {
+void MapStatPrinter::print() {
   for (const StatTy &Stat : Stats) {
     outs() << format(Stat) << '\n';
   }
+  Stats.clear();
+  MaxFilenameLen = 0;
+  MaxTableSize = 0;
+  Description = "";
+  MaxDescLen = 0;
+  Limit = std::numeric_limits<size_t>::max();
 }
 
 void MapStatPrinter::addFile(const std::string &Filename,
@@ -127,7 +129,7 @@ void MapStatPrinter::addFile(const std::string &Filename, size_t Covered,
 }
 
 void MapStatPrinter::addFile(const std::string &Filename, size_t TableSize) {
-  std::vector<bool> Map = readShadowMap(TableSize, Filename);
+  std::vector<bool> Map = readBitVector(TableSize, Filename);
   addFile(Filename, getIdxCovered(Map), TableSize);
 }
 
@@ -187,6 +189,7 @@ void MapStatPrinter::sort(SortTy S) {
 }
 
 void MapStatPrinter::limit(size_t L) { Limit = L; }
+
 bool MapStatPrinter::atLimit() const { return Limit == 0; }
 
 void MapStatPrinter::addStat(const std::string &Filename,

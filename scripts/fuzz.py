@@ -8,7 +8,6 @@ import docker
 from time import sleep
 
 from collect_seeds import TargetProp, collect_seeds_from_tests
-from lib.arch import ARCH_TO_BACKEND_MAP
 from lib.process_concurrency import MAX_SUBPROCESSES, run_concurrent_subprocesses
 from lib.target import Target
 from lib.matcher_table_sizes import (
@@ -16,6 +15,7 @@ from lib.matcher_table_sizes import (
     GISEL_MATCHER_TABLE_SIZES,
 )
 from lib.target_lists import TARGET_LISTS
+from lib.time_parser import get_time_in_seconds
 
 
 Fuzzer = Literal["aflplusplus", "libfuzzer", "irfuzzer"]
@@ -24,13 +24,6 @@ ClutserType = Literal["screen", "docker", "stdout"]
 
 
 DOCKER_IMAGE = "irfuzzer"
-SECONDS_PER_UNIT: dict[str, int] = {
-    "s": 1,
-    "m": 60,
-    "h": 3600,
-    "d": 86400,
-    "w": 604800,
-}
 MUTATOR_LIBRARY_PATHS: dict[Fuzzer, str] = {
     "aflplusplus": "",
     "libfuzzer": "mutator/build/libAFLFuzzMutate.so",
@@ -183,7 +176,7 @@ class Args(Tap):
             exit(1)
 
     def get_time_in_seconds(self) -> int:
-        return int(self.time[:-1]) * SECONDS_PER_UNIT[self.time[-1]]
+        return get_time_in_seconds(self.time)
 
 
 def get_experiment_configs(

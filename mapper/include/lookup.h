@@ -54,7 +54,7 @@ struct Matcher {
     CompleteMatch,        // Finish a match and update the results.
     MorphNodeTo,          // Build a node, finish a match and update results.
 
-    Child, // Custom kind representing a switch / scope child
+    Group, // Custom kind representing a switch / scope child
 
     // Highest enum value; watch out when adding more.
     HighestKind = MorphNodeTo
@@ -76,6 +76,9 @@ struct Matcher {
   bool hasPatPred() const;
   bool isLeaf() const;
   size_t size() const;
+
+  static std::string getKindAsString(KindTy Kind);
+  std::string getKindAsString() const;
 };
 
 struct Pattern {

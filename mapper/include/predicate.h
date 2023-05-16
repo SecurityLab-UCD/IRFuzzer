@@ -109,6 +109,9 @@ struct PredicateKeeper {
   // If false, all names will be in lower case, and queries will be converted to
   // lower case.
   bool IsCaseSensitive = false;
+  // True if pattern predicate values have been supplied from the command line.
+  // When true, skip checking named predicates during upper bound calculation.
+  bool CustomizedPatternPredicates = false;
   Predicate *True = new TruePredicate();
   Predicate *False = new FalsePredicate();
   size_t Verbosity = 0;
@@ -131,6 +134,7 @@ struct PredicateKeeper {
   // Add named predicates before adding pattern predicates
   void addNamedPredicates(const std::vector<std::string> &Records);
   void addPatternPredicates(const std::vector<std::string> &Expressions);
+  void updatePatternPredicates(const std::vector<bool> &NewPatternPredicates);
 
   // Set a named predicate to true orfalse.
   void enable(const std::string &Name);

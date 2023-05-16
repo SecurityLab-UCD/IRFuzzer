@@ -6,48 +6,41 @@
 
 using namespace llvm;
 
-template <typename A, typename B>
-std::pair<B, A> FlipPair(const std::pair<A, B> &p) {
-  return std::pair<B, A>(p.second, p.first);
-}
-
-// https://stackoverflow.com/questions/5056645/sorting-stdmap-using-value
-// flips an associative container of A,B pairs to B,A pairs
 template <typename A, typename B, template <class, class, class...> class M,
           class... Args>
-std::multimap<B, A, std::greater<B>> FlipMap(const M<A, B, Args...> &Src) {
-  std::multimap<B, A, std::greater<B>> Dst;
-  std::transform(Src.begin(), Src.end(), std::inserter(Dst, Dst.begin()),
-                 FlipPair<A, B>);
+std::vector<std::pair<A, B>> getSortedVecFromMap(const M<A, B, Args...> &Src) {
+  std::vector<std::pair<A, B>> Dst(Src.size());
+  std::copy(Src.begin(), Src.end(), Dst.begin());
+  std::sort(Dst.begin(), Dst.end(),
+            [](const auto &L, const auto &R) { return L.second > R.second; });
   return Dst;
 }
 
-std::tuple<size_t, std::vector<bool>,
-           std::multimap<size_t, size_t, std::greater<size_t>>>
+std::tuple<size_t, std::vector<bool>, PatPredBlameList>
 MatcherTree::getUpperBound() const {
   if (MT.empty())
-    return std::tuple(0, std::vector<bool>(),
-                      std::multimap<size_t, size_t, std::greater<size_t>>());
+    return std::tuple(0, std::vector<bool>(), PatPredBlameList());
   std::vector<bool> ShadowMap(MT[0].size());
   size_t UpperBound = ShadowMap.size();
   std::unordered_map<size_t, size_t> BlameMap;
   size_t I = 0;
-  visit(I, UpperBound, ShadowMap, BlameMap);
-  return std::tuple(UpperBound, ShadowMap, FlipMap(BlameMap));
+  getUpperBound(I, UpperBound, ShadowMap, BlameMap);
+  return std::tuple(UpperBound, ShadowMap, getSortedVecFromMap(BlameMap));
 }
 
-/// @brief Visit a matcher tree node
+/// @brief Visit a matcher tree node and calculate coverage upper bound
 /// @param I current matcher tree index
 /// @param UpperBound Current upper bound value
 /// @param ShadowMap Shadow map
 /// @param BlameMap Pattern predicate blame list (pat pred -> loss)
 /// @return if this leaf failed a pattern predicate check (not named predicate)
-bool MatcherTree::visit(size_t &I, size_t &UpperBound,
-                        std::vector<bool> &ShadowMap,
-                        std::unordered_map<size_t, size_t> &BlameMap) const {
+bool MatcherTree::getUpperBound(
+    size_t &I, size_t &UpperBound, std::vector<bool> &ShadowMap,
+    std::unordered_map<size_t, size_t> &BlameMap) const {
   if (MT[I].isLeaf()) {
     // We only care about leaves with a pattern or pattern predicate index
-    if (MT[I].hasPattern() && LT.PK.Verbosity) {
+    if (MT[I].hasPattern() && LT.PK.Verbosity &&
+        !LT.PK.CustomizedPatternPredicates) {
       const Pattern &Pat = LT.Patterns[MT[I].PIdx];
       // Verify that all named predicates are satisfied.
       for (size_t Pred : Pat.NamedPredicates) {
@@ -81,7 +74,7 @@ bool MatcherTree::visit(size_t &I, size_t &UpperBound,
   bool Failed = false;
   for (; I < MT.size() && MT[PI].contains(MT[I]);) {
     if (!Failed) {
-      Failed = visit(I, UpperBound, ShadowMap, BlameMap);
+      Failed = getUpperBound(I, UpperBound, ShadowMap, BlameMap);
     } else { // Previous pattern predicate check failed
       size_t Loss = MT[PI].End - MT[I].Begin + 1;
       BlameMap[MT[I - 1].PIdx] += Loss;
@@ -89,7 +82,8 @@ bool MatcherTree::visit(size_t &I, size_t &UpperBound,
 
       if (LT.PK.Verbosity > 2)
         errs() << "DEBUG: Failed pattern predicate check " << MT[I - 1].PIdx
-               << " at " << MT[I - 1].Begin << " (-" << Loss << ").\n";
+               << " at " << MT[I - 1].Begin << " with parent kind "
+               << MT[PI].getKindAsString() << " (-" << Loss << ").\n";
 
       std::fill(ShadowMap.begin() + MT[I].Begin,
                 ShadowMap.begin() + MT[PI].End + 1, true);
@@ -99,6 +93,66 @@ bool MatcherTree::visit(size_t &I, size_t &UpperBound,
         I++;
       return false;
     }
+  }
+  return false;
+}
+
+std::tuple<MatcherBlameList, PatPredBlameList>
+MatcherTree::analyzeMap(const std::vector<bool> &ShadowMap) {
+  if (MT.empty())
+    return std::tuple(MatcherBlameList(), PatPredBlameList());
+  size_t I = 0;
+  std::unordered_map<Matcher::KindTy, size_t> MatcherBlameMap;
+  std::unordered_map<size_t, size_t> PatPredBlameMap;
+  analyzeMap(I, ShadowMap, MatcherBlameMap, PatPredBlameMap);
+  return std::tuple(getSortedVecFromMap(MatcherBlameMap),
+                    getSortedVecFromMap(PatPredBlameMap));
+}
+
+bool MatcherTree::analyzeMap(
+    size_t &I, const std::vector<bool> &ShadowMap,
+    std::unordered_map<Matcher::KindTy, size_t> &MatcherBlame,
+    std::unordered_map<size_t, size_t> &PatPredBlame) {
+  if (MT[I].isLeaf()) {
+    return ShadowMap[MT[I++].Begin];
+  } else if (ShadowMap[MT[I].Begin]) {
+    // A scope or group wasn't covered after a OPC_CheckPatternPredicate failed.
+    I++;
+    return true;
+  }
+
+  size_t PI = I; // parent index
+  I++;
+  for (; I < MT.size() && MT[PI].contains(MT[I]);) {
+    if (!analyzeMap(I, ShadowMap, MatcherBlame, PatPredBlame)) {
+      continue; // Matcher is covered. Keep going.
+    }
+    I--; // Move to the first non-covered matcher
+    size_t Loss = MT[PI].End - MT[I].Begin + 1;
+    I--; // Move to the matcher that failed
+
+    if (MT[I].hasPatPred())
+      PatPredBlame[MT[I].PIdx] += Loss;
+    if (LT.PK.Verbosity > 2) {
+      if (MT[I].hasPatPred()) {
+        errs() << "DEBUG: Failed pattern predicate check " << MT[I].PIdx
+               << " at " << MT[I].Begin << " with parent kind "
+               << MT[PI].getKindAsString() << " (-" << Loss << ").\n";
+      } else {
+        errs() << "DEBUG: Failed to match " << MT[I].getKindAsString() << " at "
+               << MT[I].Begin << " (-" << Loss << ").\n";
+      }
+    }
+    MatcherBlame[MT[I].Kind] += Loss;
+    // TODO: Any other information we can record?
+
+    // TODO: Maybe add some debug checks? Like confirming that the previous
+    // matcher / rest of the matcher scope actually didn't get covered at all?
+
+    // Fast-forward out of the parent
+    while (I < MT.size() && MT[PI].contains(MT[I]))
+      I++;
+    return false;
   }
   return false;
 }

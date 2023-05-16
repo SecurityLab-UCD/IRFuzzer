@@ -35,6 +35,8 @@ bool OrPredicate::resolve() {
 }
 
 bool OrPredicate::resolve(bool NewValue) {
+  if (_Value == NewValue)
+    return _Value;
   if (NewValue)
     return Children[0]->resolve(true);
   for (Predicate *C : Children)
@@ -165,6 +167,20 @@ void PredicateKeeper::addPatternPredicates(
     PatternPredicates.push_back(parsePredicate(P));
   }
   resolve();
+}
+
+void PredicateKeeper::updatePatternPredicates(
+    const std::vector<bool> &NewPatternPredicates) {
+  CustomizedPatternPredicates = true;
+  for (size_t i = 0; i < PatternPredicates.size(); i++) {
+    // Try to update named predicate values.
+    // This can (and will) be utterly inaccurate since we can't be sure which
+    // child of an OrPredicate should have been true if PatPred is true.
+    PatternPredicates[i]->resolve(NewPatternPredicates[i]);
+    // Replace the original Predicate with the confirmed value.
+    // The old one will get deleted in dtor (still in AllPredicates).
+    PatternPredicates[i] = NewPatternPredicates[i] ? True : False;
+  }
 }
 
 // Poor man's parser for simple C++ expressions found in predicates

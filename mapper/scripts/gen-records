@@ -1,0 +1,49 @@
+#!/bin/bash
+if [[ -z $1 ]]; then
+    echo Please specify an output directory
+    exit 1
+fi
+
+if [[ $1 = -h ]]; then
+    echo "Usage: $0 <output-directory> <path-to-llvm-src> [llvm-tblgen-dir]"
+    exit 1
+fi
+
+llvm_src=~/llvm-project
+if [[ $2 ]]; then
+    llvm_src="$2"
+elif [[ $LLVM_SRC ]]; then
+    llvm_src="$LLVM_SRC"
+fi
+if [[ ! -d $llvm_src ]]; then
+    echo "$llvm_src not found. Please specify a valid LLVM source directory or define \$LLVM_SRC"
+    echo "Usage: $0 <output-directory> <path-to-llvm-src> [llvm-tblgen-dir]"
+    exit 1
+fi
+bin=$(dirname $(which llvm-tblgen))
+if [[ -n $3 ]]; then
+    bin="$3"
+fi
+
+pushd () {
+    command pushd "$@" > /dev/null
+}
+
+popd () {
+    command popd "$@" > /dev/null
+}
+
+outdir="$1"
+mkdir -p "$outdir"
+echo Dumping records to $outdir...
+
+pushd $llvm_src
+"$bin"/llvm-tblgen -gen-subtarget \
+	-I./llvm/lib/Target/X86 -I./build/include -I./llvm/include -I ./llvm/lib/Target \
+	./llvm/lib/Target/X86/X86.td -o "$outdir"/subtarget.inc
+"$bin"/llvm-tblgen -print-records \
+    -I llvm/lib/Target/X86 -I llvm/include  -I llvm/lib/Target \
+    ./llvm/lib/Target/X86/X86.td -o "$outdir"/records.td
+popd
+echo Generation time:
+times

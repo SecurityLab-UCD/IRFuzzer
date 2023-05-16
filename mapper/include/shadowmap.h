@@ -7,13 +7,17 @@
 #include <string>
 #include <vector>
 
-std::vector<bool> readShadowMap(size_t MapBitSize, const std::string &FileName);
+std::vector<bool> readBitVector(size_t BitSize, const std::string &FileName);
 
 std::vector<std::vector<bool>>
-readShadowMaps(size_t MapBitSize, const std::vector<std::string> &FileNames);
+readBitVectors(size_t BitSize, const std::vector<std::string> &FileNames);
 
-bool writeShadowMap(const std::vector<bool> &Map, const std::string &FileName);
+bool writeBitVector(const std::vector<bool> &Vec, const std::string &FileName);
 
+/// @brief Do bitwise operations on multiple shadow maps.
+/// @param Maps Shadow maps to do operations on
+/// @param Op Operator (accumulated bit OP current bit = result)
+/// @return Result of the operation
 std::vector<bool> doMapOp(const std::vector<std::vector<bool>> &Maps,
                           std::function<bool(bool, bool)> Op);
 
@@ -40,11 +44,17 @@ public:
     return std::count(Map.begin(), Map.end(), false);
   }
 
-  std::string format(const StatTy &Stat) const;
-  void print() const;
+  // Set row description.
+  // Do this before adding any stats.
+  void setRowDescription(const std::string &Desc);
+
+  // Print all added stats and clear the stored stats.
+  // Unset any existing limit.
+  void print();
 
   void addFile(const std::string &Filename, const std::vector<bool> &Map);
   void addFile(const std::string &Filename, size_t Covered, size_t TableSize);
+  // Directly read shadow map using given filename and record stats.
   void addFile(const std::string &Filename, size_t TableSize);
   void addStat(size_t Covered, size_t TableSize);
   void addStat(const std::string &Desc, size_t Covered, size_t TableSize);
@@ -65,6 +75,7 @@ public:
   bool atLimit() const;
 
 private:
+  std::string format(const StatTy &Stat) const;
   void addStat(const std::string &Filename, const std::string &Desc,
                size_t Covered, size_t TableSize);
 };

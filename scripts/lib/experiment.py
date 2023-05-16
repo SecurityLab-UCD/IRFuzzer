@@ -16,12 +16,25 @@ class Experiment(NamedTuple):
     replicate_id: int
 
     @property
-    def plot_data_path(self):
+    def name(self) -> str:
+        return f"{self.fuzzer}:{self.isel}:{self.target}:{self.replicate_id}"
+
+    @property
+    def plot_data_path(self) -> Path:
         return self.path.joinpath("default", "plot_data")
 
     @property
-    def fuzzer_stats_path(self):
+    def fuzzer_stats_path(self) -> Path:
         return self.path.joinpath("default", "fuzzer_stats")
+    
+    @property
+    def cur_input_path(self) -> Path:
+        return self.path.joinpath("default", ".cur_input")
+    
+    @property
+    def run_time(self) -> int:
+        s = self['run_time']
+        return -1 if s is None else int(s)
 
     def __getitem__(self, key: str) -> Optional[str]:
         with open(self.fuzzer_stats_path) as f:

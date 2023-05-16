@@ -45,6 +45,11 @@ def copy_bad_inputs(
     for expr in get_all_experiments(fuzzing_out_dir):
         if expr.run_time < time_secs:
             dest_path = out_dir.joinpath(expr.name + ".bc")
+
+            if not expr.cur_input_path.exists():
+                print(f"Warning: {expr.cur_input_path} does not exist!")
+                continue
+
             shutil.copy(expr.cur_input_path, dest_path)
             yield dest_path
 

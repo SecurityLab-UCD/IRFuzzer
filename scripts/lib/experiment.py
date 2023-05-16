@@ -37,10 +37,14 @@ class Experiment(NamedTuple):
         return -1 if s is None else int(s)
 
     def __getitem__(self, key: str) -> Optional[str]:
+        if not self.fuzzer_stats_path.exists():
+            return None
+
         with open(self.fuzzer_stats_path) as f:
             for line in f:
                 if line.startswith(key):
                     return line.split(" : ")[1]
+        
         return None
 
     def read_plot_data(self) -> pd.DataFrame:

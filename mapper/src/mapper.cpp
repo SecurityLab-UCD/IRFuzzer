@@ -29,6 +29,12 @@ static cl::opt<std::string> AnMapFile(cl::Positional, cl::desc("<map>"),
                                       cl::Required, cl::cat(AnalysisCategory),
                                       cl::sub(AnalyzeCmd));
 
+static cl::opt<size_t>
+    AnMaxEntries("l", cl::desc("Limit blame list entries printed"),
+                 cl::value_desc("entries"),
+                 cl::init(std::numeric_limits<size_t>::max()),
+                 cl::sub(AnalyzeCmd), cl::cat(AnalysisCategory));
+
 // ----------------------------------------------------------------
 // upperbound subcommand
 
@@ -184,7 +190,10 @@ void handleAnalyzeCmd() {
 
   outs() << "Top coverage loss cause by matcher kind:\n";
   size_t LossSum = 0;
+  MSP.limit(AnMaxEntries);
   for (const auto &[Kind, Loss] : MatcherBlame) {
+    if (MSP.atLimit())
+      break;
     // TODO: display matcher kind enum names instead of indices
     MSP.addStat(Matcher::getKindAsString(Kind), Loss, ShadowMap.size());
     LossSum += Loss;
@@ -195,11 +204,12 @@ void handleAnalyzeCmd() {
 
   outs() << "Loss from pattern predicate indices:\n";
   LossSum = 0;
+  MSP.limit(AnMaxEntries);
   for (const auto &[PatPredIdx, Loss] : PatPredBlame) {
-    LossSum += Loss;
-    MSP.addStat(std::to_string(PatPredIdx), Loss, Table.MatcherTableSize);
     if (MSP.atLimit())
       break;
+    LossSum += Loss;
+    MSP.addStat(std::to_string(PatPredIdx), Loss, Table.MatcherTableSize);
   }
   MSP.summarize("Sum", LossSum, ShadowMap.size(), true);
   MSP.print();
@@ -282,10 +292,10 @@ void handleUBCmd() {
     MSP.limit(UBMaxBlameEntries);
     size_t LossSum = 0;
     for (const auto &[PatPredIdx, Loss] : BlameMap) {
-      LossSum += Loss;
-      MSP.addStat(std::to_string(PatPredIdx), Loss, Table.MatcherTableSize);
       if (MSP.atLimit())
         break;
+      LossSum += Loss;
+      MSP.addStat(std::to_string(PatPredIdx), Loss, Table.MatcherTableSize);
     }
     MSP.summarize("Sum", LossSum, Table.MatcherTableSize, true);
     MSP.print();

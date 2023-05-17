@@ -114,45 +114,90 @@ bool MatcherTree::analyzeMap(
     std::unordered_map<Matcher::KindTy, size_t> &MatcherBlame,
     std::unordered_map<size_t, size_t> &PatPredBlame) {
   if (MT[I].isLeaf()) {
+    if (LT.PK.Verbosity > 2 && !ShadowMap[MT[I].Begin])
+      errs() << "DEBUG: Covered matcher " << MT[I].getKindAsString() << " at "
+             << MT[I].Begin << ".\n";
     return ShadowMap[MT[I++].Begin];
   } else if (ShadowMap[MT[I].Begin]) {
-    // A scope or group wasn't covered after a OPC_CheckPatternPredicate failed.
+    // A scope or group wasn't covered,
+    // either because a OPC_CheckPatternPredicate failed,
+    // or because the random IR wasn't varied enough.
     I++;
     return true;
   }
 
   size_t PI = I; // parent index
+  if (LT.PK.Verbosity > 2)
+    errs() << "DEBUG: Entering " << MT[I].getKindAsString() << " at "
+           << MT[I].Begin << ".\n";
   I++;
   for (; I < MT.size() && MT[PI].contains(MT[I]);) {
     if (!analyzeMap(I, ShadowMap, MatcherBlame, PatPredBlame)) {
       continue; // Matcher is covered. Keep going.
     }
     I--; // Move to the first non-covered matcher
-    size_t Loss = MT[PI].End - MT[I].Begin + 1;
-    I--; // Move to the matcher that failed
+    if (LT.PK.Verbosity > 3)
+      errs() << "DEBUG: Encountered uncovered matcher "
+             << MT[I].getKindAsString() << " at " << MT[I].Begin << " of size "
+             << MT[I].size() << " with parent kind " << MT[PI].getKindAsString()
+             << ".\n";
+
+    size_t Loss = 0;
+    const Matcher &SkipOutOf = !MT[I].isChild() ? MT[PI] : MT[I];
+    bool UncoveredIsLeaf = MT[I].isLeaf();
+
+    if (UncoveredIsLeaf) {
+      Loss = MT[PI].End - MT[I].Begin + 1;
+    } else {
+      Loss = MT[I].size();
+    }
+    if (!MT[I].isChild()) {
+      if (LT.PK.Verbosity > 3)
+        errs() << "DEBUG: Blaming previous matcher.\n";
+      I--;
+    } else if (LT.PK.Verbosity > 3) {
+      errs() << "DEBUG: Blaming current matcher.\n";
+    }
 
     if (MT[I].hasPatPred())
       PatPredBlame[MT[I].PIdx] += Loss;
     if (LT.PK.Verbosity > 2) {
       if (MT[I].hasPatPred()) {
         errs() << "DEBUG: Failed pattern predicate check " << MT[I].PIdx
-               << " at " << MT[I].Begin << " with parent kind "
+               << " at " << MT[I].Begin << " with ancestor kind "
                << MT[PI].getKindAsString() << " (-" << Loss << ").\n";
       } else {
-        errs() << "DEBUG: Failed to match " << MT[I].getKindAsString() << " at "
-               << MT[I].Begin << " (-" << Loss << ").\n";
+        errs() << "DEBUG: Blaming " << MT[I].getKindAsString() << " at "
+               << MT[I].Begin << " of size " << MT[I].size() << " (-" << Loss
+               << ").\n";
       }
     }
     MatcherBlame[MT[I].Kind] += Loss;
-    // TODO: Any other information we can record?
 
-    // TODO: Maybe add some debug checks? Like confirming that the previous
-    // matcher / rest of the matcher scope actually didn't get covered at all?
+    if (LT.PK.Verbosity > 3)
+      errs() << "DEBUG: Skipping out of matcher " << SkipOutOf.getKindAsString()
+             << " at " << SkipOutOf.Begin << " to after " << SkipOutOf.End
+             << ".\n";
 
-    // Fast-forward out of the parent
-    while (I < MT.size() && MT[PI].contains(MT[I]))
+    while (I < MT.size() && SkipOutOf.contains(MT[I].Begin)) {
       I++;
-    return false;
+    }
+    if (LT.PK.Verbosity > 3 && I < MT.size())
+      errs() << "DEBUG: Skipped to node at " << MT[I].Begin << ".\n";
+
+    if (UncoveredIsLeaf) {
+      if (LT.PK.Verbosity > 2)
+        errs() << "DEBUG: Leaving " << MT[PI].getKindAsString() << " from "
+               << MT[PI].End << ".\n";
+      return false;
+    }
   }
+  if (!MT[PI].isLeaf() && !MT[PI].isChild() && ShadowMap[MT[PI].End]) {
+    // Instruction selected early. The last 0 terminator was not reached.
+    MatcherBlame[MT[PI].Kind]++;
+  }
+  if (LT.PK.Verbosity > 2)
+    errs() << "DEBUG: Leaving " << MT[PI].getKindAsString() << " from "
+           << MT[PI].End << ".\n";
   return false;
 }

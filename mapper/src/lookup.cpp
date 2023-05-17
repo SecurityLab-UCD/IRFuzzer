@@ -8,6 +8,8 @@ using namespace llvm;
 using namespace simdjson;
 
 bool Matcher::operator<(const Matcher &M) const {
+  if (*this == M)
+    return !isLeaf() && M.isLeaf();
   return Begin == M.Begin ? End > M.End : Begin < M.Begin;
 }
 
@@ -32,11 +34,18 @@ bool Matcher::isLeaf() const {
   default:
     return true;
   case Scope:
+  case ScopeGroup:
   case SwitchOpcode:
   case SwitchType:
-  case Group:
+  case SwitchOpcodeCase:
+  case SwitchTypeCase:
     return false;
   }
+}
+
+bool Matcher::isChild() const {
+  return Kind == SwitchOpcodeCase || Kind == SwitchTypeCase ||
+         Kind == ScopeGroup;
 }
 
 bool Matcher::hasPatPred() const { return Kind == CheckPatternPredicate; }
@@ -86,7 +95,9 @@ std::string Matcher::getKindAsString(KindTy Kind) {
     ENUM_TO_STR(EmitNodeXForm)
     ENUM_TO_STR(CompleteMatch)
     ENUM_TO_STR(MorphNodeTo)
-    ENUM_TO_STR(Group)
+    ENUM_TO_STR(ScopeGroup)
+    ENUM_TO_STR(SwitchTypeCase)
+    ENUM_TO_STR(SwitchOpcodeCase)
   default:
     return "Unknown";
   }

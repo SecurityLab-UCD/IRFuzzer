@@ -67,6 +67,7 @@ struct Matcher {
   KindTy Kind = Scope;
   // To save space, this may either be a pattern or a pattern predicate index
   size_t PIdx = 0;
+  std::string CaseName;
 
   bool operator<(const Matcher &M) const;
   bool operator==(const Matcher &N) const;
@@ -78,6 +79,7 @@ struct Matcher {
   bool hasPatPred() const;
   bool isLeaf() const;
   bool isChild() const;
+  bool isCase() const;
   size_t size() const;
 
   static std::string getKindAsString(KindTy Kind);

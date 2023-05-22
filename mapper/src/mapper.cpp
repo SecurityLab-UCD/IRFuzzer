@@ -80,6 +80,9 @@ static cl::opt<size_t>
                       cl::cat(AnalysisCategory));
 
 // ----------------------------------------------------------------
+// pat subcommand
+
+// ----------------------------------------------------------------
 // intersect subcommand
 
 static cl::SubCommand IntersectCmd("intersect",

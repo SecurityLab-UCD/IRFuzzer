@@ -163,9 +163,13 @@ bool MatcherTree::analyzeMap(
       PatPredBlame[MT[I].PIdx] += Loss;
     if (LT.PK.Verbosity > 2) {
       if (MT[I].hasPatPred()) {
-        errs() << "DEBUG: Failed pattern predicate check " << MT[I].PIdx
+        errs() << "DEBUG: Blaming pattern predicate check " << MT[I].PIdx
                << " at " << MT[I].Begin << " with ancestor kind "
                << MT[PI].getKindAsString() << " (-" << Loss << ").\n";
+      } else if (MT[I].isCase()) {
+        errs() << "DEBUG: Blaming " << MT[I].getKindAsString() << " ("
+               << MT[I].CaseName << ") at " << MT[I].Begin << " of size "
+               << MT[I].size() << " (-" << Loss << ").\n";
       } else {
         errs() << "DEBUG: Blaming " << MT[I].getKindAsString() << " at "
                << MT[I].Begin << " of size " << MT[I].size() << " (-" << Loss

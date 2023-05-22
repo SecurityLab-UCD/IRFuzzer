@@ -43,9 +43,10 @@ bool Matcher::isLeaf() const {
   }
 }
 
-bool Matcher::isChild() const {
-  return Kind == SwitchOpcodeCase || Kind == SwitchTypeCase ||
-         Kind == ScopeGroup;
+bool Matcher::isChild() const { return isCase() || Kind == ScopeGroup; }
+
+bool Matcher::isCase() const {
+  return Kind == SwitchOpcodeCase || Kind == SwitchTypeCase;
 }
 
 bool Matcher::hasPatPred() const { return Kind == CheckPatternPredicate; }
@@ -157,6 +158,8 @@ std::vector<Matcher> getMatchers(ondemand::document &TableJSON) {
       TheMatcher.PIdx = MatcherObject["pattern"];
     } else if (TheMatcher.hasPatPred()) {
       TheMatcher.PIdx = MatcherObject["predicate"];
+    } else if (TheMatcher.isCase()) {
+      TheMatcher.CaseName = MatcherObject["case"].get_string().value();
     }
     Matchers.push_back(TheMatcher);
   }

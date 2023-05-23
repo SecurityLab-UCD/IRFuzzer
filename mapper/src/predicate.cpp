@@ -49,6 +49,11 @@ PredicateKeeper::PredicateKeeper() {
   AllPredicates.push_back(False);
 }
 
+PredicateKeeper::PredicateKeeper(PredicateKeeper &&Other) {
+  *this = Other;
+  Other.AllPredicates.clear();
+}
+
 PredicateKeeper::~PredicateKeeper() {
   for (Predicate *P : AllPredicates) {
     if (P)

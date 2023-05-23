@@ -1,5 +1,4 @@
 #include "commandline.h"
-#include "lookup.h"
 #include "matchertree.h"
 #include "shadowmap.h"
 
@@ -10,11 +9,9 @@ namespace llvm {
 
 void handleAnalyzeCmd() {
   size_t Verbosity = 1 + AnVerbosity.getNumOccurrences();
-  LookupTable Table = LookupTable::fromFile(AnLookupFile, false, Verbosity);
-  MatcherTree TheMatcherTree(Table);
-  std::vector<bool> ShadowMap =
-      readBitVector(Table.MatcherTableSize, AnMapFile);
-  auto [MatcherBlame, PatPredBlame] = TheMatcherTree.analyzeMap(ShadowMap);
+  MatcherTree MT(AnLookupFile, false, Verbosity);
+  std::vector<bool> ShadowMap = readBitVector(MT.MatcherTableSize, AnMapFile);
+  auto [MatcherBlame, PatPredBlame] = MT.analyzeMap(ShadowMap);
 
   MapStatPrinter MSP;
   MSP.addFile(AnMapFile, ShadowMap);
@@ -42,7 +39,7 @@ void handleAnalyzeCmd() {
     if (MSP.atLimit())
       break;
     LossSum += Loss;
-    MSP.addStat(std::to_string(PatPredIdx), Loss, Table.MatcherTableSize);
+    MSP.addStat(std::to_string(PatPredIdx), Loss, MT.MatcherTableSize);
   }
   MSP.summarize("Sum", LossSum, ShadowMap.size(), true);
   MSP.print();
@@ -55,8 +52,7 @@ size_t getVerbosity(const cl::opt<bool> &VerbosityCL,
 
 void handleUBCmd() {
   size_t Verbosity = getVerbosity(UBVerbosity, UBOutputFile);
-  LookupTable Table =
-      LookupTable::fromFile(UBLookupFile, UBPredCaseSensitive, Verbosity);
+  MatcherTree MT(UBLookupFile, UBPredCaseSensitive, Verbosity);
 
   // Load true predicate indices
 
@@ -72,20 +68,20 @@ void handleUBCmd() {
     size_t Idx = 0;
     if (FirstNonDigit == Pred.end()) {
       Idx = std::stoul(Pred);
-      Table.PK.enable(Idx);
+      MT.Predicates.enable(Idx);
       TruePredicates[Idx] = "";
     } else {
-      Table.PK.enable(Pred);
-      Idx = Table.PK.NamedPredLookup[Table.PK.IsCaseSensitive
-                                         ? Pred
-                                         : StringRef(Pred).lower()];
+      MT.Predicates.enable(Pred);
+      Idx = MT.Predicates.NamedPredLookup[MT.Predicates.IsCaseSensitive
+                                              ? Pred
+                                              : StringRef(Pred).lower()];
       TruePredicates[Idx] = Pred;
     }
   }
-  Table.PK.resolve();
+  MT.Predicates.resolve();
   if (Verbosity) {
     for (const auto &[I, Name] : TruePredicates) {
-      if (!Table.PK.name(I)->satisfied()) {
+      if (!MT.Predicates.name(I)->satisfied()) {
         errs() << "ERROR: Failed to satisfy named predicate " << I;
         if (Name.size())
           errs() << " (" << Name << ")";
@@ -96,7 +92,7 @@ void handleUBCmd() {
 
   if (UBPatPredStr.getNumOccurrences()) {
     std::vector<bool> NewPatPreds;
-    size_t PatPredCount = Table.PK.PatternPredicates.size();
+    size_t PatPredCount = MT.Predicates.PatternPredicates.size();
     if (UBPatPredStr.getValue().size() == PatPredCount) {
       for (size_t i = 0; i < PatPredCount; i++) {
         NewPatPreds.push_back(NewPatPreds[i] == '1');
@@ -104,11 +100,10 @@ void handleUBCmd() {
     } else {
       NewPatPreds = readBitVector(PatPredCount, UBPatPredStr);
     }
-    Table.PK.updatePatternPredicates(NewPatPreds);
+    MT.Predicates.updatePatternPredicates(NewPatPreds);
   }
 
-  MatcherTree TheMatcherTree(Table);
-  auto [UpperBound, ShadowMap, BlameMap] = TheMatcherTree.getUpperBound();
+  auto [UpperBound, ShadowMap, BlameMap] = MT.getUpperBound();
   if (Verbosity || UBShowBlameList) {
     MapStatPrinter MSP;
     MSP.summarize("Upper bound", UpperBound, ShadowMap.size(), true);
@@ -128,9 +123,9 @@ void handleUBCmd() {
       if (MSP.atLimit())
         break;
       LossSum += Loss;
-      MSP.addStat(std::to_string(PatPredIdx), Loss, Table.MatcherTableSize);
+      MSP.addStat(std::to_string(PatPredIdx), Loss, MT.MatcherTableSize);
     }
-    MSP.summarize("Sum", LossSum, Table.MatcherTableSize, true);
+    MSP.summarize("Sum", LossSum, MT.MatcherTableSize, true);
     MSP.print();
   }
   if (UBOutputFile.getNumOccurrences()) {

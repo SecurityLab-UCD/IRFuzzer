@@ -38,7 +38,6 @@ file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simd
 
 add_executable(mapper
     src/mapper.cpp
-    src/lookup.cpp
     src/matchertree.cpp
     src/shadowmap.cpp
     src/predicate.cpp

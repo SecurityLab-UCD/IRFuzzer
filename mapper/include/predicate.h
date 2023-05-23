@@ -92,7 +92,7 @@ struct OrPredicate : Predicate {
 };
 
 struct PredicateKeeper {
-  friend class LookupTable;
+  friend class MatcherTree;
 
   // Used for memory management
   std::vector<Predicate *> AllPredicates;
@@ -116,7 +116,12 @@ struct PredicateKeeper {
   Predicate *False = new FalsePredicate();
   size_t Verbosity = 0;
 
+  PredicateKeeper(const PredicateKeeper &) = default;
+  PredicateKeeper &operator=(const PredicateKeeper &) = default;
+
+public:
   PredicateKeeper();
+  PredicateKeeper(PredicateKeeper &&);
   ~PredicateKeeper();
 
   // Access a named predicate by name or index

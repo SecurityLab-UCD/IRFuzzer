@@ -29,7 +29,7 @@ llvm_map_components_to_libnames(LLVM_LIBS
 
 include_directories(
     ${LLVM_INCLUDE_DIRS}
-    ./include/
+    ${CMAKE_SOURCE_DIR}/include/
 )
 add_definitions(${LLVM_DEFINITIONS})
 
@@ -42,6 +42,7 @@ add_executable(mapper
     src/matchertree.cpp
     src/shadowmap.cpp
     src/predicate.cpp
+    src/commandline.cpp
     src/simdjson.cpp
 )
 

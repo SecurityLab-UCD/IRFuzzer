@@ -10,12 +10,12 @@
 using namespace llvm;
 
 std::vector<bool> readBitVector(size_t BitSize, const std::string &FileName) {
-  std::ifstream ShadowMapIfs(FileName, std::ios::binary);
+  std::ifstream Ifs(FileName, std::ios::binary);
   std::vector<bool> Vec;
   Vec.reserve(BitSize);
 
   char Data;
-  while (ShadowMapIfs.read(&Data, 1)) {
+  while (Ifs.read(&Data, 1)) {
     // Check vector size to ensure we ignore the padding bits.
     for (int I = 0; I < CHAR_BIT && Vec.size() < BitSize; I++) {
       // NOTE: 1 bit in shadow map means MT index not covered; reading as is

@@ -2,52 +2,83 @@
 #include "matchertree.h"
 #include "shadowmap.h"
 
+#include "simdjson.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/WithColor.h"
+#include <fstream>
 
 namespace llvm {
 
-void handleAnalyzeCmd() {
-  size_t Verbosity = 1 + AnVerbosity.getNumOccurrences();
-  MatcherTree MT(AnLookupFile, false, Verbosity);
-  std::vector<bool> ShadowMap = readBitVector(MT.MatcherTableSize, AnMapFile);
-  auto [MatcherBlame, PatPredBlame] = MT.analyzeMap(ShadowMap);
-
+void printAnalysisResults(const MatcherTree &MT, size_t EntriesLimit) {
   MapStatPrinter MSP;
-  MSP.addFile(AnMapFile, ShadowMap);
-  MSP.print();
-  outs() << '\n';
 
-  outs() << "Top coverage loss cause by matcher kind:\n";
-  size_t LossSum = 0;
   MSP.limit(AnMaxEntries);
-  for (const auto &[Kind, Loss] : MatcherBlame) {
+  outs() << "Top coverage loss cause by matcher kind:\n";
+  for (const auto &[Kind, Loss] : MT.blameMatcherKinds()) {
     if (MSP.atLimit())
       break;
-    // TODO: display matcher kind enum names instead of indices
-    MSP.addStat(Matcher::getKindAsString(Kind), Loss, ShadowMap.size());
-    LossSum += Loss;
+    MSP.addStat(Matcher::getKindAsString(Kind), Loss, MT.MatcherTableSize);
   }
-  MSP.summarize("Sum", LossSum, ShadowMap.size(), true);
+  MSP.sum();
   MSP.print();
   outs() << '\n';
 
   outs() << "Loss from pattern predicate indices:\n";
-  LossSum = 0;
-  MSP.limit(AnMaxEntries);
-  for (const auto &[PatPredIdx, Loss] : PatPredBlame) {
+  for (const auto &[PatPredIdx, Loss] : MT.blamePatternPredicates()) {
     if (MSP.atLimit())
       break;
-    LossSum += Loss;
     MSP.addStat(std::to_string(PatPredIdx), Loss, MT.MatcherTableSize);
   }
-  MSP.summarize("Sum", LossSum, ShadowMap.size(), true);
+  MSP.sum();
+  MSP.print();
+  outs() << '\n';
+
+  outs() << "Loss by depth:\n";
+  for (const auto &[Depth, Loss] : MT.blameDepth()) {
+    if (MSP.atLimit())
+      break;
+    MSP.addStat(std::to_string(Depth), Loss, MT.MatcherTableSize);
+  }
+  MSP.sum();
+  MSP.print();
+  outs() << '\n';
+
+  outs() << "Loss of SwitchOpcodeCase by depth:\n";
+  for (const auto &[Depth, Loss] : MT.blameSOCAtDepth()) {
+    if (MSP.atLimit())
+      break;
+    MSP.addStat(std::to_string(Depth), Loss, MT.MatcherTableSize);
+  }
+  MSP.sum();
   MSP.print();
 }
 
 size_t getVerbosity(const cl::opt<bool> &VerbosityCL,
                     const cl::opt<std::string> &OutputFileCL) {
   return 1 + VerbosityCL.getNumOccurrences() - OutputFileCL.getNumOccurrences();
+}
+
+void handleAnalyzeCmd() {
+  using namespace simdjson;
+  size_t Verbosity = getVerbosity(AnVerbosity, AnPatOutFile);
+  MatcherTree MT(AnLookupFile, false, Verbosity);
+  std::vector<bool> ShadowMap = readBitVector(MT.MatcherTableSize, AnMapFile);
+  MT.analyzeMap(ShadowMap);
+  if (Verbosity) {
+    MapStatPrinter MSP;
+    MSP.addFile(AnMapFile, ShadowMap);
+    MSP.print();
+    outs() << '\n';
+    printAnalysisResults(MT, AnMaxEntries);
+  }
+  if (AnPatOutFile.getNumOccurrences()) {
+    std::ofstream PatOfs(AnPatOutFile);
+    for (const auto &[Loss, BlameeIdx, BlameeKind, Pat] :
+         MT.blamePatterns(AnPatUseLossPerPattern)) {
+      PatOfs << Loss << "," << BlameeIdx << "," << BlameeKind << ",\"" << Pat
+             << "\"\n";
+    }
+  }
 }
 
 void handleUBCmd() {
@@ -103,30 +134,9 @@ void handleUBCmd() {
     MT.Predicates.updatePatternPredicates(NewPatPreds);
   }
 
-  auto [UpperBound, ShadowMap, BlameMap] = MT.getUpperBound();
-  if (Verbosity || UBShowBlameList) {
-    MapStatPrinter MSP;
-    MSP.summarize("Upper bound", UpperBound, ShadowMap.size(), true);
-    MSP.print();
-  }
-  if (UBShowBlameList) {
-    outs() << '\n';
-    outs() << "Loss from pattern predicate indices";
-    if (UBMaxBlameEntries.getNumOccurrences())
-      outs() << " (top " << UBMaxBlameEntries.getValue() << ")";
-    outs() << ":\n";
-
-    MapStatPrinter MSP;
-    MSP.limit(UBMaxBlameEntries);
-    size_t LossSum = 0;
-    for (const auto &[PatPredIdx, Loss] : BlameMap) {
-      if (MSP.atLimit())
-        break;
-      LossSum += Loss;
-      MSP.addStat(std::to_string(PatPredIdx), Loss, MT.MatcherTableSize);
-    }
-    MSP.summarize("Sum", LossSum, MT.MatcherTableSize, true);
-    MSP.print();
+  const std::vector<bool> &ShadowMap = MT.analyzeUpperBound();
+  if (Verbosity) {
+    printAnalysisResults(MT, UBMaxBlameEntries);
   }
   if (UBOutputFile.getNumOccurrences()) {
     exit(!writeBitVector(ShadowMap, UBOutputFile.getValue()));

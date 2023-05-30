@@ -115,7 +115,8 @@ void MapStatPrinter::print() {
   MaxTableSize = 0;
   Description = "";
   MaxDescLen = 0;
-  Limit = std::numeric_limits<size_t>::max();
+  CoverageSum = 0;
+  StatsPrinted = 0;
 }
 
 void MapStatPrinter::addFile(const std::string &Filename,
@@ -148,8 +149,8 @@ void MapStatPrinter::addMap(const std::vector<bool> &Map) {
 
 void MapStatPrinter::summarize(const std::string &Desc, size_t Covered,
                                size_t TableSize, bool alignToDesc) {
-  if (Limit < std::numeric_limits<size_t>::max())
-    Limit++;
+  if (atLimit() && StatsPrinted != 0)
+    StatsPrinted--;
   if (alignToDesc) {
     addStat("", Desc, Covered, TableSize);
   } else {
@@ -161,6 +162,10 @@ void MapStatPrinter::summarize(const std::string &Desc,
                                const std::vector<bool> &Map, bool alignToDesc) {
   size_t Covered = getIdxCovered(Map);
   summarize(Desc, Covered, Map.size(), alignToDesc);
+}
+
+void MapStatPrinter::sum(bool alignToDesc) {
+  summarize("Sum", CoverageSum, MaxTableSize, alignToDesc);
 }
 
 void MapStatPrinter::asc() {
@@ -190,16 +195,17 @@ void MapStatPrinter::sort(SortTy S) {
 
 void MapStatPrinter::limit(size_t L) { Limit = L; }
 
-bool MapStatPrinter::atLimit() const { return Limit == 0; }
+bool MapStatPrinter::atLimit() const { return StatsPrinted == Limit; }
 
 void MapStatPrinter::addStat(const std::string &Filename,
                              const std::string &Desc, size_t Covered,
                              size_t TableSize) {
-  if (Limit == 0)
+  if (atLimit())
     return;
-  Limit--;
+  StatsPrinted++;
   MaxTableSize = std::max(MaxTableSize, TableSize);
   MaxFilenameLen = std::max(MaxFilenameLen, Filename.size());
   MaxDescLen = std::max(MaxDescLen, Desc.size());
+  CoverageSum += Covered;
   Stats.push_back(std::tuple(Filename, Desc, Covered, TableSize));
 }

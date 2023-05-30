@@ -29,7 +29,9 @@ class MapStatPrinter {
   size_t MaxTableSize = 0;
   std::string Description = "";
   size_t MaxDescLen = 0;
-  mutable size_t Limit = std::numeric_limits<size_t>::max();
+  size_t CoverageSum = 0;
+  size_t Limit = std::numeric_limits<size_t>::max();
+  size_t StatsPrinted = 0;
 
 public:
   enum SortTy { None, Asc, Desc };
@@ -63,6 +65,7 @@ public:
                  bool alignToDesc = false);
   void summarize(const std::string &Desc, const std::vector<bool> &Map,
                  bool alignToDesc = false);
+  void sum(bool alignToDesc = true);
 
   void asc();
   void desc();

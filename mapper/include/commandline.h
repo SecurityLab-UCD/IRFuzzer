@@ -17,6 +17,8 @@ extern cl::opt<bool> AnVerbosity;
 extern cl::opt<std::string> AnLookupFile;
 extern cl::opt<std::string> AnMapFile;
 extern cl::opt<size_t> AnMaxEntries;
+extern cl::opt<std::string> AnPatOutFile;
+extern cl::opt<bool> AnPatUseLossPerPattern;
 
 // ----------------------------------------------------------------
 // upperbound subcommand

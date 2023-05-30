@@ -5,8 +5,8 @@
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
 #include <map>
-#include <set>
 #include <string>
+#include <unordered_set>
 
 struct Matcher {
 
@@ -56,7 +56,7 @@ struct Matcher {
     CompleteMatch,        // Finish a match and update the results.
     MorphNodeTo,          // Build a node, finish a match and update results.
 
-    ScopeGroup,       // Custom: A child of a scope
+    Subscope,         // Custom: A child of a scope
     SwitchTypeCase,   // Custom: A case of SwitchType
     SwitchOpcodeCase, // Custom: A case of SwitchOpcode
 
@@ -80,7 +80,7 @@ struct Matcher {
   bool hasPattern() const;
   bool hasPatPred() const;
   bool isLeaf() const;
-  bool isChild() const;
+  bool hasLeafSibling() const;
   bool isCase() const;
   size_t size() const;
 
@@ -89,23 +89,43 @@ struct Matcher {
 };
 
 typedef std::vector<std::pair<size_t, size_t>> PatPredBlameList;
-typedef std::vector<std::pair<Matcher::KindTy, size_t>> MatcherBlameList;
+typedef std::vector<std::pair<Matcher::KindTy, size_t>> MatcherKindBlameList;
 
 struct Pattern {
-  // We can but don't need to store them for now:
-  // std::string IncludePath;
-  // std::string PatternSrc;
+  std::string IncludePath;
+  std::string Src;
+  std::string Dst;
   llvm::SmallVector<size_t, 3> NamedPredicates;
   size_t Index; // Index in the lookup table array
+  size_t Complexity;
+};
+
+struct Blamee {
+  size_t MatcherIdx = 0;              // index in the Matchers vector
+  size_t Loss = 0;                    // coverage loss
+  std::unordered_set<size_t> Blamers; // index to patterns
+  size_t Depth = 1;                   // how nested the blamed matcher is
+  bool isEarlyExit = false;           // true = the blamee itself is uncovered
+
+  Blamee() = default;
+  // For uncovered null terminators
+  Blamee(size_t MatcherIdx, size_t Depth);
 };
 
 class MatcherTree {
+  // Index to the current matcher
+  size_t I = 0;
+  // Nesting level of the current matcher
+  size_t CurrentDepth = 0;
+  std::vector<bool> ShadowMap;
+
 public:
   std::vector<Pattern> Patterns;
   size_t MatcherTableSize;
   PredicateKeeper Predicates;
   // Always sorted by matcher table index then size
   std::vector<Matcher> Matchers;
+  std::vector<Blamee> BlameList;
   size_t Verbosity = 0;
 
   // Read from pattern lookup table JSON
@@ -114,19 +134,24 @@ public:
   MatcherTree(const MatcherTree &) = delete;
   MatcherTree(MatcherTree &&) = default;
 
-  /// @brief Calculate matcher table coverage upper bound
-  /// @return (covered indices, shadow map, pat pred idx -> coverage loss)
-  std::tuple<size_t, std::vector<bool>, PatPredBlameList> getUpperBound() const;
+  /// @brief Determine coverage upper bound shadow map and analyze it
+  /// @return reference to upper bound shadow map
+  const std::vector<bool> &analyzeUpperBound();
 
-  std::tuple<MatcherBlameList, PatPredBlameList>
-  analyzeMap(const std::vector<bool> &ShadowMap);
+  /// @brief Analyze coverage loss in shadow map and populate BlameList
+  /// @param Map map to be analyzed
+  void analyzeMap(const std::vector<bool> &Map);
+
+  PatPredBlameList blamePatternPredicates() const;
+  MatcherKindBlameList blameMatcherKinds() const;
+  std::vector<std::pair<size_t, size_t>> blameDepth() const;
+  std::vector<std::pair<size_t, size_t>> blameSOCAtDepth() const;
+  // returns [(blamer loss, blamee MT index, blamee kind, src -> dst)...]
+  std::vector<std::tuple<size_t, size_t, std::string, std::string>>
+  blamePatterns(bool UseLossPerPattern) const;
 
 private:
-  bool getUpperBound(size_t &I, size_t &UpperBound,
-                     std::vector<bool> &ShadowMap,
-                     std::unordered_map<size_t, size_t> &BlameMap) const;
-  bool analyzeMap(size_t &I, const std::vector<bool> &ShadowMap,
-                  std::unordered_map<Matcher::KindTy, size_t> &MatcherBlame,
-                  std::unordered_map<size_t, size_t> &PatPredBlame);
+  bool getUpperBound();
+  bool analyzeMap();
 };
 #endif // MATCHER_TREE_H_

@@ -26,6 +26,15 @@ cl::opt<size_t> AnMaxEntries("l", cl::desc("Limit blame list entries printed"),
                              cl::init(std::numeric_limits<size_t>::max()),
                              cl::sub(AnalyzeCmd), cl::cat(AnalysisCategory));
 
+cl::opt<std::string>
+    AnPatOutFile("pat", cl::desc("Output uncovered patterns sorted by loss"),
+                 cl::sub(AnalyzeCmd), cl::cat(AnalysisCategory));
+
+cl::opt<bool> AnPatUseLossPerPattern(
+    "loss-per-pattern",
+    cl::desc("Divide blamee loss by number of blamers (patterns) in --pat"),
+    cl::sub(AnalyzeCmd), cl::cat(AnalysisCategory));
+
 // ----------------------------------------------------------------
 // upperbound subcommand
 

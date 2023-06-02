@@ -51,7 +51,7 @@ add_definitions(${LLVM_DEFINITIONS})
 
 add_library(AFLCustomIRMutator SHARED
     src/afl-mutator.c
-    src/mutator.cpp
+    src/irfuzzer.cpp
 )
 target_link_libraries(AFLCustomIRMutator
     ${LLVM_LIBS}
@@ -59,7 +59,7 @@ target_link_libraries(AFLCustomIRMutator
 
 add_library(AFLFuzzMutate SHARED
     src/afl-mutator.c
-    src/fuzzmutate.cpp
+    src/libfuzzer.cpp
 )
 target_link_libraries(AFLFuzzMutate
     ${LLVM_LIBS}

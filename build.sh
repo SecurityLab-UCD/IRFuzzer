@@ -55,7 +55,7 @@ then
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_CCACHE_BUILD=OFF \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -80,7 +80,7 @@ then
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -101,7 +101,7 @@ if [ ! -f /.dockerenv ]; then
         cmake  -GNinja \
                 -DBUILD_SHARED_LIBS=ON \
                 -DLLVM_CCACHE_BUILD=ON \
-                -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
+                -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DCMAKE_BUILD_TYPE=Debug \

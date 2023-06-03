@@ -52,37 +52,10 @@ void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
   oldoutfile.close();
 }
 
-void addVectorTypeGetters(std::vector<TypeGetter> &Types) {
-  int VectorLength[] = {1, 2, 4, 8, 16, 32};
-  std::vector<TypeGetter> BasicTypeGetters(Types);
-  for (auto typeGetter : BasicTypeGetters) {
-    for (int length : VectorLength) {
-      Types.push_back([typeGetter, length](LLVMContext &C) {
-        return VectorType::get(typeGetter(C), length, false);
-      });
-    }
-  }
-}
-
 /// TODO:
 /// Type* getStructType(Context& C);
 
 void createISelMutator() {
-  std::vector<TypeGetter> Types{
-      Type::getInt1Ty,  Type::getInt8Ty,  Type::getInt16Ty, Type::getInt32Ty,
-      Type::getInt64Ty, Type::getFloatTy, Type::getDoubleTy};
-  std::vector<TypeGetter> ScalarTypes = Types;
-
-  addVectorTypeGetters(Types);
-
-  TypeGetter OpaquePtrGetter = [](LLVMContext &C) {
-    return PointerType::get(Type::getInt32Ty(C), 0);
-  };
-  Types.push_back(OpaquePtrGetter);
-
-  // Copy scalar types to change distribution.
-  for (int i = 0; i < 5; i++)
-    Types.insert(Types.end(), ScalarTypes.begin(), ScalarTypes.end());
 
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
@@ -97,8 +70,8 @@ void createISelMutator() {
   Strategies.push_back(std::make_unique<SinkInstructionStrategy>());
   Strategies.push_back(std::make_unique<ShuffleBlockStrategy>());
 
-  Mutator =
-      std::make_unique<IRMutator>(std::move(Types), std::move(Strategies));
+  Mutator = std::make_unique<IRMutator>(
+      std::move(IRMutator::getDefaultAllowedTypes()), std::move(Strategies));
 }
 
 size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,

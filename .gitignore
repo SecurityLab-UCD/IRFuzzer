@@ -1,4 +1,6 @@
 build/
+*/*_release
+*/*_debug
 llvm-aie/
 llvm-fix/
 llvm-project/
@@ -17,3 +19,4 @@ tmpfs
 docker*
 output
 archive*
+*/*.test-*

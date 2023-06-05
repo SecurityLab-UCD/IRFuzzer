@@ -1,6 +1,5 @@
 from tap import Tap
 from lib.experiment import get_all_experiments
-from process_data import iterate_over_all_experiments
 
 
 class Args(Tap):
@@ -14,6 +13,7 @@ class Args(Tap):
 def print_experiment_statuses(root_dir: str) -> None:
     for expr in get_all_experiments(root_dir):
         print(
+            expr.fuzzer.ljust(12),
             expr.isel.ljust(8),
             str(expr.target).ljust(40),
             str(expr.replicate_id).ljust(2),

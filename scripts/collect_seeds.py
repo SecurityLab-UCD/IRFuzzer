@@ -91,7 +91,14 @@ def collect_seeds_from_tests(
     out_dir = out_dir_parent.joinpath(
         "gisel" if global_isel else "dagisel", str(target)
     )
-    out_dir.mkdir(parents=True)
+
+    try:
+        out_dir.mkdir(parents=True)
+    except FileExistsError:
+        logging.warning(
+            f"Seeds for target {target} already exist in {out_dir}. Skipped seed collection."
+        )
+        return out_dir
 
     llc_command = LLCCommand(target=target, global_isel=global_isel)
 

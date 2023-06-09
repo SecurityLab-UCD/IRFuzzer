@@ -133,6 +133,14 @@ export AFL_CUSTOM_MUTATOR_ONLY=1
 # Tell AFL++ Where our mutator is
 export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so
 
+echo "Preparing seeds..."
+cd seeds.ll
+for I in *.ll; do
+    $FUZZING_HOME/llvm-project/build-release/bin/llvm-as $I
+done
+mv *.bc ../seeds
+echo "Done."
+cd $FUZZING_HOME
 # Run afl
 # $FUZZING_HOME/$AFL/afl-fuzz -i <input> -o <output> $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing
 

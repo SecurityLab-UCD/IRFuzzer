@@ -1,3 +1,4 @@
+#include "InsertIntrinsicStrategy.h"
 #include "mutator.h"
 
 #include "llvm/ADT/StringRef.h"

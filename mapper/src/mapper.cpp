@@ -1,8 +1,6 @@
 #include "commandline.h"
 #include "matchertree.h"
 #include "shadowmap.h"
-
-#include "simdjson.h"
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/WithColor.h"
 #include <fstream>
@@ -12,7 +10,7 @@ namespace llvm {
 void printAnalysisResults(const MatcherTree &MT, size_t EntriesLimit) {
   MapStatPrinter MSP;
 
-  MSP.limit(AnMaxEntries);
+  MSP.limit(EntriesLimit);
   outs() << "Top coverage loss cause by matcher kind:\n";
   for (const auto &[Kind, Loss] : MT.blameMatcherKinds()) {
     if (MSP.atLimit())
@@ -59,7 +57,6 @@ size_t getVerbosity(const cl::opt<bool> &VerbosityCL,
 }
 
 void handleAnalyzeCmd() {
-  using namespace simdjson;
   size_t Verbosity = getVerbosity(AnVerbosity, AnPatOutFile);
   MatcherTree MT(AnLookupFile, false, Verbosity);
   std::vector<bool> ShadowMap = readBitVector(MT.MatcherTableSize, AnMapFile);
@@ -73,10 +70,10 @@ void handleAnalyzeCmd() {
   }
   if (AnPatOutFile.getNumOccurrences()) {
     std::ofstream PatOfs(AnPatOutFile);
-    for (const auto &[Loss, BlameeIdx, BlameeKind, Pat] :
+    for (const auto &[Loss, BlameeIdx, BlameeDepth, BlameeKind, Pat] :
          MT.blamePatterns(AnPatUseLossPerPattern)) {
-      PatOfs << Loss << "," << BlameeIdx << "," << BlameeKind << ",\"" << Pat
-             << "\"\n";
+      PatOfs << Loss << ',' << BlameeIdx << ',' << BlameeDepth << ','
+             << BlameeKind << ",\"" << Pat << "\"\n";
     }
   }
 }
@@ -134,12 +131,16 @@ void handleUBCmd() {
     MT.Predicates.updatePatternPredicates(NewPatPreds);
   }
 
-  const std::vector<bool> &ShadowMap = MT.analyzeUpperBound();
+  MT.analyzeUpperBound();
   if (Verbosity) {
+    MapStatPrinter MSP("Upper bound");
+    MSP.addMap(MT.ShadowMap);
+    MSP.print();
+    outs() << '\n';
     printAnalysisResults(MT, UBMaxBlameEntries);
   }
   if (UBOutputFile.getNumOccurrences()) {
-    exit(!writeBitVector(ShadowMap, UBOutputFile.getValue()));
+    exit(!writeBitVector(MT.ShadowMap, UBOutputFile.getValue()));
   }
 }
 

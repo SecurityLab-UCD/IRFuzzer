@@ -1,4 +1,5 @@
 #include "matchertree.h"
+#include "simdjson.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
@@ -203,12 +204,39 @@ std::vector<std::pair<A, B>> toSortedVecByKey(const M<A, B, Args...> &Src) {
 
 const std::vector<bool> &MatcherTree::analyzeUpperBound() {
   I = 0;
+  ShadowMap.clear();
   ShadowMap.resize(MatcherTableSize, false);
   if (Matchers.empty())
     return ShadowMap;
   getUpperBound();
+  I = 0;
+  CurrentDepth = 0;
+  BlameList.clear();
   analyzeMap();
   return ShadowMap;
+}
+
+bool affectsEarlyMatch(Matcher::KindTy Kind) {
+  switch (Kind) {
+  default:
+    return false;
+  case Matcher::CheckSame:
+  case Matcher::CheckChildSame:
+  case Matcher::CheckPredicate:
+  case Matcher::CheckType:
+  case Matcher::CheckChildType:
+  case Matcher::CheckInteger:
+  case Matcher::CheckChildInteger:
+  case Matcher::CheckCondCode:
+  case Matcher::CheckChild2CondCode:
+  case Matcher::CheckValueType:
+  case Matcher::CheckAndImm:
+  case Matcher::CheckOrImm:
+  case Matcher::CheckImmAllOnesV:
+  case Matcher::CheckImmAllZerosV:
+  case Matcher::CheckFoldableChainNode:
+    return true;
+  }
 }
 
 /// @brief Visit a matcher tree node and calculate coverage upper bound
@@ -219,6 +247,9 @@ const std::vector<bool> &MatcherTree::analyzeUpperBound() {
 /// @return if this leaf failed a pattern predicate check (not named predicate)
 bool MatcherTree::getUpperBound() {
   if (Matchers[I].isLeaf()) {
+    if (Matchers[I].hasPattern()) {
+      MatchedPattern = true;
+    }
     // We only care about leaves with a pattern or pattern predicate index
     if (Matchers[I].hasPattern() && Predicates.Verbosity &&
         !Predicates.CustomizedPatternPredicates) {
@@ -245,14 +276,36 @@ bool MatcherTree::getUpperBound() {
     return false;
   }
 
-  // We have a switch, scope, or a child (i.e. switch or scope case)
+  // We have a switch/switch case, or scope/subscope
   size_t PI = I; // parent index
   I++;
   bool Failed = false;
+  bool AlwaysEarlyMatch = true;
   for (; I < Matchers.size() && Matchers[PI].contains(Matchers[I]);) {
     if (!Failed) {
+      size_t CI = I;
       Failed = getUpperBound();
-    } else { // Previous pattern predicate check failed
+      if (Matchers[PI].Kind == Matcher::Subscope) {
+        AlwaysEarlyMatch =
+            AlwaysEarlyMatch && !affectsEarlyMatch(Matchers[CI].Kind);
+      }
+      if (MatchedPattern && Matchers[PI].Kind == Matcher::Subscope) {
+        MatchedPattern = false;
+        if (!AlwaysEarlyMatch) {
+          AlwaysEarlyMatch = true;
+          continue;
+        }
+        if (Verbosity > 3) {
+          errs() << "DEBUG: Got possible early match at " << Matchers[CI].Begin
+                 << '\n';
+        }
+        // Match completed. Rest of Scope should be uncovered.
+        return true;
+      }
+    } else {
+      // Either a pattern predicate check predecessor failed, or instruction was
+      // already selected in a subscope predecessor. Mark the rest of parent as
+      // uncovered.
       std::fill(ShadowMap.begin() + Matchers[I].Begin,
                 ShadowMap.begin() + Matchers[PI].End + 1, true);
 
@@ -262,6 +315,7 @@ bool MatcherTree::getUpperBound() {
       return false;
     }
   }
+  MatchedPattern = false;
   return false;
 }
 
@@ -271,6 +325,7 @@ void MatcherTree::analyzeMap(const std::vector<bool> &Map) {
   I = 0;
   CurrentDepth = 0;
   ShadowMap = Map;
+  BlameList.clear();
   analyzeMap();
 }
 
@@ -312,9 +367,9 @@ std::vector<std::pair<size_t, size_t>> MatcherTree::blameSOCAtDepth() const {
   return toSortedVecByKey(DBM);
 }
 
-std::vector<std::tuple<size_t, size_t, std::string, std::string>>
+std::vector<std::tuple<size_t, size_t, size_t, std::string, std::string>>
 MatcherTree::blamePatterns(bool UseLossPerPattern) const {
-  std::vector<std::tuple<size_t, size_t, std::string, std::string>>
+  std::vector<std::tuple<size_t, size_t, size_t, std::string, std::string>>
       FailedPatterns;
   for (const Blamee &TheBlamee : BlameList) {
     if (TheBlamee.Blamers.size() == 0) {
@@ -328,8 +383,8 @@ MatcherTree::blamePatterns(bool UseLossPerPattern) const {
     std::string BlameeKind = Matchers[TheBlamee.MatcherIdx].getKindAsString();
     for (size_t Blamer : TheBlamee.Blamers) {
       const Pattern &P = Patterns[Blamer];
-      FailedPatterns.push_back(
-          std::tuple(Loss, BlameeMTIdx, BlameeKind, P.Src + " -> " + P.Dst));
+      FailedPatterns.push_back(std::tuple(Loss, BlameeMTIdx, TheBlamee.Depth,
+                                          BlameeKind, P.Src + " -> " + P.Dst));
     }
   }
   std::sort(FailedPatterns.begin(), FailedPatterns.end(),
@@ -339,13 +394,29 @@ MatcherTree::blamePatterns(bool UseLossPerPattern) const {
   return FailedPatterns;
 }
 
+std::set<std::string> MatcherTree::blamePossiblePatterns() const {
+  // Use set since there may be patterns that only differ in pattern
+  // predicates but otherwise do not have different source pattern strings.
+  std::set<std::string> possiblePatterns;
+  for (const Blamee &TheBlamee : BlameList) {
+    if (TheBlamee.Blamers.size() == 0)
+      continue;
+    if (Matchers[TheBlamee.MatcherIdx].Kind == Matcher::CheckPatternPredicate)
+      continue;
+    for (size_t PatIdx : TheBlamee.Blamers) {
+      possiblePatterns.insert(Patterns[PatIdx].Src);
+    }
+  }
+  return possiblePatterns;
+}
+
 bool MatcherTree::analyzeMap() {
   // TODO: remove recursion
 
   if (Matchers[I].isLeaf()) {
     return ShadowMap[Matchers[I++].Begin];
   } else if (ShadowMap[Matchers[I].Begin]) {
-    // A scope or group wasn't covered,
+    // A non-leaf matcher wasn't covered,
     // either because a OPC_CheckPatternPredicate failed,
     // or because the random IR wasn't varied enough.
     I++;

@@ -9,7 +9,6 @@
 #include <unordered_set>
 
 struct Matcher {
-
   // Matcher kind borrowed from DAGISelMatcher.h
   // Keep updated with llvm's version
   enum KindTy {
@@ -117,7 +116,9 @@ class MatcherTree {
   size_t I = 0;
   // Nesting level of the current matcher
   size_t CurrentDepth = 0;
-  std::vector<bool> ShadowMap;
+  // Used in getUpperBound() for handling early returns (instruction selected
+  // before reaching end of scope).
+  bool MatchedPattern = false;
 
 public:
   std::vector<Pattern> Patterns;
@@ -126,6 +127,7 @@ public:
   // Always sorted by matcher table index then size
   std::vector<Matcher> Matchers;
   std::vector<Blamee> BlameList;
+  std::vector<bool> ShadowMap;
   size_t Verbosity = 0;
 
   // Read from pattern lookup table JSON
@@ -147,8 +149,13 @@ public:
   std::vector<std::pair<size_t, size_t>> blameDepth() const;
   std::vector<std::pair<size_t, size_t>> blameSOCAtDepth() const;
   // returns [(blamer loss, blamee MT index, blamee kind, src -> dst)...]
-  std::vector<std::tuple<size_t, size_t, std::string, std::string>>
+  std::vector<std::tuple<size_t, size_t, size_t, std::string, std::string>>
   blamePatterns(bool UseLossPerPattern) const;
+
+  // returns [pattern source...]
+  // returns only pattern source strings that are possible (i.e. not failed
+  // by pattern predicate check)
+  std::set<std::string> blamePossiblePatterns() const;
 
 private:
   bool getUpperBound();

@@ -4,6 +4,7 @@
 #include "predicate.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/IR/Intrinsics.h"
 #include <map>
 #include <string>
 #include <unordered_set>
@@ -95,7 +96,11 @@ struct Pattern {
   std::string Src;
   std::string Dst;
   llvm::SmallVector<size_t, 3> NamedPredicates;
-  size_t Index; // Index in the lookup table array
+  // Index to PredicateKeeper::PatternPredicates; only used if
+  // !NamedPredicates.empty()
+  size_t PatPredIdx;
+  // Index in the lookup table array
+  size_t Index;
   size_t Complexity;
 };
 
@@ -156,6 +161,8 @@ public:
   // returns only pattern source strings that are possible (i.e. not failed
   // by pattern predicate check)
   std::set<std::string> blamePossiblePatterns() const;
+
+  std::vector<llvm::Intrinsic::ID> blameTargetIntrinsic() const;
 
 private:
   bool getUpperBound();

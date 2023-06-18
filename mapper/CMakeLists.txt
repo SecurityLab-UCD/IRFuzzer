@@ -24,6 +24,7 @@ set(CMAKE_CXX_FLAGS "-std=c++17 -fno-rtti -Wall -pthread")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
 llvm_map_components_to_libnames(LLVM_LIBS
+    Core
     Support
 )
 
@@ -36,15 +37,19 @@ add_definitions(${LLVM_DEFINITIONS})
 file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.h ${CMAKE_SOURCE_DIR}/include/simdjson.h)
 file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.cpp ${CMAKE_SOURCE_DIR}/src/simdjson.cpp)
 
-add_executable(mapper
-    src/mapper.cpp
-    src/matchertree.cpp
-    src/shadowmap.cpp
-    src/predicate.cpp
-    src/commandline.cpp
-    src/simdjson.cpp
+add_library(shadow
+    ${CMAKE_SOURCE_DIR}/src/matchertree.cpp
+    ${CMAKE_SOURCE_DIR}/src/shadowmap.cpp
+    ${CMAKE_SOURCE_DIR}/src/predicate.cpp
+    ${CMAKE_SOURCE_DIR}/src/commandline.cpp
+    ${CMAKE_SOURCE_DIR}/src/simdjson.cpp
 )
-
-target_link_libraries(mapper
+add_executable(mapper
+    ${CMAKE_SOURCE_DIR}/src/mapper.cpp
+)
+target_link_libraries(shadow
     ${LLVM_LIBS}
+)
+target_link_libraries(mapper
+    shadow
 )

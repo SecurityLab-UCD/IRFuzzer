@@ -1,5 +1,6 @@
 #include "matchertree.h"
 #include "simdjson.h"
+#include "llvm/IR/Function.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include <cmath>
@@ -129,11 +130,15 @@ std::vector<Pattern> getPatterns(ondemand::document &TableJSON) {
     for (uint64_t PredIdx : PatternObject["predicates"].get_array()) {
       ThePattern.NamedPredicates.push_back(PredIdx);
     }
+    if (ThePattern.NamedPredicates.size()) {
+      ThePattern.PatPredIdx = PatternObject["pat_predicate"];
+    } else {
+      ThePattern.PatPredIdx = std::numeric_limits<size_t>::max();
+    }
     ThePattern.Complexity = PatternObject["complexity"];
     ThePattern.IncludePath = PatternObject["path"].get_string().value();
     StringRef SrcDst = PatternObject["pattern"].get_string().value();
-    ThePattern.Src = SrcDst.split(" -> ").first;
-    ThePattern.Dst = SrcDst.split(" -> ").second;
+    std::tie(ThePattern.Src, ThePattern.Dst) = SrcDst.split(" -> ");
     Patterns.push_back(ThePattern);
   }
   return Patterns;
@@ -408,6 +413,28 @@ std::set<std::string> MatcherTree::blamePossiblePatterns() const {
     }
   }
   return possiblePatterns;
+}
+
+std::vector<Intrinsic::ID> MatcherTree::blameTargetIntrinsic() const {
+  std::set<Intrinsic::ID> TargetIIDs;
+  for (const Blamee &TheBlamee : BlameList) {
+    if (TheBlamee.Blamers.size() == 0)
+      continue;
+    for (size_t PatIdx : TheBlamee.Blamers) {
+      if (!Predicates.pat(Patterns[PatIdx].PatPredIdx)->satisfied())
+        continue; // CPU doesn't support this pattern
+      std::smatch SMatch;
+      // For now, only match nodes with no nesting (top-level INTRINSIC_* switch
+      // opcode cases)
+      static std::regex MatchIntrinsicID{"^\\(intrinsic_.*? (\\d+):"};
+      if (!std::regex_search(Patterns[PatIdx].Src, SMatch, MatchIntrinsicID))
+        continue; // Pattern is not an intrinsic function
+      Intrinsic::ID IID = std::stoul(SMatch.str(1));
+      if (Function::isTargetIntrinsic(IID))
+        TargetIIDs.insert(IID);
+    }
+  }
+  return std::vector<Intrinsic::ID>(TargetIIDs.begin(), TargetIIDs.end());
 }
 
 bool MatcherTree::analyzeMap() {

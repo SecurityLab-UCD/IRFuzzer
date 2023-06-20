@@ -1,7 +1,5 @@
 #ifndef INSERT_INTRINSIC_STRATEGY_H
 #define INSERT_INTRINSIC_STRATEGY_H
-#include "FunctionDef.h"
-#include "matcher.h"
 #include "llvm/FuzzMutate/IRMutator.h"
 
 #include <filesystem>
@@ -14,24 +12,25 @@ using std::filesystem::path;
 
 /// Strategy that injects intrinsic definitions.
 /// It analysis the matcher table coverage periodically to achieve that.
-class InsertIntrinsicStrategy : public IRMutationStrategy {
+class InsertIntrinsicStrategy : public InsertFunctionStrategy {
 private:
   path JSONPath;
   path WorkDirPath;
+  std::vector<Intrinsic::ID> IIDs;
 
 public:
-  InsertIntrinsicStrategy(string JSON, string WorkDir)
+  InsertIntrinsicStrategy(const string &JSON, const string &WorkDir)
       : JSONPath(JSON), WorkDirPath(WorkDir) {}
   uint64_t getWeight(size_t CurrentSize, size_t MaxSize,
                      uint64_t CurrentWeight) override {
     return 1;
   }
 
-  /// Only load or analysis when called.
-  void LazyInit();
+  /// Only load or analyzes when called.
+  void LazyInit(LLVMContext &Context);
 
   using IRMutationStrategy::mutate;
-  void mutate(Module &M, RandomIRBuilder &IB);
+  Function *chooseFunction(Module *M, RandomIRBuilder &IB);
 };
 } // namespace llvm
 #endif

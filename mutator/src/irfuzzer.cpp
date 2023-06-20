@@ -63,13 +63,15 @@ void createISelMutator() {
 
   Strategies.push_back(std::make_unique<InjectorIRStrategy>(
       InjectorIRStrategy::getDefaultOps()));
-  Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
   Strategies.push_back(std::make_unique<InstModificationIRStrategy>());
   Strategies.push_back(std::make_unique<InsertFunctionStrategy>());
   Strategies.push_back(std::make_unique<InsertCFGStrategy>());
   Strategies.push_back(std::make_unique<InsertPHIStrategy>());
   Strategies.push_back(std::make_unique<SinkInstructionStrategy>());
   Strategies.push_back(std::make_unique<ShuffleBlockStrategy>());
+  Strategies.push_back(std::make_unique<InsertIntrinsicStrategy>(
+      getenv("LOOKUP_TABLE"), std::filesystem::current_path()));
+  Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
 
   Mutator = std::make_unique<IRMutator>(
       std::move(IRMutator::getDefaultAllowedTypes()), std::move(Strategies));

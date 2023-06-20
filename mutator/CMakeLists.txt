@@ -8,13 +8,14 @@ if(NOT CMAKE_BUILD_TYPE)
 endif(NOT CMAKE_BUILD_TYPE)
 
 IF(CMAKE_BUILD_TYPE MATCHES Release)
-    find_package(LLVM REQUIRED PATHS $ENV{FUZZING_HOME}/$ENV{LLVM}/build-release/lib/cmake/llvm NO_DEFAULT_PATH)
+    set(LLVM_DIR $ENV{FUZZING_HOME}/$ENV{LLVM}/build-release/lib/cmake/llvm)
 ENDIF(CMAKE_BUILD_TYPE MATCHES Release)
 
-
 IF(CMAKE_BUILD_TYPE MATCHES Debug)
-    find_package(LLVM REQUIRED PATHS $ENV{FUZZING_HOME}/$ENV{LLVM}/build-debug/lib/cmake/llvm NO_DEFAULT_PATH)
+    set(LLVM_DIR $ENV{FUZZING_HOME}/$ENV{LLVM}/build-debug/lib/cmake/llvm)
 ENDIF(CMAKE_BUILD_TYPE MATCHES Debug)
+
+find_package(LLVM REQUIRED CONFIG)
 
 message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
 message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
@@ -42,19 +43,24 @@ llvm_map_components_to_libnames(LLVM_LIBS
     Target
 )
 
+add_subdirectory(../mapper/ ../mapper/build)
+
 include_directories(
     $ENV{FUZZING_HOME}/$ENV{AFL}/include/
     ${LLVM_INCLUDE_DIRS}
     ./include/
+    ../mapper/include
 )
 add_definitions(${LLVM_DEFINITIONS})
 
 add_library(AFLCustomIRMutator SHARED
     src/afl-mutator.c
     src/irfuzzer.cpp
+    src/InsertIntrinsicStrategy.cpp
 )
 target_link_libraries(AFLCustomIRMutator
     ${LLVM_LIBS}
+    shadow
 )
 
 add_library(AFLFuzzMutate SHARED

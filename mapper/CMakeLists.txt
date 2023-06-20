@@ -30,22 +30,22 @@ llvm_map_components_to_libnames(LLVM_LIBS
 
 include_directories(
     ${LLVM_INCLUDE_DIRS}
-    ${CMAKE_SOURCE_DIR}/include/
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/
 )
 add_definitions(${LLVM_DEFINITIONS})
 
-file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.h ${CMAKE_SOURCE_DIR}/include/simdjson.h)
-file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.cpp ${CMAKE_SOURCE_DIR}/src/simdjson.cpp)
+file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.h ${CMAKE_CURRENT_SOURCE_DIR}/include/simdjson.h)
+file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/simdjson.cpp)
 
-add_library(shadow
-    ${CMAKE_SOURCE_DIR}/src/matchertree.cpp
-    ${CMAKE_SOURCE_DIR}/src/shadowmap.cpp
-    ${CMAKE_SOURCE_DIR}/src/predicate.cpp
-    ${CMAKE_SOURCE_DIR}/src/commandline.cpp
-    ${CMAKE_SOURCE_DIR}/src/simdjson.cpp
+add_library(shadow SHARED
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/matchertree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmap.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/predicate.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/commandline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/simdjson.cpp
 )
 add_executable(mapper
-    ${CMAKE_SOURCE_DIR}/src/mapper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mapper.cpp
 )
 target_link_libraries(shadow
     ${LLVM_LIBS}

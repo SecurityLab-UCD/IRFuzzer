@@ -164,6 +164,10 @@ std::vector<Matcher> getMatchers(ondemand::document &TableJSON) {
   return Matchers;
 }
 
+MatcherTree::MatcherTree(const std::string &Filename) {
+  MatcherTree(Filename, false, 0);
+}
+
 MatcherTree::MatcherTree(const std::string &Filename, bool NameCaseSensitive,
                          size_t Verbosity)
     : Verbosity(Verbosity) {
@@ -331,7 +335,16 @@ void MatcherTree::analyzeMap(const std::vector<bool> &Map) {
   CurrentDepth = 0;
   ShadowMap = Map;
   BlameList.clear();
-  analyzeMap();
+  if (!std::count(Map.begin(), Map.end(), false)) {
+    // Handle blank shadow map by blaming outermost matcher
+    Blamee TheBlamee;
+    TheBlamee.Loss = Map.size();
+    for (size_t I = 0; I < Patterns.size(); I++)
+      TheBlamee.Blamers.insert(I);
+    BlameList.push_back(TheBlamee);
+  } else {
+    analyzeMap();
+  }
 }
 
 PatPredBlameList MatcherTree::blamePatternPredicates() const {
@@ -417,21 +430,22 @@ std::set<std::string> MatcherTree::blamePossiblePatterns() const {
 
 std::vector<Intrinsic::ID> MatcherTree::blameTargetIntrinsic() const {
   std::set<Intrinsic::ID> TargetIIDs;
+  errs() << "Blame list size: " << BlameList.size() << "\n";
   for (const Blamee &TheBlamee : BlameList) {
     if (TheBlamee.Blamers.size() == 0)
       continue;
     for (size_t PatIdx : TheBlamee.Blamers) {
-      if (!Predicates.pat(Patterns[PatIdx].PatPredIdx)->satisfied())
-        continue; // CPU doesn't support this pattern
       std::smatch SMatch;
       // For now, only match nodes with no nesting (top-level INTRINSIC_* switch
       // opcode cases)
       static std::regex MatchIntrinsicID{"^\\(intrinsic_.*? (\\d+):"};
       if (!std::regex_search(Patterns[PatIdx].Src, SMatch, MatchIntrinsicID))
         continue; // Pattern is not an intrinsic function
-      Intrinsic::ID IID = std::stoul(SMatch.str(1));
-      if (Function::isTargetIntrinsic(IID))
-        TargetIIDs.insert(IID);
+      Intrinsic::ID IID = std::stoul(SMatch[1]);
+
+      // If this fails, try regenerating intrinsics.
+      assert(Function::isTargetIntrinsic(IID) && "Expected target intrinsic");
+      TargetIIDs.insert(IID);
     }
   }
   return std::vector<Intrinsic::ID>(TargetIIDs.begin(), TargetIIDs.end());

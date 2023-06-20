@@ -43,7 +43,7 @@ llvm_map_components_to_libnames(LLVM_LIBS
     Target
 )
 
-add_subdirectory(../mapper/ ../mapper/build)
+add_subdirectory(../mapper/ ./mapper/)
 
 include_directories(
     $ENV{FUZZING_HOME}/$ENV{AFL}/include/

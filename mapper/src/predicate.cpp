@@ -113,7 +113,8 @@ void PredicateKeeper::addNamedPredicates(
   // Composite predicates to be parsed after literals
   std::map<std::string, std::string> NamedPredsToParse;
 
-  std::regex MatchCondString(R"_(string CondString = "(.+?)";\n)_");
+  std::regex MatchCondString(R"_(string CondString = "(.*?)";\n)_");
+  std::regex MatchCondString2(R"_(code CondString = \[\{ (.*?) \}\];\n)_");
   std::regex MatchNonLiteralPredicate("!|\\||&");
 
   // Find literals
@@ -122,22 +123,19 @@ void PredicateKeeper::addNamedPredicates(
     std::string Name = IsCaseSensitive ? NameRef.str() : NameRef.lower();
     std::smatch Match;
 
-    if (!std::regex_search(Record, Match, MatchCondString)) {
+    std::string CondString;
+    if (!std::regex_search(Record, Match, MatchCondString) &&
+        !std::regex_search(Record, Match, MatchCondString2)) {
       errs() << "FATAL ERROR: Failed to extract condition for predicate "
              << Name << "\n";
       if (Verbosity)
         errs() << Record << "\n";
       exit(1);
     }
+    CondString = Match.str(1);
+    if (CondString.empty())
+      CondString = "true";
 
-    std::string CondString = Match.str(1);
-    if (CondString.empty()) {
-      errs() << "FATAL ERROR: Got empty condition for predicate " << Name
-             << "\n";
-      if (Verbosity)
-        errs() << Record << "\n";
-      exit(1);
-    }
     Predicate *P = nullptr;
     if (std::regex_search(CondString, MatchNonLiteralPredicate)) {
       NamedPredsToParse.insert(std::make_pair(Name, CondString));
@@ -205,13 +203,15 @@ Predicate *PredicateKeeper::parseExpr(const std::string &CondString,
 
 Predicate *PredicateKeeper::parseGroup(const std::string &CondString,
                                        size_t &CurIndex) {
-  if (CondString[CurIndex] != '(') {
+  if (CondString[CurIndex] != '(')
     notFound("(", CondString, CurIndex);
-  }
-  Predicate *P = parseExpr(CondString, ++CurIndex);
-  if (CondString[CurIndex] != ')') {
+  if (CondString[++CurIndex] == ' ')
+    CurIndex++;
+  Predicate *P = parseExpr(CondString, CurIndex);
+  if (CondString[CurIndex] == ' ')
+    CurIndex++;
+  if (CondString[CurIndex] != ')')
     notFound(")", CondString, CurIndex);
-  }
   CurIndex++;
   return P;
 }
@@ -220,10 +220,11 @@ Predicate *PredicateKeeper::parseOr(const std::string &CondString,
                                     size_t &CurIndex) {
   std::vector<Predicate *> Children;
   Children.push_back(parseAnd(CondString, CurIndex));
-  while (CondString.find(" || ", CurIndex) == CurIndex ||
-         CondString.find(" ||", CurIndex) == CurIndex) {
-    CurIndex += 3;
-    if (CondString[CurIndex] == ' ')
+  while (CondString.find("||", CurIndex) - CurIndex <= 1) {
+    CurIndex += 2;
+    if (CondString[CurIndex] == '|')
+      CurIndex++;
+    while (CondString[CurIndex] == ' ')
       CurIndex++;
     Children.push_back(parseAnd(CondString, CurIndex));
   }
@@ -239,10 +240,11 @@ Predicate *PredicateKeeper::parseAnd(const std::string &CondString,
                                      size_t &CurIndex) {
   std::vector<Predicate *> Children;
   Children.push_back(parseNot(CondString, CurIndex));
-  while (CondString.find(" && ", CurIndex) == CurIndex ||
-         CondString.find(" &&", CurIndex) == CurIndex) {
-    CurIndex += 3;
-    if (CondString[CurIndex] == ' ')
+  while (CondString.find("&&", CurIndex) - CurIndex <= 1) {
+    CurIndex += 2;
+    if (CondString[CurIndex] == '&')
+      CurIndex++;
+    while (CondString[CurIndex] == ' ')
       CurIndex++;
     Children.push_back(parseNot(CondString, CurIndex));
   }

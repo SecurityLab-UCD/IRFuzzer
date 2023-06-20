@@ -173,13 +173,18 @@ private:
   std::string IdentifierRegex = "[A-Za-z_][A-Za-z0-9_]*";
   // HACK: Pray that TableGen doesn't pass function calls as arguments to
   // function calls
-  std::string MaybeFuncCallRegex = IdentifierRegex + "(\\(.*?\\))?";
+  std::string MaybeFuncCallRegex =
+      IdentifierRegex + "((<" + IdentifierRegex + ">)?\\(.*?\\))?";
   std::string NoSpaceValueRegex = "(" + IdentifierRegex + "::)?" +
                                   MaybeFuncCallRegex + "((->|.)" +
                                   MaybeFuncCallRegex + ")*";
   std::string MaybeComparisonRegex =
-      NoSpaceValueRegex + "( (==|!=) " + NoSpaceValueRegex + ")?";
-  std::regex MatchLiteral{"^" + MaybeComparisonRegex};
+      NoSpaceValueRegex + "( *([><!=]=?) *(" + NoSpaceValueRegex + "|\\d+))?";
+  std::string MaybeTernaryRegex = MaybeComparisonRegex + "( ?\\? ?" +
+                                  MaybeComparisonRegex + " ?: ?" +
+                                  MaybeComparisonRegex + ")?";
+  std::regex MatchLiteral{"^" + MaybeTernaryRegex};
+  // (Subtarget->getWavefrontSize() == 64)
 };
 
 #endif // PREDICATE_H_

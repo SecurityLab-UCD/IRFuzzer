@@ -131,7 +131,12 @@ std::vector<Pattern> getPatterns(ondemand::document &TableJSON) {
       ThePattern.NamedPredicates.push_back(PredIdx);
     }
     if (ThePattern.NamedPredicates.size()) {
-      ThePattern.PatPredIdx = PatternObject["pat_predicate"];
+      try {
+        ThePattern.PatPredIdx = PatternObject["pat_predicate"];
+      } catch (simdjson_error &) {
+        // The named predicate is a TruePredicate.
+        ThePattern.NamedPredicates.clear();
+      }
     } else {
       ThePattern.PatPredIdx = std::numeric_limits<size_t>::max();
     }
@@ -178,7 +183,8 @@ MatcherTree::MatcherTree(const std::string &Filename, bool NameCaseSensitive,
   Matchers = getMatchers(TableJSON);
   Patterns = getPatterns(TableJSON);
   std::sort(Matchers.begin(), Matchers.end());
-  Matchers[0].End++; // final null terminator
+  if (Matchers.size())
+    Matchers[0].End++; // final null terminator
 
   Predicates.Verbosity = Verbosity;
   Predicates.IsCaseSensitive = NameCaseSensitive;
@@ -218,10 +224,7 @@ const std::vector<bool> &MatcherTree::analyzeUpperBound() {
   if (Matchers.empty())
     return ShadowMap;
   getUpperBound();
-  I = 0;
-  CurrentDepth = 0;
-  BlameList.clear();
-  analyzeMap();
+  analyzeMap(ShadowMap);
   return ShadowMap;
 }
 

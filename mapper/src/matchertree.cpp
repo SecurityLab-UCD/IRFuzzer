@@ -443,9 +443,9 @@ std::vector<Intrinsic::ID> MatcherTree::blameTargetIntrinsic() const {
         continue; // Pattern is not an intrinsic function
       Intrinsic::ID IID = std::stoul(SMatch[1]);
 
-      // If this fails, try regenerating intrinsics.
-      assert(Function::isTargetIntrinsic(IID) && "Expected target intrinsic");
-      TargetIIDs.insert(IID);
+      // A few of them are not target intrinsic functions
+      if (Function::isTargetIntrinsic(IID))
+        TargetIIDs.insert(IID);
     }
   }
   return std::vector<Intrinsic::ID>(TargetIIDs.begin(), TargetIIDs.end());

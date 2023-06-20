@@ -34,6 +34,7 @@ include_directories(
 )
 add_definitions(${LLVM_DEFINITIONS})
 
+# TODO: use apt to install simdjson
 file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.h ${CMAKE_CURRENT_SOURCE_DIR}/include/simdjson.h)
 file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/simdjson.cpp)
 

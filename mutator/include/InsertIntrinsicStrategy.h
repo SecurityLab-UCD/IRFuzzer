@@ -17,6 +17,7 @@ private:
   path JSONPath;
   path WorkDirPath;
   std::vector<Intrinsic::ID> IIDs;
+  bool IsInitialized = false;
 
 public:
   InsertIntrinsicStrategy(const string &JSON, const string &WorkDir)
@@ -27,7 +28,7 @@ public:
   }
 
   /// Only load or analyzes when called.
-  void LazyInit(LLVMContext &Context);
+  void LazyInit();
 
   using IRMutationStrategy::mutate;
   Function *chooseFunction(Module *M, RandomIRBuilder &IB) override;

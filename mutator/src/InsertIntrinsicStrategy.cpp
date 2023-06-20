@@ -19,28 +19,32 @@ namespace llvm {
 
 Function *InsertIntrinsicStrategy::chooseFunction(Module *M,
                                                   RandomIRBuilder &IB) {
-  LazyInit(M->getContext());
+  LazyInit();
   auto RS = makeSampler(IB.Rand, IIDs);
   return Intrinsic::getDeclaration(M, RS.getSelection());
 }
 
-std::chrono::nanoseconds GetLastModDuration(const fs::path &FP) {
+static std::chrono::nanoseconds GetLastModDuration(const fs::path &FP) {
   if (!fs::is_regular_file(FP))
     return std::chrono::nanoseconds::max();
   return fs::file_time_type::clock::now() - fs::last_write_time(FP);
 }
 
-void InsertIntrinsicStrategy::LazyInit(LLVMContext &Context) {
+void InsertIntrinsicStrategy::LazyInit() {
   fs::path SavedIIDsPath = WorkDirPath / "saved_iids";
   const auto Threshold = 10min;
   const auto LastMod = GetLastModDuration(SavedIIDsPath);
 
   if (LastMod <= Threshold) {
+    if (IsInitialized)
+      return;
+
     Intrinsic::ID IID;
     std::ifstream Ifs(SavedIIDsPath);
     while (Ifs >> IID) {
       IIDs.push_back(IID);
     }
+    IsInitialized = true;
     return;
   }
 
@@ -60,6 +64,7 @@ void InsertIntrinsicStrategy::LazyInit(LLVMContext &Context) {
   for (Intrinsic::ID IID : IIDs) {
     Ofs << IID << '\n';
   }
+  IsInitialized = true;
 }
 
 } // namespace llvm

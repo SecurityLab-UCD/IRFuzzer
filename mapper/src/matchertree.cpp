@@ -169,10 +169,6 @@ std::vector<Matcher> getMatchers(ondemand::document &TableJSON) {
   return Matchers;
 }
 
-MatcherTree::MatcherTree(const std::string &Filename) {
-  MatcherTree(Filename, false, 0);
-}
-
 MatcherTree::MatcherTree(const std::string &Filename, bool NameCaseSensitive,
                          size_t Verbosity)
     : Verbosity(Verbosity) {
@@ -433,7 +429,6 @@ std::set<std::string> MatcherTree::blamePossiblePatterns() const {
 
 std::vector<Intrinsic::ID> MatcherTree::blameTargetIntrinsic() const {
   std::set<Intrinsic::ID> TargetIIDs;
-  errs() << "Blame list size: " << BlameList.size() << "\n";
   for (const Blamee &TheBlamee : BlameList) {
     if (TheBlamee.Blamers.size() == 0)
       continue;

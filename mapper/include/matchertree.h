@@ -136,9 +136,8 @@ public:
   size_t Verbosity = 0;
 
   // Read from pattern lookup table JSON
-  MatcherTree(const std::string &Filename);
-  MatcherTree(const std::string &Filename, bool NameCaseSensitive,
-              size_t Verbosity);
+  MatcherTree(const std::string &Filename, bool NameCaseSensitive = false,
+              size_t Verbosity = 0);
   MatcherTree(const MatcherTree &) = delete;
   MatcherTree(MatcherTree &&) = default;
 

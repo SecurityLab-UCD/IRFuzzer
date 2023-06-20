@@ -26,7 +26,7 @@ Function *InsertIntrinsicStrategy::chooseFunction(Module *M,
 
 std::chrono::nanoseconds GetLastModDuration(const fs::path &FP) {
   if (!fs::is_regular_file(FP))
-    return std::chrono::minutes::max();
+    return std::chrono::nanoseconds::max();
   return fs::file_time_type::clock::now() - fs::last_write_time(FP);
 }
 
@@ -46,9 +46,15 @@ void InsertIntrinsicStrategy::LazyInit(LLVMContext &Context) {
 
   // Saved IIDs are stale. Regenerate the list.
   MatcherTree MT(JSONPath);
-  MT.analyzeMap(
-      readBitVector(MT.MatcherTableSize, WorkDirPath / "fuzz_shadowmap"));
-  std::vector<Intrinsic::ID> IIDs = MT.blameTargetIntrinsic();
+  fs::path ShadowMapPath = WorkDirPath / "fuzz_shadowmap";
+  std::vector<bool> Map;
+  if (!fs::is_regular_file(ShadowMapPath)) {
+    Map.resize(MT.MatcherTableSize, true);
+  } else {
+    Map = readBitVector(MT.MatcherTableSize, ShadowMapPath);
+  }
+  MT.analyzeMap(Map);
+  IIDs = MT.blameTargetIntrinsic();
 
   std::ofstream Ofs(SavedIIDsPath);
   for (Intrinsic::ID IID : IIDs) {

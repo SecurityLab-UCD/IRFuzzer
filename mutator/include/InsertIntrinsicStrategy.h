@@ -30,7 +30,7 @@ public:
   void LazyInit(LLVMContext &Context);
 
   using IRMutationStrategy::mutate;
-  Function *chooseFunction(Module *M, RandomIRBuilder &IB);
+  Function *chooseFunction(Module *M, RandomIRBuilder &IB) override;
 };
 } // namespace llvm
 #endif

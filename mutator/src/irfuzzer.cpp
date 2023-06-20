@@ -69,8 +69,9 @@ void createISelMutator() {
   Strategies.push_back(std::make_unique<InsertPHIStrategy>());
   Strategies.push_back(std::make_unique<SinkInstructionStrategy>());
   Strategies.push_back(std::make_unique<ShuffleBlockStrategy>());
-  Strategies.push_back(std::make_unique<InsertIntrinsicStrategy>(
-      getenv("LOOKUP_TABLE"), std::filesystem::current_path()));
+  if (getenv("LOOKUP_TABLE"))
+    Strategies.push_back(std::make_unique<InsertIntrinsicStrategy>(
+        getenv("LOOKUP_TABLE"), std::filesystem::current_path()));
   Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
 
   Mutator = std::make_unique<IRMutator>(

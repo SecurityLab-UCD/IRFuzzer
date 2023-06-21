@@ -56,32 +56,53 @@ TARGET_LISTS: dict[str, list[Target]] = {
         Target("xcore"),
     ],
     "cpu": [
-        # Intel
-        Target("x86_64", "alderlake"),
-        Target("x86_64", "sapphirerapids"),
-        # AMD
-        Target("x86_64", "znver3"),
-        # Apple
         Target("aarch64", "apple-a16"),
         Target("aarch64", "apple-m2"),
         # Samsung
         Target("aarch64", "exynos-m5"),
-        # ARM
-        Target("aarch64", "cortex-a710"),
+        Target("aarch64", "cortex-a715"),
         Target("aarch64", "cortex-x2"),
+        Target("aarch64", "tsv110"),
         Target("aarch64", "cortex-r82"),
-        # Target("aarch64", "neoverse-v2"),
         # AMD
         Target("amdgcn", "gfx1100"),
         Target("amdgcn", "gfx1036"),
-        Target("amdgcn", "gfx1010"),
+        ## ARM
+        Target("arm", "armv9.4-a"),
+        ## Hexagon
         # Qualcomm
-        Target("hexagon", "hexagonv69"),
+        Target("hexagon", "hexagonv71t"),
+        Target("hexagon", "hexagonv73"),
+        ## LoongArch
+        Target("loongarch64", "generic-la64"),
+        ## MIPS
+        Target("mips64", "mips64r6"),
+        ## NVPTX
         # Nvidia
         Target("nvptx64", "sm_90"),
+        # PPC
+        Target("ppc64", "pwr9"),
+        ## RISCV
         # SiFive
         Target("riscv64", "sifive-u74"),
-        # WASM
+        Target("riscv64", "sifive-x280"),
+        Target("riscv64", "rocket-rv64"),
+        Target("riscv64", "syntacore-scr1-base"),
+        # SystemZ
+        Target("systemz", "z15"),
+        Target("systemz", "z16"),
+        # VE
+        Target("ve", "generic"),
+        ## WASM
+        Target("wasm64", "generic"),
         Target("wasm64", "bleeding-edge"),
+        ## X86
+        # Intel
+        Target("x86_64", "alderlake"),
+        Target("x86_64", "sapphirerapids"),
+        Target("x86_64", "icelake-server"),
+        # AMD
+        Target("x86_64", "znver3"),
+        Target("x86_64", "znver4"),
     ],
 }

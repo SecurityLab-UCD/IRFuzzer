@@ -1,0 +1,10 @@
+#!/bin/bash
+if [[ ! $1 ]]; then
+  echo "Usage: $0 <pat-pred-idx>"
+  exit 1
+fi
+file=isel.json
+if [[ $2 ]]; then
+  file="$2"
+fi
+jq ".pat_predicates | .[$1]" $file

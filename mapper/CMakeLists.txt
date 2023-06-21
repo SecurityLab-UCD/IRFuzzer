@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.4)
-project(afl-ir-custom-mutator)
+project(map2patterns)
 
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -24,58 +24,33 @@ set(CMAKE_CXX_FLAGS "-std=c++17 -fno-rtti -Wall -pthread")
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG")
 
 llvm_map_components_to_libnames(LLVM_LIBS
-    AllTargetsAsmParsers
-    AllTargetsCodeGens
-    AllTargetsDescs
-    AllTargetsInfos
-    Analysis
-    AsmPrinter
-    BitReader
-    BitWriter
-    CodeGen
     Core
-    FuzzMutate
-    IRReader
-    MC
-    ScalarOpts
-    SelectionDAG
     Support
-    Target
 )
 
-add_subdirectory(../mapper/ ./mapper/)
-
 include_directories(
-    $ENV{FUZZING_HOME}/$ENV{AFL}/include/
     ${LLVM_INCLUDE_DIRS}
-    ./include/
-    ../mapper/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/
 )
 add_definitions(${LLVM_DEFINITIONS})
 
-add_library(AFLCustomIRMutator SHARED
-    src/afl-mutator.c
-    src/irfuzzer.cpp
-    src/InsertIntrinsicStrategy.cpp
+# TODO: use apt to install simdjson
+file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.h ${CMAKE_CURRENT_SOURCE_DIR}/include/simdjson.h)
+file(DOWNLOAD https://github.com/simdjson/simdjson/releases/download/v3.1.7/simdjson.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/simdjson.cpp)
+
+add_library(shadow SHARED
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/matchertree.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmap.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/predicate.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/commandline.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/simdjson.cpp
 )
-target_link_libraries(AFLCustomIRMutator
+add_executable(mapper
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/mapper.cpp
+)
+target_link_libraries(shadow
     ${LLVM_LIBS}
+)
+target_link_libraries(mapper
     shadow
-)
-
-add_library(AFLFuzzMutate SHARED
-    src/afl-mutator.c
-    src/libfuzzer.cpp
-)
-target_link_libraries(AFLFuzzMutate
-    ${LLVM_LIBS}
-)
-
-
-add_executable(MutatorDriver
-    src/main.cpp
-)
-target_link_libraries(MutatorDriver
-    AFLCustomIRMutator
-    ${LLVM_LIBS}
 )

@@ -1,0 +1,70 @@
+#!/bin/bash
+pushd () {
+    command pushd "$@" > /dev/null
+}
+
+popd () {
+    command popd "$@" > /dev/null
+}
+
+if [[ -z $1 ]]; then
+    echo "Usage: $0 <save-dir> [-f]"
+    echo "  -f: Force regeneration of lookup table"
+    exit 1
+fi
+
+BASE=$(realpath "$1")
+mkdir -p "$BASE"
+pushd "$BASE" 
+
+if [[ ! -f isel.json || $2 = -f ]]; then
+    gen-lookup $PWD
+fi
+
+echo Generating derivative JSON files...
+jq '.predicates' isel.json > predicates.json
+jq '.matchers' isel.json > matchers.json
+jq '.pat_predicates' isel.json > pat_predicates.json
+jq '.patterns' isel.json > patterns.json
+jq '.patterns | [.[].predicates] | unique' isel.json > pred_combinations.json
+jq -r '.predicates | .[]' isel.json | sed 's/ .*//;/^$/d;/}/d;' | jq -R . | jq -s . > pred_names.json
+jq '.predicates | .[]' isel.json | grep -vE '!|\||&|RecomputePerFunction = 1' | jq -r | sed 's/ .*//;/^$/d;/}/d;' | jq -R . | jq -s . > literals.json
+
+export TABLE_SIZE=$(jq .table_size isel.json)
+N_PREDS=$(jq '.predicates | length' isel.json)
+export PRED_MAX=$(($N_PREDS - 1))
+
+echo Generating base.map...
+mapper upperbound isel.json -o base.map
+
+rm -rf ./preds/{p,x,c}
+mkdir -p ./preds/p # single predicate coverage
+mkdir -p ./preds/x # diff predicate base
+mkdir -p ./preds/c # diff pred-combination base
+
+# Generate predicate maps
+echo Generating predicate maps...
+for p in $(seq 0 $PRED_MAX); do
+    mapper upperbound isel.json $p -o preds/p/$p.map & 
+done
+wait
+
+# Generate predicate maps (diffed against baseline)
+echo Generating predicate map diffs...
+for p in $(seq 0 $PRED_MAX); do
+    mapper diff $TABLE_SIZE preds/p/$p.map base.map -o preds/x/$p.map & 
+done
+wait
+
+# Generate pred combinations
+echo Generating predicate combination diffs...
+gen-pred-comb-cmds | bash
+
+# Generate coverage report for combinations
+echo Generating coverage report...
+cov_report="$BASE/c-coverage.txt"
+pushd preds/c
+mapper stat $TABLE_SIZE * -sort desc > "$cov_report"
+popd # preds/c -> BASE
+popd # BASE -> original
+echo Generated report in $cov_report

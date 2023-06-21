@@ -183,7 +183,7 @@ for target in $targets; do
         target_td="PPC.td"
     fi
     "$FUZZING_HOME/$LLVM/build-pl/bin/llvm-tblgen" -gen-dag-isel -pattern-lookup "$outdir/$target.json" \
-        -I./llvm/lib/Target/$target -I./build/include -I./llvm/include -I./llvm/lib/Target \
+        -I./llvm/lib/Target/$target -I./build-pl/include -I./llvm/include -I./llvm/lib/Target \
         ./llvm/lib/Target/$target/$target_td -o "$outdir/$target.inc" -d /dev/null &
 done
 wait

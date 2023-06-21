@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 import subprocess
 from typing import Iterable, Literal, NamedTuple, Optional
+import typing
 import os
 from tap import Tap
 import docker
@@ -18,17 +19,42 @@ from lib.target_lists import TARGET_LISTS
 from lib.time_parser import get_time_in_seconds
 
 
+class FuzzerConfig(NamedTuple):
+    extra_env: dict[str, str]
+    extra_cmd: list[str] = []
+
+    def getIRFuzzer(other_env: dict[str, str] = {}, other_cmd: list[str] = []):
+        extra_env = {
+            "AFL_CUSTOM_MUTATOR_ONLY": "1",
+            "AFL_CUSTOM_MUTATOR_LIBRARY": "mutator/build/libAFLCustomIRMutator.so",
+        }
+        extra_env.update(other_env)
+        return FuzzerConfig(
+            extra_env=extra_env,
+            extra_cmd=other_cmd,
+        )
+
+
 Fuzzer = Literal["aflplusplus", "libfuzzer", "irfuzzer"]
 ISel = Literal["dagisel", "gisel"]
 ClutserType = Literal["screen", "docker", "stdout"]
 
 
 DOCKER_IMAGE = "irfuzzer"
-MUTATOR_LIBRARY_PATHS: dict[Fuzzer, str] = {
-    "aflplusplus": "",
-    "libfuzzer": "mutator/build/libAFLFuzzMutate.so",
-    "irfuzzer": "mutator/build/libAFLCustomIRMutator.so",
+FUZZERS: dict[str, FuzzerConfig] = {
+    "aflplusplus": FuzzerConfig(extra_env={"AFL_CUSTOM_MUTATOR_ONLY": "0"}),
+    "libfuzzer": FuzzerConfig(
+        extra_env={
+            "AFL_CUSTOM_MUTATOR_ONLY": "1",
+            "AFL_CUSTOM_MUTATOR_LIBRARY": "mutator/build/libAFLFuzzMutate.so",
+        },
+    ),
+    "irfuzzer": FuzzerConfig.getIRFuzzer(other_cmd=[" -w"]),
 }
+# Check Fuzzer and FUZZERS match.
+assert list(FUZZERS.keys()) == list(
+    typing.get_args(Fuzzer)
+), "FUZZERS and Fuzzer don't match"
 
 
 class ExperimentConfig(NamedTuple):
@@ -36,6 +62,7 @@ class ExperimentConfig(NamedTuple):
     target: Target
     isel: ISel
     seed_dir: Path
+    expr_root: Path
     time: int
     replicate_id: int
 
@@ -59,28 +86,35 @@ class ExperimentConfig(NamedTuple):
         return matcher_table_sizes[backend]
 
     def get_fuzzing_env(self) -> dict[str, str]:
-        return {
-            "AFL_CUSTOM_MUTATOR_ONLY": "0" if self.fuzzer == "aflplusplus" else "1",
-            "AFL_CUSTOM_MUTATOR_LIBRARY": MUTATOR_LIBRARY_PATHS[self.fuzzer],
+        envs = {
             "TRIPLE": str(self.target.triple),
             "CPU": self.target.cpu if self.target.cpu else "",
             "ATTR": ",".join(self.target.attrs),
             "GLOBAL_ISEL": "1" if self.isel == "gisel" else "0",
             "MATCHER_TABLE_SIZE": str(self.matcher_table_size),
         }
+        envs.update(FUZZERS[self.fuzzer].extra_env)
+        return envs
 
     def get_fuzzing_command(self, output_dir: str | Path) -> str:
-        cmd = f"$AFL/afl-fuzz -V {self.time} -i {self.seed_dir} -o {output_dir}"
+        cmd = [
+            "$AFL/afl-fuzz",
+            "-V",
+            str(self.time),
+            "-i",
+            str(self.seed_dir),
+            "-o",
+            str(output_dir),
+        ]
 
-        if self.fuzzer == "irfuzzer":
-            cmd += " -w"
+        cmd += FUZZERS[self.fuzzer].extra_cmd
 
-        cmd += " llvm-isel-afl/build/isel-fuzzing"
+        cmd.append("llvm-isel-afl/build/isel-fuzzing")
 
-        return cmd
+        return " ".join(cmd)
 
-    def get_output_dir(self, output_root_dir: Path) -> Path:
-        return output_root_dir.joinpath(
+    def get_output_dir(self) -> Path:
+        return self.expr_root.joinpath(
             self.fuzzer,
             self.isel,
             str(self.target),
@@ -94,7 +128,7 @@ class Args(Tap):
     (Reference: https://github.com/swansonk14/typed-argument-parser)
     """
 
-    fuzzer: Fuzzer = "irfuzzer"
+    fuzzers: list[Fuzzer] = ["irfuzzer"]
     """the fuzzer used for fuzzing"""
 
     seeds: str
@@ -180,48 +214,51 @@ class Args(Tap):
 
 
 def get_experiment_configs(
-    fuzzer: Fuzzer,
+    fuzzers: list[Fuzzer],
     isel: ISel,
     targets: list[Target],
     time: int,
     repeat: int,
     offset: int,
     seed_dir: Path,
+    expr_root: Path,
     seeding_from_tests: bool,
     props_to_match: list[TargetProp],
     compilation_timout_secs: Optional[float],
 ) -> Iterable[ExperimentConfig]:
-    for target in targets:
-        expr_seed_dir = seed_dir
+    for fuzzer in fuzzers:
+        for target in targets:
+            expr_seed_dir = seed_dir
 
-        if seeding_from_tests:
-            expr_seed_dir = collect_seeds_from_tests(
-                target=target,
-                global_isel=isel == "gisel",
-                out_dir_parent=seed_dir,
-                props_to_match=props_to_match,
-                dump_bc=True,
-                symlink_to_ll=False,
-                timeout_secs=compilation_timout_secs,
-            )
-
-        for r in range(repeat):
-            expr_config = ExperimentConfig(
-                fuzzer=fuzzer,
-                target=target,
-                isel=isel,
-                seed_dir=expr_seed_dir,
-                time=time,
-                replicate_id=r + offset,
-            )
-
-            if expr_config.matcher_table_size is None:
-                logging.warn(
-                    f"Can't find matcher table size for target '{expr_config.target}', not fuzzing"
+            if seeding_from_tests:
+                expr_seed_dir = collect_seeds_from_tests(
+                    target=target,
+                    global_isel=isel == "gisel",
+                    out_dir_parent=seed_dir,
+                    props_to_match=props_to_match,
+                    dump_bc=True,
+                    symlink_to_ll=False,
+                    timeout_secs=compilation_timout_secs,
                 )
-                continue
 
-            yield expr_config
+            for r in range(repeat):
+                expr_config = ExperimentConfig(
+                    fuzzer=fuzzer,
+                    target=target,
+                    isel=isel,
+                    seed_dir=expr_seed_dir,
+                    expr_root=expr_root,
+                    time=time,
+                    replicate_id=r + offset,
+                )
+
+                if expr_config.matcher_table_size is None:
+                    logging.warn(
+                        f"Can't find matcher table size for target '{expr_config.target}', not fuzzing"
+                    )
+                    continue
+
+                yield expr_config
 
 
 def combine_commands(*commands: str) -> str:
@@ -230,7 +267,6 @@ def combine_commands(*commands: str) -> str:
 
 def batch_fuzz_using_docker(
     experiment_configs: list[ExperimentConfig],
-    out_root: Path,
     jobs: int,
 ) -> None:
     """
@@ -253,7 +289,7 @@ def batch_fuzz_using_docker(
         logging.info(f"Starting experiment {experiment.name}...")
 
         seed_dir = experiment.seed_dir
-        out_dir = experiment.get_output_dir(out_root)
+        out_dir = experiment.get_output_dir()
         out_dir.mkdir(parents=True)
 
         container = client.containers.run(
@@ -291,18 +327,17 @@ def batch_fuzz_using_docker(
 
 def batch_fuzz(
     experiment_configs: list[ExperimentConfig],
-    out_root: Path,
     type: ClutserType,
     jobs: int,
 ) -> None:
     if type == "docker":
-        batch_fuzz_using_docker(experiment_configs, out_root, jobs)
+        batch_fuzz_using_docker(experiment_configs, jobs)
         return
 
     def start_subprocess(experiment: ExperimentConfig) -> subprocess.Popen:
         logging.info(f"Starting experiment {experiment.name}...")
 
-        out_dir = experiment.get_output_dir(out_root)
+        out_dir = experiment.get_output_dir()
         out_dir.mkdir(parents=True)
 
         env = experiment.get_fuzzing_env()
@@ -340,8 +375,8 @@ def batch_fuzz(
     )
 
 
-def fuzz(expr_config: ExperimentConfig, out_root: Path) -> int:
-    out_dir = expr_config.get_output_dir(out_root)
+def fuzz(expr_config: ExperimentConfig) -> int:
+    out_dir = expr_config.get_output_dir()
     out_dir.mkdir(parents=True)
 
     process = subprocess.run(
@@ -369,30 +404,33 @@ def main() -> None:
 
     expr_configs = list(
         get_experiment_configs(
-            fuzzer=args.fuzzer,
+            fuzzers=args.fuzzers,
             isel=args.isel,
             targets=args.get_fuzzing_targets(),
             time=args.get_time_in_seconds(),
             repeat=args.repeat,
             offset=args.offset,
             seed_dir=Path(args.seeds),
+            expr_root=out_root,
             seeding_from_tests=args.seeding_from_tests,
             props_to_match=args.props_to_match,
             compilation_timout_secs=args.timeout,
         )
     )
 
+    # Pause for some seconds before starting.
+    start_pause = 5
     print(
-        f"\nThe following {len(expr_configs)} experiment(s) will start in 10 seconds:\n"
+        f"\nThe following {len(expr_configs)} experiment(s) will start in {start_pause} seconds:\n"
     )
     for expr in expr_configs:
         print(f" - {expr.name}")
     print()
 
-    sleep(10)
+    sleep(start_pause)
 
     if len(expr_configs) == 1 and args.type is None:
-        exit(fuzz(expr_config=expr_configs[0], out_root=out_root))
+        exit(fuzz(expr_config=expr_configs[0]))
     elif args.type is None:
         logging.error(
             "'--type' must be specified when running multiple fuzzing experiments"
@@ -400,7 +438,6 @@ def main() -> None:
     else:
         batch_fuzz(
             experiment_configs=expr_configs,
-            out_root=out_root,
             type=args.type,
             jobs=args.jobs,
         )

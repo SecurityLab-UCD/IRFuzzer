@@ -148,3 +148,45 @@ cd $FUZZING_HOME
 # It will report a `no such process`, that's ok.
 # That process is `grep`, which is also shown in `ps`, which died before `kill` thus doesn't exist.
 # kill -9 $(ps aux | grep isel-fuzzing | awk '{print $2}')
+
+###### Compile mapper.
+mkdir -p mapper/build
+cd mapper/build
+cmake -GNinja .. && ninja -j 4
+cd $FUZZING_HOME
+
+###### Generate all pattern lookup tables (JSONs)
+cd $LLVM
+git fetch origin pattern-lookup
+git cherry-pick -n origin/pattern-lookup
+mkdir -p build-pl
+cd build-pl
+cmake  -GNinja \
+        -DBUILD_SHARED_LIBS=ON \
+        -DLLVM_CCACHE_BUILD=ON \
+        -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_BUILD_TYPE=Release \
+    ../llvm
+ninja -j $(nproc --all) llvm-tblgen llc
+
+cd "$FUZZING_HOME/$LLVM/llvm/lib/Target"
+targets=$(find * -maxdepth 0 -type d -print)
+outdir="$FUZZING_HOME/$LLVM/build-pl/pattern-lookup"
+cd "$FUZZING_HOME/$LLVM"
+mkdir -p "$outdir"
+for target in $targets; do
+    echo "Generating pattern lookup table for $target..."
+    target_td=$target.td
+    if [[ $target == "PowerPC" ]]; then
+        target_td="PPC.td"
+    fi
+    "$FUZZING_HOME/$LLVM/build-pl/bin/llvm-tblgen" -gen-dag-isel -pattern-lookup "$outdir/$target.json" \
+        -I./llvm/lib/Target/$target -I./build/include -I./llvm/include -I./llvm/lib/Target \
+        ./llvm/lib/Target/$target/$target_td -o "$outdir/$target.inc" -d /dev/null &
+done
+wait
+
+git reset --hard
+cd $FUZZING_HOME

@@ -1,0 +1,46 @@
+#!/bin/bash
+if [[ -z $1 ]]; then
+    echo Please specify an output directory
+    exit 1
+fi
+
+if [[ $1 = -h ]]; then
+    echo "Usage: $0 <output-directory> <path-to-llvm-src> [llvm-tblgen-dir]"
+    exit 1
+fi
+
+llvm_src=~/llvm-project
+if [[ $2 ]]; then
+    llvm_src="$2"
+elif [[ $LLVM_SRC ]]; then
+    llvm_src="$LLVM_SRC"
+fi
+if [[ ! -d $llvm_src ]]; then
+    echo "$llvm_src not found. Please specify a valid LLVM source directory or define \$LLVM_SRC"
+    echo "Usage: $0 <output-directory> <path-to-llvm-src> [llvm-tblgen-dir]"
+    exit 1
+fi
+bin=$(dirname $(which llvm-tblgen))
+if [[ -n $3 ]]; then
+    bin="$3"
+fi
+
+pushd () {
+    command pushd "$@" > /dev/null
+}
+
+popd () {
+    command popd "$@" > /dev/null
+}
+
+outdir="$1"
+mkdir -p "$outdir"
+echo Writing pattern lookup file to $outdir...
+
+pushd $llvm_src
+"$bin"/llvm-tblgen -gen-dag-isel -pattern-lookup "$outdir"/isel.json \
+	-I./llvm/lib/Target/X86 -I./build/include -I./llvm/include -I ./llvm/lib/Target \
+	./llvm/lib/Target/X86/X86.td -o "$outdir"/isel.inc -d "$outdir"/isel.inc.d
+popd
+echo Generation time:
+times

@@ -158,9 +158,9 @@ std::vector<Matcher> getMatchers(ondemand::document &TableJSON) {
     size_t Size = MatcherObject["size"];
     TheMatcher.End = TheMatcher.Begin + Size - 1;
     if (TheMatcher.hasPattern()) {
-      TheMatcher.PIdx = MatcherObject["pattern"];
+      TheMatcher.PatternIdx = MatcherObject["pattern"];
     } else if (TheMatcher.hasPatPred()) {
-      TheMatcher.PIdx = MatcherObject["predicate"];
+      TheMatcher.PatPredIdx = MatcherObject["predicate"];
     } else if (TheMatcher.isCase()) {
       TheMatcher.CaseName = MatcherObject["case"].get_string().value();
     }
@@ -213,17 +213,20 @@ std::vector<std::pair<A, B>> toSortedVecByKey(const M<A, B, Args...> &Src) {
   return Dst;
 }
 
-const std::vector<bool> &MatcherTree::analyzeUpperBound() {
+void MatcherTree::analyzeUpperBound() {
   I = 0;
   ShadowMap.clear();
+  // Start by assuming that all indices could be covered
   ShadowMap.resize(MatcherTableSize, false);
-  if (Matchers.empty())
-    return ShadowMap;
-  getUpperBound();
-  analyzeMap(ShadowMap);
-  return ShadowMap;
+  if (Matchers.size()) {
+    getUpperBound();
+    analyzeMap(ShadowMap);
+  }
 }
 
+/// @param Kind matcher kind
+/// @return true if the given matcher kind could fail, which means that the
+/// current immediate subscope may not always succeed & lead to early match.
 bool affectsEarlyMatch(Matcher::KindTy Kind) {
   switch (Kind) {
   default:
@@ -248,11 +251,7 @@ bool affectsEarlyMatch(Matcher::KindTy Kind) {
 }
 
 /// @brief Visit a matcher tree node and calculate coverage upper bound
-/// @param I current matcher tree index
-/// @param UpperBound Current upper bound value
-/// @param ShadowMap Shadow map
-/// @param BlameMap Pattern predicate blame list (pat pred -> loss)
-/// @return if this leaf failed a pattern predicate check (not named predicate)
+/// @return whether this leaf failed (e.g. by a pattern predicate check)
 bool MatcherTree::getUpperBound() {
   if (Matchers[I].isLeaf()) {
     if (Matchers[I].hasPattern()) {
@@ -261,7 +260,7 @@ bool MatcherTree::getUpperBound() {
     // We only care about leaves with a pattern or pattern predicate index
     if (Matchers[I].hasPattern() && Predicates.Verbosity &&
         !Predicates.CustomizedPatternPredicates) {
-      const Pattern &Pat = Patterns[Matchers[I].PIdx];
+      const Pattern &Pat = Patterns[Matchers[I].PatternIdx];
       // Verify that all named predicates are satisfied.
       for (size_t Pred : Pat.NamedPredicates) {
         if (!Predicates.name(Pred)->satisfied()) {
@@ -276,7 +275,7 @@ bool MatcherTree::getUpperBound() {
         }
       }
     } else if (Matchers[I].hasPatPred() &&
-               !Predicates.pat(Matchers[I].PIdx)->satisfied()) {
+               !Predicates.pat(Matchers[I].PatPredIdx)->satisfied()) {
       I++;
       return true;
     }
@@ -346,38 +345,33 @@ void MatcherTree::analyzeMap(const std::vector<bool> &Map) {
   }
 }
 
-PatPredBlameList MatcherTree::blamePatternPredicates() const {
-  std::unordered_map<size_t, size_t> PPBM;
+std::vector<std::pair<size_t, size_t>>
+MatcherTree::blamePatternPredicates() const {
+  std::unordered_map<size_t, size_t> BlameMap;
   for (const Blamee &TheBlamee : BlameList) {
     const Matcher &M = Matchers[TheBlamee.MatcherIdx];
     if (!M.hasPatPred())
       continue;
-    PPBM[M.PIdx] += TheBlamee.Loss;
+    BlameMap[M.PatPredIdx] += TheBlamee.Loss;
   }
-  return toSortedVecByValue(PPBM);
+  return toSortedVecByValue(BlameMap);
 }
 
-MatcherKindBlameList MatcherTree::blameMatcherKinds() const {
-  std::unordered_map<Matcher::KindTy, size_t> MKBM;
+std::vector<std::pair<Matcher::KindTy, size_t>>
+MatcherTree::blameMatcherKinds() const {
+  std::unordered_map<Matcher::KindTy, size_t> BlameMap;
   for (const Blamee &TheBlamee : BlameList) {
     const Matcher &M = Matchers[TheBlamee.MatcherIdx];
-    MKBM[M.Kind] += TheBlamee.Loss;
+    BlameMap[M.Kind] += TheBlamee.Loss;
   }
-  return toSortedVecByValue(MKBM);
+  return toSortedVecByValue(BlameMap);
 }
 
-std::vector<std::pair<size_t, size_t>> MatcherTree::blameDepth() const {
+std::vector<std::pair<size_t, size_t>>
+MatcherTree::blameDepth(std::optional<Matcher::KindTy> Kind) const {
   std::unordered_map<size_t, size_t> DBM;
   for (const Blamee &TheBlamee : BlameList) {
-    DBM[TheBlamee.Depth] += TheBlamee.Loss;
-  }
-  return toSortedVecByKey(DBM);
-}
-
-std::vector<std::pair<size_t, size_t>> MatcherTree::blameSOCAtDepth() const {
-  std::unordered_map<size_t, size_t> DBM;
-  for (const Blamee &TheBlamee : BlameList) {
-    if (Matchers[TheBlamee.MatcherIdx].Kind != Matcher::SwitchOpcodeCase)
+    if (Kind.has_value() && Matchers[TheBlamee.MatcherIdx].Kind != Kind.value())
       continue;
     DBM[TheBlamee.Depth] += TheBlamee.Loss;
   }
@@ -411,20 +405,21 @@ MatcherTree::blamePatterns(bool UseLossPerPattern) const {
   return FailedPatterns;
 }
 
-std::set<std::string> MatcherTree::blamePossiblePatterns() const {
+std::vector<std::string> MatcherTree::blamePossiblePatterns() const {
   // Use set since there may be patterns that only differ in pattern
   // predicates but otherwise do not have different source pattern strings.
-  std::set<std::string> possiblePatterns;
+  std::set<std::string> PossiblePatterns;
   for (const Blamee &TheBlamee : BlameList) {
     if (TheBlamee.Blamers.size() == 0)
       continue;
     if (Matchers[TheBlamee.MatcherIdx].Kind == Matcher::CheckPatternPredicate)
       continue;
     for (size_t PatIdx : TheBlamee.Blamers) {
-      possiblePatterns.insert(Patterns[PatIdx].Src);
+      PossiblePatterns.insert(Patterns[PatIdx].Src);
     }
   }
-  return possiblePatterns;
+  return std::vector<std::string>(PossiblePatterns.begin(),
+                                  PossiblePatterns.end());
 }
 
 std::vector<Intrinsic::ID> MatcherTree::blameTargetIntrinsic() const {
@@ -449,9 +444,9 @@ std::vector<Intrinsic::ID> MatcherTree::blameTargetIntrinsic() const {
   return std::vector<Intrinsic::ID>(TargetIIDs.begin(), TargetIIDs.end());
 }
 
+/// @brief Generate blame list for the current ShadowMap
+/// @return whether the current matcher failed / was not covered
 bool MatcherTree::analyzeMap() {
-  // TODO: remove recursion
-
   if (Matchers[I].isLeaf()) {
     return ShadowMap[Matchers[I++].Begin];
   } else if (ShadowMap[Matchers[I].Begin]) {
@@ -506,10 +501,11 @@ bool MatcherTree::analyzeMap() {
       const Matcher &M = Matchers[I];
       if (!M.hasPattern())
         continue;
-      TheBlamee.Blamers.insert(M.PIdx);
+      TheBlamee.Blamers.insert(M.PatternIdx);
       if (Verbosity > 3) {
-        errs() << "DEBUG:     Blamer: Pattern " << M.PIdx << " at " << M.Begin
-               << " with complexity " << Patterns[M.PIdx].Complexity << '\n';
+        errs() << "DEBUG:     Blamer: Pattern " << M.PatternIdx << " at "
+               << M.Begin << " with complexity "
+               << Patterns[M.PatternIdx].Complexity << '\n';
       }
     }
     if (TheBlamee.Blamers.size() == 0) {
@@ -525,7 +521,7 @@ bool MatcherTree::analyzeMap() {
       if (M.isCase()) {
         errs() << " (" << M.CaseName << ')';
       } else if (M.hasPatPred()) {
-        errs() << " (" << M.PIdx << ")";
+        errs() << " (" << M.PatPredIdx << ")";
       }
       errs() << " at " << M.Begin << " (depth " << CurrentDepth << ") of size "
              << M.size() << " (-" << TheBlamee.Loss << ")\n";

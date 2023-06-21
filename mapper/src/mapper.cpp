@@ -42,7 +42,7 @@ void printAnalysisResults(const MatcherTree &MT, size_t EntriesLimit) {
   outs() << '\n';
 
   outs() << "Loss of SwitchOpcodeCase by depth:\n";
-  for (const auto &[Depth, Loss] : MT.blameSOCAtDepth()) {
+  for (const auto &[Depth, Loss] : MT.blameDepth(Matcher::SwitchOpcodeCase)) {
     if (MSP.atLimit())
       break;
     MSP.addStat(std::to_string(Depth), Loss, MT.MatcherTableSize);

@@ -25,8 +25,7 @@ Function *InsertIntrinsicStrategy::chooseFunction(Module *M,
 }
 
 static std::chrono::nanoseconds GetLastModDuration(const fs::path &FP) {
-  if (!fs::is_regular_file(FP))
-    return std::chrono::nanoseconds::max();
+  assert(fs::is_regular_file(FP));
   return fs::file_time_type::clock::now() - fs::last_write_time(FP);
 }
 

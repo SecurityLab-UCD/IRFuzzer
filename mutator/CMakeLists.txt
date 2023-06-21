@@ -43,6 +43,9 @@ llvm_map_components_to_libnames(LLVM_LIBS
     Target
 )
 
+# TODO: Instead of add it as a subdir, I thin it's 
+# better if mapper is its own project and we say 
+# mutator depends on it to avoid this awkward subdir
 add_subdirectory(../mapper/ ./mapper/)
 
 include_directories(

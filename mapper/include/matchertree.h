@@ -64,52 +64,94 @@ struct Matcher {
     HighestKind = MorphNodeTo
   };
 
+  // [Begin, End]
   size_t Begin = 0;
   size_t End = 0;
   KindTy Kind = Scope;
-  // To save space, this may either be a pattern or a pattern predicate index
-  size_t PIdx = 0;
+  union {
+    // Index to Patterns associated with a MorphNodeTo or CompleteMatch
+    size_t PatternIdx;
+    // Index to PredicateKeeper::PatternPredicates used by CheckPatternPredicate
+    size_t PatPredIdx;
+  };
+
+  // Name of a switch case (i.e. opcode or type name)
   std::string CaseName;
 
+  /// @param M another matcher
+  /// @return whether the current matcher comes before M in
+  /// matcher table
   bool operator<(const Matcher &M) const;
+
+  /// @param N another matcher
+  /// @return whether the current matcher has the same interval as N
   bool operator==(const Matcher &N) const;
+
+  /// @param N another matcher
+  /// @return !(*this == N)
   bool operator!=(const Matcher &N) const;
 
+  /// @param i a matcher table index
+  /// @return whether the matcher table index is within this matcher
   bool contains(size_t i) const;
+
+  /// @param N a matcher
+  /// @return whether the matcher fully contains N
   bool contains(const Matcher &N) const;
+
+  /// @return whether this matcher has a PatternIdx
   bool hasPattern() const;
+
+  /// @return whether this matcher has a PatPredIdx
   bool hasPatPred() const;
+
+  /// @return true if this kind of matcher cannot have child matchers
   bool isLeaf() const;
+
+  /// @return true if this kind of matcher can have siblings that are leaves
   bool hasLeafSibling() const;
+
+  /// @return true if this matcher is a Switch{Type,Opcode}Case
   bool isCase() const;
+
+  /// @return size of the matcher in matcher table
   size_t size() const;
 
   static std::string getKindAsString(KindTy Kind);
   std::string getKindAsString() const;
 };
 
-typedef std::vector<std::pair<size_t, size_t>> PatPredBlameList;
-typedef std::vector<std::pair<Matcher::KindTy, size_t>> MatcherKindBlameList;
-
 struct Pattern {
+  // where the pattern was defined (a .td file name with line number)
   std::string IncludePath;
+  // pattern source (uses DAG opcodes)
   std::string Src;
+  // pattern destination (uses machine instruction opcodes)
   std::string Dst;
+  // a list of predicates that must be satisfied for SelectionDAG to generate
+  // this pattern
   llvm::SmallVector<size_t, 3> NamedPredicates;
-  // Index to PredicateKeeper::PatternPredicates; only used if
-  // !NamedPredicates.empty()
+  // Index to PredicateKeeper::PatternPredicates. Same thing as named
+  // predicates, except they are concatenated into a single C++ expression. Only
+  // use if !NamedPredicates.empty().
   size_t PatPredIdx;
-  // Index in the lookup table array
+  // The pattern's index in the lookup table array
   size_t Index;
-  size_t Complexity;
+  // Pattern's complexity as calculated by TableGen
+  int Complexity;
 };
 
 struct Blamee {
-  size_t MatcherIdx = 0;              // index in the Matchers vector
-  size_t Loss = 0;                    // coverage loss
-  std::unordered_set<size_t> Blamers; // index to patterns
-  size_t Depth = 1;                   // how nested the blamed matcher is
-  bool isEarlyExit = false;           // true = the blamee itself is uncovered
+  // Blamee's index in Matchers
+  size_t MatcherIdx = 0;
+  // Coverage loss
+  size_t Loss = 0;
+  // Indices to patterns that were not covered due to the blamee
+  std::unordered_set<size_t> Blamers;
+  // How nested the blamee is
+  size_t Depth = 1;
+  // If true, then the blamee itself is uncovered
+  bool isEarlyExit = false;
 
   Blamee() = default;
   // For uncovered null terminators
@@ -128,40 +170,72 @@ class MatcherTree {
 public:
   std::vector<Pattern> Patterns;
   size_t MatcherTableSize;
+  // Stores the truth value of all named predicates and pattern predicates (i.e.
+  // predicate checks)
   PredicateKeeper Predicates;
-  // Always sorted by matcher table index then size
+  // List of matchers sorted by matcher table index and then size
   std::vector<Matcher> Matchers;
+  // List of matchers that caused coverage loss
+  // Populated by analyzeMap()
   std::vector<Blamee> BlameList;
+  // Current shadow map under analysis
   std::vector<bool> ShadowMap;
+  // For use in mapper only
   size_t Verbosity = 0;
 
-  // Read from pattern lookup table JSON
+  /// @brief Create matcher tree from pattern lookup table JSON
+  /// @param Filename file path to pattern lookup table
+  /// @param NameCaseSensitive whether predicate names are case-sensitive
+  /// @param Verbosity verbosity; for use in mapper only
   MatcherTree(const std::string &Filename, bool NameCaseSensitive = false,
               size_t Verbosity = 0);
   MatcherTree(const MatcherTree &) = delete;
   MatcherTree(MatcherTree &&) = default;
 
   /// @brief Determine coverage upper bound shadow map and analyze it
-  /// @return reference to upper bound shadow map
-  const std::vector<bool> &analyzeUpperBound();
+  /// @note The upperbound shadow map is MatcherTree::ShadowMap. This function
+  /// also calls analyzeMap().
+  void analyzeUpperBound();
 
   /// @brief Analyze coverage loss in shadow map and populate BlameList
   /// @param Map map to be analyzed
+  /// @note Run this before using the blame member functions.
   void analyzeMap(const std::vector<bool> &Map);
 
-  PatPredBlameList blamePatternPredicates() const;
-  MatcherKindBlameList blameMatcherKinds() const;
-  std::vector<std::pair<size_t, size_t>> blameDepth() const;
-  std::vector<std::pair<size_t, size_t>> blameSOCAtDepth() const;
-  // returns [(blamer loss, blamee MT index, blamee kind, src -> dst)...]
+  /// @brief Calculate coverage loss caused by unsatisfied pattern predicates
+  /// @return [(pattern predicate index, coverage loss)...]
+  /// @note Run analyzeMap() beforehand
+  std::vector<std::pair<size_t, size_t>> blamePatternPredicates() const;
+
+  /// @brief Calculate coverage loss caused by different matcher kinds
+  /// @return [(matcher kind, coverage loss)...]
+  /// @note Run analyzeMap() beforehand
+  std::vector<std::pair<Matcher::KindTy, size_t>> blameMatcherKinds() const;
+
+  /// @brief Calculate coverage loss occurred at different nesting levels /
+  /// depths
+  /// @param Kind only calculate loss from blamees with a given matcher kind
+  /// @return [(depth, coverage loss)...]
+  /// @note Run analyzeMap() beforehand
+  std::vector<std::pair<size_t, size_t>>
+  blameDepth(std::optional<Matcher::KindTy> Kind = std::nullopt) const;
+
+  /// @brief Get patterns that were not covered
+  /// @param UseLossPerPattern For each blamer's coverage loss, use average loss
+  /// per blamer instead of total blamee loss
+  /// @return [(blamer coverage loss, blamee matcher table index, blamee depth,
+  /// pattern src, pattern dst)...]
+  /// @note Run analyzeMap() beforehand
   std::vector<std::tuple<size_t, size_t, size_t, std::string, std::string>>
   blamePatterns(bool UseLossPerPattern) const;
 
-  // returns [pattern source...]
-  // returns only pattern source strings that are possible (i.e. not failed
-  // by pattern predicate check)
-  std::set<std::string> blamePossiblePatterns() const;
+  /// @return all uncovered but possible pattern source strings (i.e. not failed
+  /// by pattern predicate check)
+  /// @note Run analyzeMap() beforehand
+  std::vector<std::string> blamePossiblePatterns() const;
 
+  /// @return all uncovered target intrinsic IDs in matcher table
+  /// @note Run analyzeMap() beforehand
   std::vector<llvm::Intrinsic::ID> blameTargetIntrinsic() const;
 
 private:

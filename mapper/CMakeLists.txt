@@ -42,11 +42,11 @@ add_library(shadow SHARED
     ${CMAKE_CURRENT_SOURCE_DIR}/src/matchertree.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/shadowmap.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/predicate.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/commandline.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/simdjson.cpp
 )
 add_executable(mapper
     ${CMAKE_CURRENT_SOURCE_DIR}/src/mapper.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/commandline.cpp
 )
 target_link_libraries(shadow
     ${LLVM_LIBS}

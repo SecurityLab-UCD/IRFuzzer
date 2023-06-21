@@ -176,7 +176,7 @@ private:
   std::string MaybeFuncCallRegex =
       IdentifierRegex + "((<" + IdentifierRegex + ">)?\\(.*?\\))?";
   std::string NoSpaceValueRegex = "(" + IdentifierRegex + "::)?" +
-                                  MaybeFuncCallRegex + "((->|.)" +
+                                  MaybeFuncCallRegex + "((->|\\.)" +
                                   MaybeFuncCallRegex + ")*";
   std::string MaybeComparisonRegex =
       NoSpaceValueRegex + "( *([><!=]=?) *(" + NoSpaceValueRegex + "|\\d+))?";

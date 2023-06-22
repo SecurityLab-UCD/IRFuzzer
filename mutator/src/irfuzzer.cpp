@@ -28,6 +28,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 #include <vector>
 
 #ifdef DEBUG
@@ -69,9 +70,16 @@ void createISelMutator() {
   Strategies.push_back(std::make_unique<InsertPHIStrategy>());
   Strategies.push_back(std::make_unique<SinkInstructionStrategy>());
   Strategies.push_back(std::make_unique<ShuffleBlockStrategy>());
-  if (getenv("LOOKUP_TABLE") && getenv("WORK_DIR"))
+  if (getenv("INTRINSIC_FEEDBACK")) {
+    // Make everything explict.
+    char *table = getenv("LOOKUP_TABLE");
+    char *workdir = getenv("WORK_DIR");
+    // TODO: Ignore THRESHOLD is not a number for now.
+    char *threshold = getenv("THRESHOLD");
+    assert(table && workdir && threshold);
     Strategies.push_back(std::make_unique<InsertIntrinsicStrategy>(
-        getenv("LOOKUP_TABLE"), getenv("WORK_DIR")));
+        table, workdir, std::stoi(threshold)));
+  }
   Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
 
   Mutator = std::make_unique<IRMutator>(

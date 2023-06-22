@@ -17,10 +17,11 @@ from lib.matcher_table_sizes import (
 )
 from lib.target_lists import TARGET_LISTS
 from lib.time_parser import get_time_in_seconds
+from lib import LLVM_LOOKUP_TABLE_DIR
 
 
 class FuzzerConfig(NamedTuple):
-    extra_env: dict[str, str]
+    extra_env: dict[str, str] = {}
     extra_cmd: list[str] = []
 
     def getIRFuzzer(other_env: dict[str, str] = {}, other_cmd: list[str] = []):
@@ -35,7 +36,9 @@ class FuzzerConfig(NamedTuple):
         )
 
 
-Fuzzer = Literal["aflplusplus", "libfuzzer", "irfuzzer"]
+Fuzzer = Literal[
+    "aflplusplus", "libfuzzer", "irfuzzer", "ir-intrinsic", "ir-wo-shadowmap"
+]
 ISel = Literal["dagisel", "gisel"]
 ClutserType = Literal["screen", "docker", "stdout"]
 
@@ -49,7 +52,14 @@ FUZZERS: dict[str, FuzzerConfig] = {
             "AFL_CUSTOM_MUTATOR_LIBRARY": "mutator/build/libAFLFuzzMutate.so",
         },
     ),
-    "irfuzzer": FuzzerConfig.getIRFuzzer(other_cmd=[" -w"]),
+    "ir-wo-shadowmap": FuzzerConfig.getIRFuzzer(),
+    "irfuzzer": FuzzerConfig.getIRFuzzer(other_cmd=["-w"]),
+    "ir-intrinsic-feedback": FuzzerConfig.getIRFuzzer(
+        extra_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "10"}, other_cmd=["-w"]
+    ),
+    "ir-intrinsic-wo-feedback": FuzzerConfig.getIRFuzzer(
+        extra_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "86400"}, other_cmd=["-w"]
+    ),
 }
 # Check Fuzzer and FUZZERS match.
 assert list(FUZZERS.keys()) == list(
@@ -87,6 +97,10 @@ class ExperimentConfig(NamedTuple):
 
     def get_fuzzing_env(self) -> dict[str, str]:
         envs = {
+            "WORK_DIR": self.get_output_dir(),
+            "LOOKUP_TABLE": str(
+                Path(LLVM_LOOKUP_TABLE_DIR, self.target.triple.backend() + ".json")
+            ),
             "TRIPLE": str(self.target.triple),
             "CPU": self.target.cpu if self.target.cpu else "",
             "ATTR": ",".join(self.target.attrs),

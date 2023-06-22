@@ -32,7 +32,6 @@ static std::chrono::nanoseconds GetLastModDuration(const fs::path &FP) {
 
 void InsertIntrinsicStrategy::LazyInit() {
   fs::path SavedIIDsPath = WorkDirPath / "saved_iids";
-  const auto Threshold = 10min;
   const auto LastMod = GetLastModDuration(SavedIIDsPath);
 
   if (LastMod <= Threshold) {

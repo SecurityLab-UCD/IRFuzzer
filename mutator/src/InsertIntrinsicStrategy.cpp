@@ -25,13 +25,13 @@ Function *InsertIntrinsicStrategy::chooseFunction(Module *M,
 }
 
 static std::chrono::nanoseconds GetLastModDuration(const fs::path &FP) {
-  assert(fs::is_regular_file(FP));
+  if (!fs::is_regular_file(FP))
+    return std::chrono::nanoseconds::max();
   return fs::file_time_type::clock::now() - fs::last_write_time(FP);
 }
 
 void InsertIntrinsicStrategy::LazyInit() {
   fs::path SavedIIDsPath = WorkDirPath / "saved_iids";
-  const auto Threshold = 10min;
   const auto LastMod = GetLastModDuration(SavedIIDsPath);
 
   if (LastMod <= Threshold) {

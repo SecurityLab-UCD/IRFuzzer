@@ -52,11 +52,14 @@ FUZZERS: dict[str, FuzzerConfig] = {
             "AFL_CUSTOM_MUTATOR_LIBRARY": "mutator/build/libAFLFuzzMutate.so",
         },
     ),
-    "irfuzzer": FuzzerConfig.getIRFuzzer(other_cmd=["-w"]),
-    "ir-intrinsic": FuzzerConfig.getIRFuzzer(
-        extra_env={"INTRINSIC_FEEDBACK": "1"}, other_cmd=["-w"]
-    ),
     "ir-wo-shadowmap": FuzzerConfig.getIRFuzzer(),
+    "irfuzzer": FuzzerConfig.getIRFuzzer(other_cmd=["-w"]),
+    "ir-intrinsic-feedback": FuzzerConfig.getIRFuzzer(
+        extra_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "10"}, other_cmd=["-w"]
+    ),
+    "ir-intrinsic-wo-feedback": FuzzerConfig.getIRFuzzer(
+        extra_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "86400"}, other_cmd=["-w"]
+    ),
 }
 # Check Fuzzer and FUZZERS match.
 assert list(FUZZERS.keys()) == list(

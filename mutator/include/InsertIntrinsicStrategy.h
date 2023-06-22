@@ -19,9 +19,12 @@ private:
   std::vector<Intrinsic::ID> IIDs;
   bool IsInitialized = false;
 
+  std::chrono::minutes Threshold;
+
 public:
-  InsertIntrinsicStrategy(const string &JSON, const string &WorkDir)
-      : JSONPath(JSON), WorkDirPath(WorkDir) {}
+  InsertIntrinsicStrategy(const string &JSON, const string &WorkDir,
+                          const int &Threshold)
+      : JSONPath(JSON), WorkDirPath(WorkDir), Threshold(Threshold) {}
   uint64_t getWeight(size_t CurrentSize, size_t MaxSize,
                      uint64_t CurrentWeight) override {
     return 1;

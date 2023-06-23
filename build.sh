@@ -125,22 +125,29 @@ cd $FUZZING_HOME
 ###### Compile mutator.
 mkdir -p mutator/build
 cd mutator/build
-cmake -GNinja .. && ninja -j 4
+cmake -GNinja .. && ninja -j $(nproc --all)
+cd $FUZZING_HOME
+cd mutator/build-debug
+cmake -GNinja .. -DCMAKE_BUILD_TYPE=Debug && ninja -j $(nproc --all)
 cd $FUZZING_HOME
 
+### We are using `scripts/fuzz.py` now.
 # Tell AFL++ to only use our mutator
-export AFL_CUSTOM_MUTATOR_ONLY=1
+# export AFL_CUSTOM_MUTATOR_ONLY=1
 # Tell AFL++ Where our mutator is
-export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so
+# export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so
 
-echo "Preparing seeds..."
-cd seeds.ll
-for I in *.ll; do
-    $FUZZING_HOME/llvm-project/build-release/bin/llvm-as $I
-done
-mv *.bc ../seeds
-echo "Done."
-cd $FUZZING_HOME
+if [ ! -f $FUZZING_HOME/seeds/*.ll ]
+then
+    echo "Preparing seeds..."
+    cd seeds.ll
+    for I in *.ll; do
+        $FUZZING_HOME/llvm-project/build-release/bin/llvm-as $I
+    done
+    mv *.bc ../seeds
+    echo "Done."
+    cd $FUZZING_HOME
+fi
 # Run afl
 # $FUZZING_HOME/$AFL/afl-fuzz -i <input> -o <output> $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing
 
@@ -155,38 +162,45 @@ cd mapper/build
 cmake -GNinja .. && ninja -j 4
 cd $FUZZING_HOME
 
-###### Generate all pattern lookup tables (JSONs)
-cd $LLVM
-git fetch origin pattern-lookup
-git cherry-pick -n origin/pattern-lookup
-mkdir -p build-pl
-cd build-pl
-cmake  -GNinja \
-        -DBUILD_SHARED_LIBS=ON \
-        -DLLVM_CCACHE_BUILD=ON \
-        -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
-        -DCMAKE_C_COMPILER=clang \
-        -DCMAKE_CXX_COMPILER=clang++ \
-        -DCMAKE_BUILD_TYPE=Release \
-    ../llvm
-ninja -j $(nproc --all) llvm-tblgen llc
+if [ ! -d $FUZZING_HOME/$LLVM/build-pl ]
+then
+    ###### Generate all pattern lookup tables (JSONs)
+    cd $LLVM
+    # TODO: Currently this approach will for all (debug, afl++, release, pl) builds to rebuild
+    # because these files in the pattern lookup changed. That's ~1000 tasks in each build, which
+    # is a waste of time. Think of better options in the future.
+    # One idea: git apply <patch> and then git checkout.
+    git fetch origin pattern-lookup
+    git cherry-pick -n origin/pattern-lookup
+    mkdir -p build-pl
+    cd build-pl
+    cmake  -GNinja \
+            -DBUILD_SHARED_LIBS=ON \
+            -DLLVM_CCACHE_BUILD=ON \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release \
+        ../llvm
+    ninja -j $(nproc --all) llvm-tblgen llc
 
-cd "$FUZZING_HOME/$LLVM/llvm/lib/Target"
-targets=$(find * -maxdepth 0 -type d -print)
-outdir="$FUZZING_HOME/$LLVM/build-pl/pattern-lookup"
-cd "$FUZZING_HOME/$LLVM"
-mkdir -p "$outdir"
-for target in $targets; do
-    echo "Generating pattern lookup table for $target..."
-    target_td=$target.td
-    if [[ $target == "PowerPC" ]]; then
-        target_td="PPC.td"
-    fi
-    "$FUZZING_HOME/$LLVM/build-pl/bin/llvm-tblgen" -gen-dag-isel -pattern-lookup "$outdir/$target.json" \
-        -I./llvm/lib/Target/$target -I./build-pl/include -I./llvm/include -I./llvm/lib/Target \
-        ./llvm/lib/Target/$target/$target_td -o "$outdir/$target.inc" -d /dev/null &
-done
-wait
+    cd "$FUZZING_HOME/$LLVM/llvm/lib/Target"
+    targets=$(find * -maxdepth 0 -type d -print)
+    outdir="$FUZZING_HOME/$LLVM/build-pl/pattern-lookup"
+    cd "$FUZZING_HOME/$LLVM"
+    mkdir -p "$outdir"
+    for target in $targets; do
+        echo "Generating pattern lookup table for $target..."
+        target_td=$target.td
+        if [[ $target == "PowerPC" ]]; then
+            target_td="PPC.td"
+        fi
+        "$FUZZING_HOME/$LLVM/build-pl/bin/llvm-tblgen" -gen-dag-isel -pattern-lookup "$outdir/$target.json" \
+            -I./llvm/lib/Target/$target -I./build-pl/include -I./llvm/include -I./llvm/lib/Target \
+            ./llvm/lib/Target/$target/$target_td -o "$outdir/$target.inc" -d /dev/null &
+    done
+    wait
 
-git reset --hard
-cd $FUZZING_HOME
+    git reset --hard
+    cd $FUZZING_HOME
+fi

@@ -37,7 +37,12 @@ class FuzzerConfig(NamedTuple):
 
 
 Fuzzer = Literal[
-    "aflplusplus", "libfuzzer", "irfuzzer", "ir-intrinsic", "ir-wo-shadowmap"
+    "aflplusplus",
+    "libfuzzer",
+    "ir-wo-shadowmap",
+    "irfuzzer",
+    "ir-intrinsic-feedback",
+    "ir-intrinsic-wo-feedback",
 ]
 ISel = Literal["dagisel", "gisel"]
 ClutserType = Literal["screen", "docker", "stdout"]
@@ -55,16 +60,16 @@ FUZZERS: dict[str, FuzzerConfig] = {
     "ir-wo-shadowmap": FuzzerConfig.getIRFuzzer(),
     "irfuzzer": FuzzerConfig.getIRFuzzer(other_cmd=["-w"]),
     "ir-intrinsic-feedback": FuzzerConfig.getIRFuzzer(
-        extra_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "10"}, other_cmd=["-w"]
+        other_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "10"}, other_cmd=["-w"]
     ),
     "ir-intrinsic-wo-feedback": FuzzerConfig.getIRFuzzer(
-        extra_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "86400"}, other_cmd=["-w"]
+        other_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "86400"}, other_cmd=["-w"]
     ),
 }
 # Check Fuzzer and FUZZERS match.
 assert list(FUZZERS.keys()) == list(
     typing.get_args(Fuzzer)
-), "FUZZERS and Fuzzer don't match"
+), f"FUZZERS({FUZZERS.keys()}) and Fuzzer({Fuzzer}) don't match"
 
 
 class ExperimentConfig(NamedTuple):
@@ -97,9 +102,9 @@ class ExperimentConfig(NamedTuple):
 
     def get_fuzzing_env(self) -> dict[str, str]:
         envs = {
-            "WORK_DIR": self.get_output_dir(),
+            "WORK_DIR": str(self.get_output_dir().joinpath("default")),
             "LOOKUP_TABLE": str(
-                Path(LLVM_LOOKUP_TABLE_DIR, self.target.triple.backend() + ".json")
+                Path(LLVM_LOOKUP_TABLE_DIR, self.target.triple.backend + ".json")
             ),
             "TRIPLE": str(self.target.triple),
             "CPU": self.target.cpu if self.target.cpu else "",

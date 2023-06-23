@@ -1,6 +1,6 @@
 build/
-*/*_release
-*/*_debug
+*/*release
+*/*debug
 llvm-aie/
 llvm-fix/
 llvm-project/

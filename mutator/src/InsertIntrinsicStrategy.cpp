@@ -21,7 +21,16 @@ Function *InsertIntrinsicStrategy::chooseFunction(Module *M,
                                                   RandomIRBuilder &IB) {
   LazyInit();
   auto RS = makeSampler(IB.Rand, IIDs);
-  return Intrinsic::getDeclaration(M, RS.getSelection());
+  if (RS.isEmpty())
+    return nullptr;
+  Intrinsic::ID IID = RS.getSelection();
+  errs() << Intrinsic::getBaseName(IID) << "\n";
+  if (!Intrinsic.isOverloaded(IID)) {
+    return Intrinsic::getDeclaration(M, IID);
+  } else {
+    // TODO: Figure our what type to overload that intrinsic later.
+    return nullptr;
+  }
 }
 
 static std::chrono::nanoseconds GetLastModDuration(const fs::path &FP) {

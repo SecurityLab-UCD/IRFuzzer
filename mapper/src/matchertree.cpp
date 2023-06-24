@@ -140,7 +140,9 @@ std::vector<Pattern> getPatterns(ondemand::document &TableJSON) {
     } else {
       ThePattern.PatPredIdx = std::numeric_limits<size_t>::max();
     }
-    ThePattern.Complexity = PatternObject["complexity"];
+    // TODO: It seems some patterns don't have complexity. This can be
+    // reproduced on both X86 and AArch64.
+    ThePattern.Complexity = 0; // PatternObject["complexity"];
     ThePattern.IncludePath = PatternObject["path"].get_string().value();
     StringRef SrcDst = PatternObject["pattern"].get_string().value();
     std::tie(ThePattern.Src, ThePattern.Dst) = SrcDst.split(" -> ");

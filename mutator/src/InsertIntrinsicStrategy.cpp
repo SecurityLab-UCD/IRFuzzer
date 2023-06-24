@@ -24,11 +24,10 @@ Function *InsertIntrinsicStrategy::chooseFunction(Module *M,
   if (RS.isEmpty())
     return nullptr;
   Intrinsic::ID IID = RS.getSelection();
-  errs() << Intrinsic::getBaseName(IID) << "\n";
-  if (!Intrinsic.isOverloaded(IID)) {
+  if (!Intrinsic::isOverloaded(IID)) {
     return Intrinsic::getDeclaration(M, IID);
   } else {
-    // TODO: Figure our what type to overload that intrinsic later.
+    // TODO: Analysis the arg kind and come up with corresponding type.
     return nullptr;
   }
 }

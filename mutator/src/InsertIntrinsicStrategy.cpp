@@ -20,16 +20,21 @@ namespace llvm {
 Function *InsertIntrinsicStrategy::chooseFunction(Module *M,
                                                   RandomIRBuilder &IB) {
   LazyInit();
-  auto RS = makeSampler(IB.Rand, IIDs);
+  // TODO: Analysis the arg kind and come up with corresponding type.
+  auto RS = makeSampler(IB.Rand, make_filter_range(IIDs, [](Intrinsic::ID ID) {
+                          return !Intrinsic::isOverloaded(ID);
+                        }));
   if (RS.isEmpty())
     return nullptr;
   Intrinsic::ID IID = RS.getSelection();
-  if (!Intrinsic::isOverloaded(IID)) {
-    return Intrinsic::getDeclaration(M, IID);
-  } else {
-    // TODO: Analysis the arg kind and come up with corresponding type.
+  Function *F = Intrinsic::getDeclaration(M, IID);
+  // AMX can't be stored to memory and has its own syntax and stuff.
+  // Too complicated for now, will just ignore it.
+  if (F->getReturnType()->isX86_AMXTy() ||
+      std::any_of(F->arg_begin(), F->arg_end(),
+                  [](Argument &Arg) { return Arg.getType()->isX86_AMXTy(); }))
     return nullptr;
-  }
+  return F;
 }
 
 static std::chrono::nanoseconds GetLastModDuration(const fs::path &FP) {

@@ -127,6 +127,7 @@ mkdir -p mutator/build
 cd mutator/build
 cmake -GNinja .. && ninja -j $(nproc --all)
 cd $FUZZING_HOME
+mkdir -p mutator/build-debug
 cd mutator/build-debug
 cmake -GNinja .. -DCMAKE_BUILD_TYPE=Debug && ninja -j $(nproc --all)
 cd $FUZZING_HOME
@@ -144,6 +145,7 @@ then
     for I in *.ll; do
         $FUZZING_HOME/llvm-project/build-release/bin/llvm-as $I
     done
+    mkdir -p ../seeds
     mv *.bc ../seeds
     echo "Done."
     cd $FUZZING_HOME

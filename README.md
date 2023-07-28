@@ -118,7 +118,7 @@ To install some dependencies you may want to:
 # `apt install -y python3.8 python3-pip wget`
 wget https://bootstrap.pypa.io/get-pip.py
 python3.8 get-pip.py
-pip3.8 install -r requirements.txt
+pip3.8 install -r ./scripts/requirements.txt
 ```
 
 ### Description and usage

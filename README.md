@@ -118,7 +118,12 @@ To install some dependencies you may want to:
 # `apt install -y python3.8 python3-pip wget`
 wget https://bootstrap.pypa.io/get-pip.py
 python3.8 get-pip.py
-pip3.8 install -r ./scripts/requirements.txt
+# tqdm is a must to track the process of a task
+pip3.8 install tqdm 
+# It's ok to not install these if you don't intend to do data analysis
+pip3.8 install panda matplotlib
+# You can install all the dependencies of the scripts with:
+pip3.8 install -r scripts/requirements.txt
 ```
 
 ### Description and usage

@@ -33,9 +33,11 @@ def remove_matcher_table_build_files(global_isel: bool) -> None:
             continue
 
         backend = target_dir.name
-        paths = list(Path(target_dir).glob(
-            f"CMakeFiles/LLVM{backend}CodeGen.dir/**/*{suffix}.cpp.o"
-        ))
+        paths = list(
+            Path(target_dir).glob(
+                f"CMakeFiles/LLVM{backend}CodeGen.dir/**/*{suffix}.cpp.o"
+            )
+        )
 
         for path in paths:
             print(f"Removing {path}...")
@@ -60,16 +62,19 @@ def build_llvm_afl(jobs: int) -> str:
         print(stderr)
         exit(1)
 
-    print(stdout)
-
     p.check_returncode()
+
+    ## Filter out compiler outputs, mostly warnings.
+    stdout = "\n".join(filter(lambda l: len(l) > 1 and l[0] == "[", stdout.split("\n")))
+
+    print(stdout)
 
     return stdout
 
 
 def get_output_pattern(global_isel: bool) -> str:
     suffix = get_obj_file_suffix(global_isel)
-    line1 = rf"\[(\d+)/\d+\] Building CXX object lib/Target/(.+)/CMakeFiles/.+{suffix}\.cpp\.o"
+    line1 = rf"\[(\d+)/\d+\] Building CXX object lib/Target/.+/CMakeFiles/.+/(.+){suffix}\.cpp\.o"
     line2 = r"\[\+\] MatcherTable size: (\d+)"
     return rf"{line1}\n{line2}"
 

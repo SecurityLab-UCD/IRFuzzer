@@ -32,7 +32,7 @@ fi
 export PATH=$PATH:$HOME/clang+llvm/bin
 
 ###### Download submodules
-git submodule update
+# git submodule update
 
 ###### Compile AFLplusplus
 cd $FUZZING_HOME/$AFL; make -j; cd $FUZZING_HOME
@@ -55,7 +55,7 @@ then
             -DBUILD_SHARED_LIBS=OFF \
             -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_CCACHE_BUILD=OFF \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE;X86;AArch64;RISCV" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -80,7 +80,7 @@ then
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE;X86;AArch64;RISCV" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -101,7 +101,7 @@ if [ ! -f /.dockerenv ]; then
         cmake  -GNinja \
                 -DBUILD_SHARED_LIBS=ON \
                 -DLLVM_CCACHE_BUILD=ON \
-                -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
+                -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="AIE;X86;AArch64;RISCV" \
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DCMAKE_BUILD_TYPE=Debug \
@@ -123,13 +123,25 @@ ninja -j 4
 cd $FUZZING_HOME
 
 ###### Compile mutator.
-mkdir -p mutator/build
-cd mutator/build
-cmake -GNinja .. && ninja -j $(nproc --all)
+mkdir -p mutator/build-release
+cd mutator/build-release
+cmake -GNinja \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_BUILD_TYPE=Release \
+    .. 
+ninja -j $(nproc --all)
 cd $FUZZING_HOME
+ln -s mutator/build mutator/build-release
+
 mkdir -p mutator/build-debug
 cd mutator/build-debug
-cmake -GNinja .. -DCMAKE_BUILD_TYPE=Debug && ninja -j $(nproc --all)
+cmake -GNinja \
+        -DCMAKE_C_COMPILER=clang \
+        -DCMAKE_CXX_COMPILER=clang++ \
+        -DCMAKE_BUILD_TYPE=Debug \
+    .. 
+ninja -j $(nproc --all)
 cd $FUZZING_HOME
 
 ### We are using `scripts/fuzz.py` now.
@@ -148,61 +160,5 @@ then
     mkdir -p ../seeds
     mv *.bc ../seeds
     echo "Done."
-    cd $FUZZING_HOME
-fi
-# Run afl
-# $FUZZING_HOME/$AFL/afl-fuzz -i <input> -o <output> $FUZZING_HOME/llvm-isel-afl/build/isel-fuzzing
-
-# Kill zombie processes left over by afl.
-# It will report a `no such process`, that's ok.
-# That process is `grep`, which is also shown in `ps`, which died before `kill` thus doesn't exist.
-# kill -9 $(ps aux | grep isel-fuzzing | awk '{print $2}')
-
-###### Compile mapper.
-mkdir -p mapper/build
-cd mapper/build
-cmake -GNinja .. && ninja -j 4
-cd $FUZZING_HOME
-
-if [ ! -d $FUZZING_HOME/$LLVM/build-pl ]
-then
-    ###### Generate all pattern lookup tables (JSONs)
-    cd $LLVM
-    # TODO: Currently this approach will for all (debug, afl++, release, pl) builds to rebuild
-    # because these files in the pattern lookup changed. That's ~1000 tasks in each build, which
-    # is a waste of time. Think of better options in the future.
-    # One idea: git apply <patch> and then git checkout.
-    git fetch origin pattern-lookup
-    git cherry-pick -n origin/pattern-lookup
-    mkdir -p build-pl
-    cd build-pl
-    cmake  -GNinja \
-            -DBUILD_SHARED_LIBS=ON \
-            -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
-            -DCMAKE_C_COMPILER=clang \
-            -DCMAKE_CXX_COMPILER=clang++ \
-            -DCMAKE_BUILD_TYPE=Release \
-        ../llvm
-    ninja -j $(nproc --all) llvm-tblgen llc
-
-    cd "$FUZZING_HOME/$LLVM/llvm/lib/Target"
-    targets=$(find * -maxdepth 0 -type d -print)
-    outdir="$FUZZING_HOME/$LLVM/build-pl/pattern-lookup"
-    cd "$FUZZING_HOME/$LLVM"
-    mkdir -p "$outdir"
-    for target in $targets; do
-        echo "Generating pattern lookup table for $target..."
-        target_td=$target.td
-        if [[ $target == "PowerPC" ]]; then
-            target_td="PPC.td"
-        fi
-        "$FUZZING_HOME/$LLVM/build-pl/bin/llvm-tblgen" -gen-dag-isel -pattern-lookup "$outdir/$target.json" \
-            -I./llvm/lib/Target/$target -I./build-pl/include -I./llvm/include -I./llvm/lib/Target \
-            ./llvm/lib/Target/$target/$target_td -o "$outdir/$target.inc" -d /dev/null &
-    done
-    wait
-
-    git reset --hard
     cd $FUZZING_HOME
 fi

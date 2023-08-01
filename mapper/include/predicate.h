@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <vector>
 
-class PredicateKeeper;
+struct PredicateKeeper;
 
 struct Predicate {
   friend PredicateKeeper;

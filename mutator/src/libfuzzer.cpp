@@ -75,7 +75,7 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
     exit(1);
   }
 
-  Mutator->mutateModule(*M, Seed, MaxSize, false);
+  Mutator->mutateModule(*M, Seed, MaxSize);
 
   return writeModule(*M, Data, MaxSize);
 }

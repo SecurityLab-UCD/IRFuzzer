@@ -62,52 +62,63 @@ TARGET_LISTS: dict[str, list[Target]] = {
         Target("thumbeb"),
     ],
     "cpu": [
+        # AArch64
+        ## Apple
         Target("aarch64", "apple-a16"),
         Target("aarch64", "apple-m2"),
-        # Samsung
-        Target("aarch64", "exynos-m5"),
+        ## ARM
         Target("aarch64", "cortex-a715"),
-        Target("aarch64", "cortex-x2"),
-        Target("aarch64", "tsv110"),
         Target("aarch64", "cortex-r82"),
-        # AMD
+        Target("aarch64", "cortex-x3"),
+        ## Samsung
+        Target("aarch64", "exynos-m5"),
+        ## HiSilicon
+        Target("aarch64", "tsv110"),
+
+        # AMDGCN
         Target("amdgcn", "gfx1100"),
         Target("amdgcn", "gfx1036"),
-        ## ARM
-        Target("arm", "armv9.4-a"),
-        ## Hexagon
-        # Qualcomm
+
+        # Hexagon
         Target("hexagon", "hexagonv71t"),
         Target("hexagon", "hexagonv73"),
-        ## LoongArch
+
+        # LoongArch
         Target("loongarch64", "generic-la64"),
-        ## MIPS
+
+        # MIPS
         Target("mips64", "mips64r6"),
-        ## NVPTX
-        # Nvidia
+
+        # NVPTX
         Target("nvptx64", "sm_90"),
-        # PPC
+
+        # PowerPC
         Target("ppc64", "pwr9"),
-        ## RISCV
-        # SiFive
+
+        # RISCV
         Target("riscv64", "sifive-u74"),
         Target("riscv64", "sifive-x280"),
         Target("riscv64", "rocket-rv64"),
         Target("riscv64", "syntacore-scr1-base"),
+
         # SystemZ
         Target("systemz", "z15"),
         Target("systemz", "z16"),
+
         # VE
         Target("ve", "generic"),
+
         ## WASM
         Target("wasm64", "generic"),
         Target("wasm64", "bleeding-edge"),
-        ## X86
-        # Intel
-        Target("x86_64", "alderlake"),
-        Target("x86_64", "sapphirerapids"),
-        Target("x86_64", "icelake-server"),
-        # AMD
+
+        # X86
+        ## Intel
+        Target("x86_64", "alderlake"), # Alder Lake (12th Gen Core)
+        Target("x86_64", "raptorlake"), # Raptor Lake (13th Gen Core)
+        Target("x86_64", "sapphirerapids"), # Sapphire Rapids (4rd Gen Xeon Scalable)
+        Target("x86_64", "emeraldrapids"), # Emerald Rapids (5rd Gen Xeon)
+        ## AMD
         Target("x86_64", "znver3"),
         Target("x86_64", "znver4"),
     ],

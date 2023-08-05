@@ -1,6 +1,10 @@
 from lib.target import Target
 
 TARGET_LISTS: dict[str, list[Target]] = {
+    "aie": [
+        Target("aie"),
+        Target("aie2"),
+    ],
     "1": [
         Target("arm"),
         Target("aarch64"),

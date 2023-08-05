@@ -111,6 +111,7 @@ class ExperimentConfig(NamedTuple):
             "ATTR": ",".join(self.target.attrs),
             "GLOBAL_ISEL": "1" if self.isel == "gisel" else "0",
             "MATCHER_TABLE_SIZE": str(self.matcher_table_size),
+            "AFL_IGNORE_TIMEOUTS": "",
         }
         envs.update(FUZZERS[self.fuzzer].extra_env)
         return envs

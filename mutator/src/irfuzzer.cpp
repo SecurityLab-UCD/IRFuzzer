@@ -83,13 +83,25 @@ void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
 /// TODO:
 /// Type* getStructType(Context& C);
 
+std::vector<fuzzerop::OpDescriptor> getDefaultOps() {
+  std::vector<fuzzerop::OpDescriptor> Ops;
+  describeFuzzerIntOps(Ops);
+  describeFuzzerFloatOps(Ops);
+  describeFuzzerUnaryOperations(Ops);
+  describeFuzzerControlFlowOps(Ops);
+  describeFuzzerOtherOps(Ops);
+  describeFuzzerPointerOps(Ops);
+  describeFuzzerAggregateOps(Ops);
+  describeFuzzerVectorOps(Ops);
+  return Ops;
+}
+
 void createISelMutator() {
 
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
 
-  Strategies.push_back(std::make_unique<InjectorIRStrategy>(
-      InjectorIRStrategy::getDefaultOps()));
+  Strategies.push_back(std::make_unique<InjectorIRStrategy>(getDefaultOps()));
   Strategies.push_back(std::make_unique<InstModificationIRStrategy>());
   Strategies.push_back(std::make_unique<InsertFunctionStrategy>());
   Strategies.push_back(std::make_unique<InsertCFGStrategy>());

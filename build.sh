@@ -123,8 +123,8 @@ ninja -j 4
 cd $FUZZING_HOME
 
 ###### Compile mutator.
-mkdir -p mutator/build-release
-cd mutator/build-release
+mkdir -p mutator/build
+cd mutator/build
 cmake -GNinja \
         -DCMAKE_C_COMPILER=clang \
         -DCMAKE_CXX_COMPILER=clang++ \
@@ -132,7 +132,6 @@ cmake -GNinja \
     .. 
 ninja -j $(nproc --all)
 cd $FUZZING_HOME
-ln -s mutator/build mutator/build-release
 
 mkdir -p mutator/build-debug
 cd mutator/build-debug
@@ -152,13 +151,16 @@ cd $FUZZING_HOME
 
 if [ ! -f $FUZZING_HOME/seeds/*.ll ]
 then
+    mkdir -p seeds
     echo "Preparing seeds..."
-    cd seeds.ll
-    for I in *.ll; do
-        $FUZZING_HOME/llvm-project/build-release/bin/llvm-as $I
+    for D in seeds*.ll; do
+        cd $D
+        for I in *.ll; do
+            $FUZZING_HOME/llvm-project/build-release/bin/llvm-as $I
+        done
+        mv *.bc ../seeds
+        cd ..
     done
-    mkdir -p ../seeds
-    mv *.bc ../seeds
     echo "Done."
     cd $FUZZING_HOME
 fi

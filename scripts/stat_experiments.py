@@ -11,9 +11,13 @@ class Args(Tap):
     output: Optional[str] = None
     """output csv file to write to; if not provided, write to stdout in string format"""
 
+    summerize: bool = False
+    """if true, print summary of experiments"""
+
     def configure(self) -> None:
         self.add_argument("input")
         self.add_argument("-o", "--output")
+        self.add_argument("-s", "--summerize")
 
 
 experiment_prop_map: dict[str, Callable[[Experiment], str | int | float | None]] = {
@@ -44,10 +48,20 @@ def main():
 
     df = read_experiment_stats(args.input)
 
+    if args.summerize:
+        df = df.groupby(["fuzzer", "isel", "target"]).agg(
+            {
+                "replicate": ["count"],
+                "run_time": ["mean"],
+                "init_mt_cvg": ["mean"],
+                "cur_mt_cvg": ["mean", "std"],
+            }
+        )
+
     if args.output is None:
         print(
             df.to_string(
-                index=False,
+                index=args.summerize,
                 formatters={
                     "run_time": lambda sec: f"{sec / 3600 :.1f}h",
                     "init_mt_cvg": "{:,.3%}".format,
@@ -56,7 +70,7 @@ def main():
             )
         )
     else:
-        df.to_csv(args.output, index=False)
+        df.to_csv(args.output, index=args.summerize)
 
 
 if __name__ == "__main__":

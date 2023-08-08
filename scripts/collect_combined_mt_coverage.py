@@ -1,16 +1,10 @@
 from itertools import groupby
-from pathlib import Path
 from typing import Iterable
 from bitarray import bitarray
 from tap import Tap
-from math import ceil
 
-from lib.arch import ARCH_TO_BACKEND_MAP
+from lib.coverage_map import read_coverage_map
 from lib.experiment import Experiment, get_all_experiments
-from lib.matcher_table_sizes import (
-    DAGISEL_MATCHER_TABLE_SIZES,
-    GISEL_MATCHER_TABLE_SIZES,
-)
 
 
 class Args(Tap):
@@ -19,17 +13,6 @@ class Args(Tap):
 
     def configure(self) -> None:
         self.add_argument("input")
-
-
-def read_coverage_map(path: Path, matcher_table_size: int) -> bitarray:
-    cvg_map = bitarray()
-
-    with open(path, "rb") as file:
-        cvg_map.fromfile(file)
-        assert ceil(matcher_table_size / 64) * 64 == len(cvg_map)
-        cvg_map = cvg_map[:matcher_table_size]
-
-    return cvg_map
 
 
 def get_combined_coverage_map(
@@ -50,17 +33,6 @@ def get_combined_coverage_map(
     return combined_cvg_map
 
 
-def get_matcher_table_size(backend: str, isel: str) -> int:
-    backend = ARCH_TO_BACKEND_MAP[backend]
-
-    if isel == "dagisel":
-        return DAGISEL_MATCHER_TABLE_SIZES[backend]
-    elif isel == "gisel":
-        return GISEL_MATCHER_TABLE_SIZES[backend]
-    else:
-        raise Exception("Invalid ISel")
-
-
 def main():
     args = Args().parse_args()
 
@@ -68,8 +40,8 @@ def main():
         get_all_experiments(args.input),
         lambda expr: (expr.target.triple.arch, expr.isel),
     ):
-        matcher_table_size = get_matcher_table_size(arch, isel)
         exprs = list(exprs)
+        matcher_table_size = exprs[0].matcher_table_size
 
         initial_cvg_map = get_combined_coverage_map(
             exprs,

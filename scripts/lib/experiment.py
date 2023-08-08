@@ -1,11 +1,17 @@
 from pathlib import Path
 from typing import Iterable, NamedTuple, Optional
+from bitarray import bitarray
 
 import pandas as pd
 from lib.fs import subdirs_of
 from lib.plot_data import read_plot_data
 
 from lib.target import Target
+from lib.matcher_table_sizes import (
+    DAGISEL_MATCHER_TABLE_SIZES,
+    GISEL_MATCHER_TABLE_SIZES,
+)
+from lib.coverage_map import read_coverage_map
 
 
 class Experiment(NamedTuple):
@@ -20,20 +26,75 @@ class Experiment(NamedTuple):
         return f"{self.fuzzer}:{self.isel}:{self.target}:{self.replicate_id}"
 
     @property
+    def matcher_table_size(self) -> int:
+        if self.isel == "dagisel":
+            return DAGISEL_MATCHER_TABLE_SIZES[self.target.backend]
+        elif self.isel == "gisel":
+            return GISEL_MATCHER_TABLE_SIZES[self.target.backend]
+        else:
+            raise Exception("Invalid ISel")
+
+    @property
     def plot_data_path(self) -> Path:
-        return self.path.joinpath("default", "plot_data")
+        return self.path / "default" / "plot_data"
 
     @property
     def fuzzer_stats_path(self) -> Path:
-        return self.path.joinpath("default", "fuzzer_stats")
-    
+        return self.path / "default" / "fuzzer_stats"
+
     @property
     def cur_input_path(self) -> Path:
-        return self.path.joinpath("default", ".cur_input")
+        return self.path / "default" / ".cur_input"
     
     @property
+    def initial_bitmap_path(self) -> Path:
+        return self.path / "default" / "fuzz_initial_bitmap"
+
+    @property
+    def bitmap_path(self) -> Path:
+        return self.path / "default" / "fuzz_bitmap"
+
+    @property
+    def initial_shadow_map_path(self) -> Path:
+        return self.path / "default" / "fuzz_initial_shadowmap"
+
+    @property
+    def shadow_map_path(self) -> Path:
+        return self.path / "default" / "fuzz_shadowmap"
+        
+    @property
+    def intial_bitmap(self) -> bitarray:
+        return read_coverage_map(self.initial_bitmap_path, self.matcher_table_size)
+
+    @property
+    def bitmap(self) -> bitarray:
+        return read_coverage_map(self.bitmap_path, self.matcher_table_size)
+
+    @property
+    def intial_shadow_map(self) -> bitarray:
+        return read_coverage_map(self.initial_shadow_map_path, self.matcher_table_size)
+
+    @property
+    def shadow_map(self) -> bitarray:
+        return read_coverage_map(self.shadow_map_path, self.matcher_table_size)
+
+    @property
+    def initial_matcher_table_coverage(self) -> float | None:
+        try:
+            return self.intial_shadow_map.count(0) / self.matcher_table_size
+        except FileNotFoundError:
+            return None
+    
+    @property
+    def matcher_table_coverage(self) -> float | None:
+        try:
+            return self.shadow_map.count(0) / self.matcher_table_size
+        except FileNotFoundError:
+            return None
+
+    @property
     def run_time(self) -> int:
-        s = self['run_time']
+        s = self["run_time"]
         return -1 if s is None else int(s)
 
     def __getitem__(self, key: str) -> Optional[str]:
@@ -44,7 +105,7 @@ class Experiment(NamedTuple):
             for line in f:
                 if line.startswith(key):
                     return line.split(" : ")[1]
-        
+
         return None
 
     def read_plot_data(self) -> pd.DataFrame:

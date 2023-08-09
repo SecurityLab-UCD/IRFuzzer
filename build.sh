@@ -153,14 +153,19 @@ if [ ! -f $FUZZING_HOME/seeds/*.ll ]
 then
     mkdir -p seeds
     echo "Preparing seeds..."
-    for D in seeds*.ll; do
-        cd $D
-        for I in *.ll; do
-            $FUZZING_HOME/llvm-project/build-release/bin/llvm-as $I
-        done
-        mv *.bc ../seeds
-        cd ..
+    cd seeds.ll
+    for I in *.ll; do
+        $FUZZING_HOME/llvm-project/build-release/bin/llvm-as $I
     done
-    echo "Done."
+    mv *.bc ../seeds/
     cd $FUZZING_HOME
+
+    for TRIPLE in aie aie2; do
+        python3.10 ./scripts/collect_seeds.py  --triple $TRIPLE -o tmp
+        mkdir -p seeds.$TRIPLE
+        cp seeds/*.bc seeds.$TRIPLE/
+        mv tmp/dagisel/$TRIPLE/* seeds.$TRIPLE
+    done
+    rm tmp seeds -rf
+    echo "Done."
 fi

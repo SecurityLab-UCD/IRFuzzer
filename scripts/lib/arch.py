@@ -3,7 +3,7 @@ ARCH_TO_BACKEND_MAP: dict[str, str] = {
     "aarch64_32": "AArch64",
     "aarch64_be": "AArch64",
     "aie": "AIE",
-    "aie2": "AIE2",
+    "aie2": "AIE",
     "amdgcn": "AMDGPU",
     "arc": "ARC",
     "arm": "ARM",

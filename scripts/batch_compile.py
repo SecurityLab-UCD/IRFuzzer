@@ -1,19 +1,42 @@
-import argparse
 import os
 import subprocess
 from typing import Iterable, Optional
+from tap import Tap
 
 from lib.process_concurrency import MAX_SUBPROCESSES, run_concurrent_subprocesses
+
+
+class Args(Tap):
+    input: str
+    """The input directory containing C source code files"""
+
+    output: str
+    """The output directory for LLVM IR bytecode files"""
+
+    opt_level: int
+    """Optimization level for clang"""
+
+    jobs: Optional[int] = None
+    """The number of concurrent subprocesses"""
+
+    csmith_root: str = "../csmith"
+    """The root directory for CSmith repo"""
+
+    def configure(self) -> None:
+        self.add_argument("input")
+        self.add_argument("-o", "--output")
+        self.add_argument("-O", "--opt-level")
+        self.add_argument("-j", "--jobs")
 
 
 def build_clang_flags(
     target: str,
     sysroot: Optional[str] = None,
     include_paths: list[str] = [],
-    opt_level: str = "0",
+    opt_level: int = 0,
 ) -> Iterable[str]:
     yield f"--target={target}"
-    yield "-O" + opt_level
+    yield f"-O{opt_level}"
 
     if sysroot is not None:
         yield f"--sysroot={sysroot}"
@@ -54,39 +77,7 @@ def batch_compile(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Batch compiling C code to LLVM IR")
-
-    parser.add_argument(
-        "-i",
-        "--input",
-        type=str,
-        required=True,
-        help="The input directory containing C source code files",
-    )
-
-    parser.add_argument(
-        "-o",
-        "--output",
-        type=str,
-        required=True,
-        help="The output directory for LLVM IR bytecode files",
-    )
-
-    parser.add_argument(
-        "-j",
-        "--jobs",
-        type=int,
-        help="The number of concurrent subprocesses",
-    )
-
-    parser.add_argument(
-        "--csmith-root",
-        type=str,
-        default="../csmith",
-        help="The root directory for CSmith repo",
-    )
-
-    args = parser.parse_args()
+    args = Args(underscores_to_dashes=True).parse_args()
 
     def batch_compile_wrapper(
         target: str,
@@ -97,7 +88,9 @@ def main() -> None:
     ) -> None:
         if not os.path.exists(args.csmith_root):
             print(f"ERROR: missing CSmith in {args.csmith_root}.")
-            print(f"Run `git clone https://github.com/csmith-project/csmith.git {args.csmith_root}`")
+            print(
+                f"Run `git clone https://github.com/csmith-project/csmith.git {args.csmith_root}`"
+            )
             return
 
         if (include is not None and not os.path.exists(include)) or (
@@ -119,7 +112,7 @@ def main() -> None:
                     sysroot=sysroot,
                     include_paths=[os.path.join(args.csmith_root, "runtime")]
                     + ([] if include is None else [include]),
-                    opt_level="2",
+                    opt_level=args.opt_level,
                 )
             ),
             n_jobs=args.jobs,
@@ -146,19 +139,14 @@ def main() -> None:
         apt_package="libc6-dev-arm64-cross",
     )
     batch_compile_wrapper(
-        "riscv32",
-        include="./riscv32/sysroot/usr/include",
-        link="https://github.com/riscv-collab/riscv-gnu-toolchain",
-    )
-    batch_compile_wrapper(
         "riscv64",
         include="/usr/riscv64-linux-gnu/include",
         apt_package="libc6-dev-riscv64-cross",
     )
     batch_compile_wrapper(
         "wasm32-wasi",
-        sysroot="./wasi-sdk-14.0/share/wasi-sysroot",
-        link="https://github.com/WebAssembly/wasi-sdk",
+        sysroot="../wasi-sysroot",
+        link="https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-20/wasi-sysroot-20.0.tar.gz",
     )
 
 

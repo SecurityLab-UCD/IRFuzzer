@@ -42,6 +42,7 @@ class FuzzerConfig(NamedTuple):
 
 Fuzzer = Literal[
     "aflplusplus",
+    "aflplusplus-seeds-dry-run",
     "libfuzzer",
     "ir-wo-shadowmap",
     "irfuzzer",
@@ -55,7 +56,16 @@ ClutserType = Literal["screen", "docker", "stdout"]
 DOCKER_IMAGE = "irfuzzer"
 FUZZER_CONFIGS: dict[Fuzzer, FuzzerConfig] = {
     "aflplusplus": FuzzerConfig(
-        extra_env={"AFL_CUSTOM_MUTATOR_ONLY": "0"},
+        extra_env={
+            "AFL_CUSTOM_MUTATOR_ONLY": "0",
+        },
+    ),
+    "aflplusplus-seeds-dry-run": FuzzerConfig(
+        extra_env={
+            "AFL_CUSTOM_MUTATOR_ONLY": "0",
+            "AFL_FAST_CAL": "1",
+        },
+        extra_args=["-t", "10000"],
     ),
     "libfuzzer": FuzzerConfig(
         extra_env={

@@ -22,9 +22,13 @@ from lib import LLVM_LOOKUP_TABLE_DIR
 
 class FuzzerConfig(NamedTuple):
     extra_env: dict[str, str] = {}
-    extra_cmd: list[str] = []
+    extra_args: list[str] = []
 
-    def getIRFuzzer(other_env: dict[str, str] = {}, other_cmd: list[str] = []):
+    @staticmethod
+    def getIRFuzzer(
+        other_env: dict[str, str] = {},
+        other_args: list[str] = [],
+    ) -> "FuzzerConfig":
         extra_env = {
             "AFL_CUSTOM_MUTATOR_ONLY": "1",
             "AFL_CUSTOM_MUTATOR_LIBRARY": "mutator/build/libAFLCustomIRMutator.so",
@@ -32,7 +36,7 @@ class FuzzerConfig(NamedTuple):
         extra_env.update(other_env)
         return FuzzerConfig(
             extra_env=extra_env,
-            extra_cmd=other_cmd,
+            extra_args=other_args,
         )
 
 
@@ -49,8 +53,10 @@ ClutserType = Literal["screen", "docker", "stdout"]
 
 
 DOCKER_IMAGE = "irfuzzer"
-FUZZERS: dict[str, FuzzerConfig] = {
-    "aflplusplus": FuzzerConfig(extra_env={"AFL_CUSTOM_MUTATOR_ONLY": "0"}),
+FUZZER_CONFIGS: dict[Fuzzer, FuzzerConfig] = {
+    "aflplusplus": FuzzerConfig(
+        extra_env={"AFL_CUSTOM_MUTATOR_ONLY": "0"},
+    ),
     "libfuzzer": FuzzerConfig(
         extra_env={
             "AFL_CUSTOM_MUTATOR_ONLY": "1",
@@ -58,18 +64,23 @@ FUZZERS: dict[str, FuzzerConfig] = {
         },
     ),
     "ir-wo-shadowmap": FuzzerConfig.getIRFuzzer(),
-    "irfuzzer": FuzzerConfig.getIRFuzzer(other_cmd=["-w"]),
+    "irfuzzer": FuzzerConfig.getIRFuzzer(
+        other_args=["-w"],
+    ),
     "ir-intrinsic-feedback": FuzzerConfig.getIRFuzzer(
-        other_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "10"}, other_cmd=["-w"]
+        other_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "10"},
+        other_args=["-w"],
     ),
     "ir-intrinsic-wo-feedback": FuzzerConfig.getIRFuzzer(
-        other_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "86400"}, other_cmd=["-w"]
+        other_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "86400"},
+        other_args=["-w"],
     ),
 }
+
 # Check Fuzzer and FUZZERS match.
-assert list(FUZZERS.keys()) == list(
+assert list(FUZZER_CONFIGS.keys()) == list(
     typing.get_args(Fuzzer)
-), f"FUZZERS({FUZZERS.keys()}) and Fuzzer({Fuzzer}) don't match"
+), f"FUZZERS({FUZZER_CONFIGS.keys()}) and Fuzzer({Fuzzer}) don't match"
 
 
 class ExperimentConfig(NamedTuple):
@@ -112,7 +123,7 @@ class ExperimentConfig(NamedTuple):
             "GLOBAL_ISEL": "1" if self.isel == "gisel" else "0",
             "MATCHER_TABLE_SIZE": str(self.matcher_table_size),
         }
-        envs.update(FUZZERS[self.fuzzer].extra_env)
+        envs.update(FUZZER_CONFIGS[self.fuzzer].extra_env)
         return envs
 
     def get_fuzzing_command(self, output_dir: str | Path) -> str:
@@ -124,11 +135,9 @@ class ExperimentConfig(NamedTuple):
             str(self.seed_dir),
             "-o",
             str(output_dir),
+            *FUZZER_CONFIGS[self.fuzzer].extra_args,
+            "llvm-isel-afl/build/isel-fuzzing",
         ]
-
-        cmd += FUZZERS[self.fuzzer].extra_cmd
-
-        cmd.append("llvm-isel-afl/build/isel-fuzzing")
 
         return " ".join(cmd)
 

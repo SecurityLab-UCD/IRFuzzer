@@ -99,7 +99,6 @@ TARGET_LISTS: dict[str, list[Target]] = {
         Target("riscv64", "sifive-u74"),
         Target("riscv64", "sifive-x280"),
         Target("riscv64", "rocket-rv64"),
-        Target("riscv64", "syntacore-scr1-base"),
 
         # SystemZ
         Target("systemz", "z15"),

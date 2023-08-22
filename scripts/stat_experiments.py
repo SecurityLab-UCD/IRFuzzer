@@ -31,8 +31,8 @@ experiment_prop_map: dict[str, Callable[[Experiment], str | int | float | None]]
     "target": lambda expr: str(expr.target),
     "replicate": lambda expr: expr.replicate_id,
     "run_time": lambda expr: expr.run_time,
-    # "init_br_cvg": lambda expr: expr.initial_bitmap_coverage,
-    # "cur_br_cvg": lambda expr: expr.bitmap_coverage,
+    "init_br_cvg": lambda expr: expr.initial_branch_coverage,
+    "cur_br_cvg": lambda expr: expr.branch_coverage,
     "init_mt_cvg": lambda expr: expr.initial_matcher_table_coverage,
     "cur_mt_cvg": lambda expr: expr.matcher_table_coverage,
 }
@@ -61,6 +61,8 @@ def main():
             {
                 "replicate": ["count"],
                 "run_time": ["mean"],
+                "init_br_cvg": ["mean"],
+                "cur_br_cvg": ["mean", "std"],
                 "init_mt_cvg": ["mean"],
                 "cur_mt_cvg": ["mean", "std"],
             }
@@ -72,7 +74,7 @@ def main():
         # df = df.round(decimals=4)
 
         # round mean run time to nearest second
-        # since a few experiments will have 1 second difference than the set time
+        # since a few experiments may have 1 second difference than the set time
         df[("run_time", "mean")] = df[("run_time", "mean")].round()
 
 
@@ -102,7 +104,6 @@ def main():
                     "target",
                     ("replicate", "count"),
                     ("run_time", "mean"),
-                    ("init_mt_cvg", "mean"),
                 ],
                 suffixes=(None, f"_{fuzzer}"),
             ),
@@ -115,6 +116,10 @@ def main():
             # drop columns of NaN values that comes from the initial empty dataframe
             # but those are necessary in the merge process
             columns=[
+                ("init_br_cvg", "mean"),
+                ("cur_br_cvg", "mean"),
+                ("cur_br_cvg", "std"),
+                ("init_mt_cvg", "mean"),
                 ("cur_mt_cvg", "mean"),
                 ("cur_mt_cvg", "std"),
             ]
@@ -128,6 +133,8 @@ def main():
                     "run_time": lambda sec: f"{sec / 3600 :.1f}h",
                     "init_mt_cvg": "{:,.3%}".format,
                     "cur_mt_cvg": "{:,.3%}".format,
+                    "init_br_cvg": "{:,.3%}".format,
+                    "cur_br_cvg": "{:,.3%}".format,
                 },
             )
         )

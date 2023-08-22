@@ -2,7 +2,7 @@ import argparse
 import subprocess
 import os
 import re
-from typing import Iterable, Iterator, List, Optional, Set, Tuple
+from typing import Iterable, Iterator, List, Optional, Tuple
 import shutil
 from pathlib import Path
 import tempfile
@@ -30,7 +30,7 @@ class StackTrace:
 
     def __str__(self) -> str:
         ret = ""
-        for (f, l) in self.stack_frames:
+        for f, l in self.stack_frames:
             ret += f"\t{f} {l}\n"
         return ret
 
@@ -45,6 +45,7 @@ class StackTrace:
 
 
 class CrashError:
+    bc_path: Path
     return_code: int
     failed_pass: Optional[str]
     message_raw: str
@@ -65,6 +66,7 @@ class CrashError:
         hash_op_code_only_for_isel_crash: bool = False,
         remove_addr_in_stacktrace: bool = False,
     ):
+        self.bc_path = Path(args[-1])
         self.return_code = return_code
         self.hash_stacktrace_only = hash_stacktrace_only
         self.hash_op_code_only_for_isel_crash = hash_op_code_only_for_isel_crash
@@ -216,10 +218,16 @@ def classify(
 
     Path(output_dir).mkdir(parents=True)
 
-    crash_hashes: Set[int] = set()
+    # key: hash of crash, value: list of crashes with the same hash
+    classified_crashes: dict[int, list[CrashError]] = {}
+
     false_alarms: List[str] = []
 
-    def on_process_exit(file_name: str, exit_code: Optional[int], p: subprocess.Popen) -> None:
+    def on_process_exit(
+        file_name: str,
+        exit_code: Optional[int],
+        p: subprocess.Popen,
+    ) -> None:
         ir_bc_path: str = p.args[-1]  # type: ignore
         stderr_dump_path = os.path.join(temp_dir, file_name + ".stderr")
         stderr_dump_file = open(stderr_dump_path)
@@ -247,8 +255,10 @@ def classify(
         folder_path = os.path.join(output_dir, folder_name)
         Path(folder_path).mkdir(parents=True, exist_ok=True)
 
-        if hash(crash) not in crash_hashes:
-            crash_hashes.add(hash(crash))
+        crash_hash = hash(crash)
+
+        if crash_hash not in classified_crashes:
+            classified_crashes[crash_hash] = [crash]
             with open(
                 os.path.join(output_dir, folder_name + ".log"), "w+"
             ) as report_path:
@@ -256,6 +266,8 @@ def classify(
 
             if verbose:
                 print("New crash type:", folder_name)
+        else:
+            classified_crashes[crash_hash].append(crash)
 
         if create_symlink_to_source:
             os.symlink(
@@ -278,12 +290,30 @@ def classify(
         on_exit=on_process_exit,
     )
 
-    print(f"{len(false_alarms)} false positives, {len(crash_hashes)} unique crashes")
+    print(
+        f"{len(false_alarms)} false positives, {len(classified_crashes)} unique crashes"
+    )
+
     with open(os.path.join(output_dir, "false_positives.txt"), "a+") as file:
         file.writelines(line + "\n" for line in false_alarms)
 
-    with open(os.path.join(output_dir, "unique_crashes"), "w+") as file:
-        file.write(str(len(crash_hashes)))
+    with open(os.path.join(output_dir, "n_unique_crashes"), "w+") as file:
+        file.write(str(len(classified_crashes)))
+
+    with open(os.path.join(output_dir, "unique_crashes.csv"), "w+") as file:
+        print("CrashHash", "Count", "DiscoveredAt", sep=",", file=file)
+        for crash_hash, crashes in classified_crashes.items():
+            print(
+                crash_hash,
+                len(crashes),
+                min(
+                    # get the discovered time from the source file name
+                    int(crash.bc_path.name.split(",")[3].split(":")[1])
+                    for crash in crashes
+                ),
+                file=file,
+                sep=",",
+            )
 
 
 def main() -> None:

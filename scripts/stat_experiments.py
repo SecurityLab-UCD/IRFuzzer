@@ -29,6 +29,7 @@ experiment_prop_map: dict[str, Callable[[Experiment], str | int | float | None]]
     "fuzzer": lambda expr: expr.fuzzer,
     "isel": lambda expr: expr.isel,
     "target": lambda expr: str(expr.target),
+    "mt_size": lambda expr: expr.matcher_table_size,
     "replicate": lambda expr: expr.replicate_id,
     "run_time": lambda expr: expr.run_time,
     "init_br_cvg": lambda expr: expr.initial_branch_coverage,
@@ -57,7 +58,7 @@ def main():
         args.summerize = True
 
     if args.summerize:
-        df = df.groupby(["fuzzer", "isel", "target"]).agg(
+        df = df.groupby(["fuzzer", "isel", "target", "mt_size"]).agg(
             {
                 "replicate": ["count"],
                 "run_time": ["mean"],
@@ -102,6 +103,7 @@ def main():
                 on=[
                     "isel",
                     "target",
+                    "mt_size",
                     ("replicate", "count"),
                     ("run_time", "mean"),
                 ],

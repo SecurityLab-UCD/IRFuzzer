@@ -11,7 +11,10 @@ from lib.matcher_table_sizes import (
     DAGISEL_MATCHER_TABLE_SIZES,
     GISEL_MATCHER_TABLE_SIZES,
 )
-from lib.coverage_map import read_coverage_map
+from lib.coverage_map import count_non_255_bytes, read_coverage_map
+
+
+BITMAP_SIZE_IN_BYTES = 65536
 
 
 class Experiment(NamedTuple):
@@ -45,7 +48,7 @@ class Experiment(NamedTuple):
     @property
     def cur_input_path(self) -> Path:
         return self.path / "default" / ".cur_input"
-    
+
     @property
     def initial_bitmap_path(self) -> Path:
         return self.path / "default" / "fuzz_initial_bitmap"
@@ -61,14 +64,14 @@ class Experiment(NamedTuple):
     @property
     def shadow_map_path(self) -> Path:
         return self.path / "default" / "fuzz_shadowmap"
-        
+
     @property
     def intial_bitmap(self) -> bitarray:
-        return read_coverage_map(self.initial_bitmap_path, self.matcher_table_size)
+        return read_coverage_map(self.initial_bitmap_path, BITMAP_SIZE_IN_BYTES * 8)
 
     @property
     def bitmap(self) -> bitarray:
-        return read_coverage_map(self.bitmap_path, self.matcher_table_size)
+        return read_coverage_map(self.bitmap_path, BITMAP_SIZE_IN_BYTES * 8)
 
     @property
     def intial_shadow_map(self) -> bitarray:
@@ -79,12 +82,26 @@ class Experiment(NamedTuple):
         return read_coverage_map(self.shadow_map_path, self.matcher_table_size)
 
     @property
+    def initial_branch_coverage(self) -> float | None:
+        try:
+            return count_non_255_bytes(self.initial_bitmap_path) / BITMAP_SIZE_IN_BYTES
+        except FileNotFoundError:
+            return None
+
+    @property
+    def branch_coverage(self) -> float | None:
+        try:
+            return count_non_255_bytes(self.bitmap_path) / BITMAP_SIZE_IN_BYTES
+        except FileNotFoundError:
+            return None
+
+    @property
     def initial_matcher_table_coverage(self) -> float | None:
         try:
             return self.intial_shadow_map.count(0) / self.matcher_table_size
         except FileNotFoundError:
             return None
-    
+
     @property
     def matcher_table_coverage(self) -> float | None:
         try:

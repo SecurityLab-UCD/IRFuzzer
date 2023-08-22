@@ -148,6 +148,13 @@ class CrashError:
                 r"LLVM ERROR: Cannot select:.+ = ([a-zA-Z0-9_:]+(<.+>)?)",
                 message_lines[0],
             )
+
+            if match is None:
+                match = re.match(
+                    r"LLVM ERROR: Cannot select: (intrinsic %[a-zA-Z0-9_:\.]+)",
+                    message_lines[0],
+                )
+
             if match is None:
                 print(f'ERROR: failed to extract instruction from "{message_lines[0]}"')
                 self.subtype = "Unknown"

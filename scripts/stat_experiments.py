@@ -1,3 +1,4 @@
+from functools import reduce
 from typing import Callable, Optional
 from tap import Tap
 from lib.experiment import Experiment, get_all_experiments
@@ -14,10 +15,14 @@ class Args(Tap):
     summerize: bool = False
     """if true, print summary of experiments"""
 
+    compare: bool = False
+    """comparison among fuzzers"""
+
     def configure(self) -> None:
         self.add_argument("input")
         self.add_argument("-o", "--output")
         self.add_argument("-s", "--summerize")
+        self.add_argument("-c", "--compare")
 
 
 experiment_prop_map: dict[str, Callable[[Experiment], str | int | float | None]] = {
@@ -48,6 +53,9 @@ def main():
 
     df = read_experiment_stats(args.input)
 
+    if args.compare:
+        args.summerize = True
+
     if args.summerize:
         df = df.groupby(["fuzzer", "isel", "target"]).agg(
             {
@@ -56,6 +64,60 @@ def main():
                 "init_mt_cvg": ["mean"],
                 "cur_mt_cvg": ["mean", "std"],
             }
+        )
+
+    if args.compare:
+        fuzzers = df.index.get_level_values("fuzzer").unique()
+
+        # df = df.round(decimals=4)
+
+        # round mean run time to nearest second
+        # since a few experiments will have 1 second difference than the set time
+        df[("run_time", "mean")] = df[("run_time", "mean")].round()
+
+
+        # The following commented code is a reference for how to merge 2 dataframes
+        # the actual code using `reduce` further below is a generalization but harder to read
+        #
+        # df = pd.merge(
+        #     left=df.loc[fuzzers[0]],
+        #     right=df.loc[fuzzers[1]],
+        #     how="outer",
+        #     on=[
+        #         "isel",
+        #         "target",
+        #         ("replicate", "count"),
+        #         ("run_time", "mean"),
+        #         ("init_mt_cvg", "mean"),
+        #     ],
+        #     suffixes=(f"_{fuzzers[0]}", f"_{fuzzers[1]}"),
+        # )
+
+        df = reduce(
+            lambda df_tmp, fuzzer: df_tmp.merge(
+                right=df.loc[fuzzer],
+                how="outer",
+                on=[
+                    "isel",
+                    "target",
+                    ("replicate", "count"),
+                    ("run_time", "mean"),
+                    ("init_mt_cvg", "mean"),
+                ],
+                suffixes=(None, f"_{fuzzer}"),
+            ),
+
+            fuzzers,
+
+            # get a empty dataframe with the same columns and indexes as df
+            df.iloc[:0, :],
+        ).drop(
+            # drop columns of NaN values that comes from the initial empty dataframe
+            # but those are necessary in the merge process
+            columns=[
+                ("cur_mt_cvg", "mean"),
+                ("cur_mt_cvg", "std"),
+            ]
         )
 
     if args.output is None:

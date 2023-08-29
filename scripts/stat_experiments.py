@@ -3,6 +3,7 @@ from pathlib import Path
 from typing import Callable, Optional
 from tap import Tap
 import pandas as pd
+from scipy.stats import mannwhitneyu
 
 from lib.experiment import Experiment, get_all_experiments
 from lib.target import Target
@@ -78,6 +79,11 @@ fuzzer_order: list[str] = [
 
 fuzzer_order_map: dict[str, int] = {fuzzer: i for i, fuzzer in enumerate(fuzzer_order)}
 
+fuzzer_sig_test_map: dict[str, str] = {
+    "irfuzzer": "libfuzzer",
+    "ir-intrinsic-feedback": "irfuzzer",
+}
+
 
 def read_experiment_stats(root_dir: str) -> pd.DataFrame:
     return pd.DataFrame(
@@ -90,14 +96,19 @@ def read_experiment_stats(root_dir: str) -> pd.DataFrame:
 
 
 def summerize(df: pd.DataFrame) -> pd.DataFrame:
+    # Keep raw data for statistical test
+
+    def raw_data(x):
+        return x.values.tolist()
+
     return df.groupby(["fuzzer", "isel", "target", "mt_size"]).agg(
         {
             "replicate": ["count"],
             "run_time": ["mean"],
             "init_br_cvg": ["mean"],
-            "cur_br_cvg": ["mean", "std"],
+            "cur_br_cvg": ["mean", "std", raw_data],
             "init_mt_cvg": ["mean"],
-            "cur_mt_cvg": ["mean", "std"],
+            "cur_mt_cvg": ["mean", "std", raw_data],
         }
     )
 
@@ -153,9 +164,11 @@ def compare(df: pd.DataFrame) -> pd.DataFrame:
                 ("init_br_cvg", "mean"),
                 ("cur_br_cvg", "mean"),
                 ("cur_br_cvg", "std"),
+                ("cur_br_cvg", "raw_data"),
                 ("init_mt_cvg", "mean"),
                 ("cur_mt_cvg", "mean"),
                 ("cur_mt_cvg", "std"),
+                ("cur_mt_cvg", "raw_data"),
             ]
         )
         .reset_index(["mt_size"])
@@ -168,6 +181,36 @@ def compare(df: pd.DataFrame) -> pd.DataFrame:
             else (col[0].rsplit("_", 1)[0], col[0].rsplit("_", 1)[1], col[1])
             for col in df.columns
         ]
+    )
+
+    # calculate p-value
+    for col in df.columns:
+        if col[0] not in ["cur_mt_cvg", "cur_br_cvg"]:
+            continue
+
+        expr_fuzzer = col[1]
+        ctrl_fuzzer = fuzzer_sig_test_map.get(expr_fuzzer)
+
+        if ctrl_fuzzer is None:
+            continue
+
+        df[col[0], expr_fuzzer, "p-value"] = df.apply(
+            lambda row: mannwhitneyu(
+                row[(col[0], expr_fuzzer, "raw_data")],
+                row[(col[0], ctrl_fuzzer, "raw_data")],
+                alternative="greater",
+            ).pvalue,
+            axis=1,
+        )
+
+    # drop raw data
+    df.drop(
+        columns=[
+            col
+            for col in df.columns
+            if col[0] in ["cur_mt_cvg", "cur_br_cvg"] and col[2] == "raw_data"
+        ],
+        inplace=True,
     )
 
     # sort columns
@@ -210,6 +253,27 @@ def dump_tex(df: pd.DataFrame, out_path: Path) -> None:
     cols_to_drop = nunique[nunique == 1].index
     df.drop(cols_to_drop, axis=1, inplace=True)
 
+    # format columns
+    for col in df.columns:
+        if col[2] != "mean":
+            continue
+
+        p_value_col = (col[0], col[1], "p-value")
+
+        if p_value_col in df.columns:
+            # bold mean values whose p-value is less than 0.05
+            df[col] = df.apply(
+                lambda row: f"\\textbf{{{row[col]:.1%}}}"
+                if row[p_value_col] < 0.05
+                else f"{row[col]:.1%}",
+                axis=1,
+            )
+        else:
+            df[col] = df.apply(
+                lambda row: f"{row[col]:.1%}",
+                axis=1,
+            )
+
     # drop other columns that are not needed
     df.drop(
         [
@@ -218,6 +282,7 @@ def dump_tex(df: pd.DataFrame, out_path: Path) -> None:
             if (
                 col[0] in ["mt_size"]
                 or "std" in col[2]
+                or "p-value" in col[2]
                 or ("init_" in col[0] and col[1] != "irfuzzer")
             )
         ],
@@ -239,15 +304,11 @@ def dump_tex(df: pd.DataFrame, out_path: Path) -> None:
     # sort columns
     df.sort_index(
         axis=1,
-        key=lambda index: index.map(
-            lambda col: fuzzer_order_map.get(col, col)
-        ),
+        key=lambda index: index.map(lambda col: fuzzer_order_map.get(col, col)),
         inplace=True,
     )
 
-    df.style.format(
-        "{:.1%}", subset=[col for col in df.columns if "_cvg" in col[0]]
-    ).to_latex(
+    df.style.to_latex(
         out_path,
         column_format="l" * df.index.nlevels + "|" + "r" * len(df.columns),
         hrules=True,

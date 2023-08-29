@@ -237,7 +237,7 @@ def classify(
     ) -> None:
         ir_bc_path: str = p.args[-1]  # type: ignore
         stderr_dump_path = os.path.join(temp_dir, file_name + ".stderr")
-        stderr_dump_file = open(stderr_dump_path)
+        stderr_dump_file = open(stderr_dump_path, encoding="utf-8", errors="ignore")
 
         if os.stat(stderr_dump_path).st_size == 0:
             false_alarms.append(ir_bc_path)

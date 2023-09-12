@@ -79,9 +79,9 @@ fuzzer_order: list[str] = [
 
 fuzzer_order_map: dict[str, int] = {fuzzer: i for i, fuzzer in enumerate(fuzzer_order)}
 
-fuzzer_sig_test_map: dict[str, str] = {
-    "irfuzzer": "libfuzzer",
-    "ir-intrinsic-feedback": "irfuzzer",
+fuzzer_sig_test_map: dict[str, list[str]] = {
+    "irfuzzer": ["aflplusplus", "libfuzzer"],
+    "ir-intrinsic-feedback": ["aflplusplus", "libfuzzer"],
 }
 
 
@@ -189,17 +189,22 @@ def compare(df: pd.DataFrame) -> pd.DataFrame:
             continue
 
         expr_fuzzer = col[1]
-        ctrl_fuzzer = fuzzer_sig_test_map.get(expr_fuzzer)
+        ctrl_fuzzers = fuzzer_sig_test_map.get(expr_fuzzer, [])
 
-        if ctrl_fuzzer is None:
+        if len(ctrl_fuzzers) == 0:
             continue
 
         df[col[0], expr_fuzzer, "p-value"] = df.apply(
-            lambda row: mannwhitneyu(
-                row[(col[0], expr_fuzzer, "raw_data")],
-                row[(col[0], ctrl_fuzzer, "raw_data")],
-                alternative="greater",
-            ).pvalue,
+            lambda row: max(
+                float(
+                    mannwhitneyu(
+                        row[(col[0], expr_fuzzer, "raw_data")],
+                        row[(col[0], ctrl_fuzzer, "raw_data")],
+                        alternative="greater",
+                    ).pvalue
+                )
+                for ctrl_fuzzer in ctrl_fuzzers
+            ),
             axis=1,
         )
 
@@ -254,25 +259,34 @@ def dump_tex(df: pd.DataFrame, out_path: Path) -> None:
     df.drop(cols_to_drop, axis=1, inplace=True)
 
     # format columns
+    df_numeric = df.copy()
     for col in df.columns:
         if col[2] != "mean":
             continue
 
         p_value_col = (col[0], col[1], "p-value")
 
+        def format_coverage_for_col(row) -> str:
+            if "riscv" in str(row.name) and col[0].endswith("_mt_cvg"):
+                return f"{row[col] * 1000 :.1f}\\si{{\\permille}}"
+            else:
+                return f"{row[col] * 100 :.1f}\\si{{\\percent}}"
+
+        def is_best_col(row) -> bool:
+            return row[col] == max(
+                row[c] for c in row.index if c[0] == col[0] and c[2] == "mean"
+            )
+
         if p_value_col in df.columns:
-            # bold mean values whose p-value is less than 0.05
-            df[col] = df.apply(
-                lambda row: f"\\textbf{{{row[col]:.1%}}}"
-                if row[p_value_col] < 0.05
-                else f"{row[col]:.1%}",
+            # bold mean values whose p-value is less than 0.05 and is the best in class
+            df[col] = df_numeric.apply(
+                lambda row: f"\\textbf{{{format_coverage_for_col(row)}}}"
+                if row[p_value_col] < 0.05 and is_best_col(row)
+                else format_coverage_for_col(row),
                 axis=1,
             )
         else:
-            df[col] = df.apply(
-                lambda row: f"{row[col]:.1%}",
-                axis=1,
-            )
+            df[col] = df_numeric.apply(format_coverage_for_col, axis=1)
 
     # drop other columns that are not needed
     df.drop(
@@ -328,9 +342,11 @@ def dump_tex(df: pd.DataFrame, out_path: Path) -> None:
                 "\\usepackage[left=0.5cm, right=0.5cm]{geometry}",
                 "\\usepackage{booktabs}",
                 "\\usepackage{multirow}",
+                "\\usepackage{siunitx}",
+                "\\DeclareSIUnit\\permille{\\text{\\textperthousand}}"
                 "\\begin{document}",
                 "",
-                tex.replace("_", "\\_").replace("%", "\\%"),
+                tex.replace("_", "\\_"),
                 "",
                 "\\end{document}",
                 "",
@@ -360,10 +376,10 @@ def main():
                     index=args.summerize,
                     formatters={
                         "run_time": lambda sec: f"{sec / 3600 :.1f}h",
-                        "init_mt_cvg": "{:,.3%}".format,
-                        "cur_mt_cvg": "{:,.3%}".format,
-                        "init_br_cvg": "{:,.3%}".format,
-                        "cur_br_cvg": "{:,.3%}".format,
+                        "init_mt_cvg": "{:,.2%}".format,
+                        "cur_mt_cvg": "{:,.2%}".format,
+                        "init_br_cvg": "{:,.2%}".format,
+                        "cur_br_cvg": "{:,.2%}".format,
                     },
                 ),
                 file=None if args.output is None else open(args.output, "w"),

@@ -43,10 +43,12 @@ class FuzzerConfig(NamedTuple):
 Fuzzer = Literal[
     "aflplusplus",
     "aflplusplus-seeds-dry-run",
-    "libfuzzer",
+    "aflplusplus-seeds-dry-run-O3",
+    "fuzzmutate",
     "ir-wo-shadowmap",
+    "irfuzzer-bare",
+    "irfuzzer-O3",
     "irfuzzer",
-    "ir-intrinsic-feedback",
     "ir-intrinsic-wo-feedback",
 ]
 ISel = Literal["dagisel", "gisel"]
@@ -67,17 +69,29 @@ FUZZER_CONFIGS: dict[Fuzzer, FuzzerConfig] = {
         },
         extra_args=["-t", "10000"],
     ),
-    "libfuzzer": FuzzerConfig(
+    "aflplusplus-seeds-dry-run-O3": FuzzerConfig(
+        extra_env={
+            "OPT_LEVEL": "-O3",
+            "AFL_CUSTOM_MUTATOR_ONLY": "0",
+            "AFL_FAST_CAL": "1",
+        },
+        extra_args=["-t", "10000"],
+    ),
+    "fuzzmutate": FuzzerConfig(
         extra_env={
             "AFL_CUSTOM_MUTATOR_ONLY": "1",
             "AFL_CUSTOM_MUTATOR_LIBRARY": "mutator/build/libAFLFuzzMutate.so",
         },
     ),
     "ir-wo-shadowmap": FuzzerConfig.getIRFuzzer(),
-    "irfuzzer": FuzzerConfig.getIRFuzzer(
+    "irfuzzer-bare": FuzzerConfig.getIRFuzzer(
         other_args=["-w"],
     ),
-    "ir-intrinsic-feedback": FuzzerConfig.getIRFuzzer(
+    "irfuzzer-O3": FuzzerConfig.getIRFuzzer(
+        other_args=["-w"],
+        other_env={"OPT_LEVEL": "-O3", "INTRINSIC_FEEDBACK": "1", "THRESHOLD": "10"},
+    ),
+    "irfuzzer": FuzzerConfig.getIRFuzzer(
         other_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "10"},
         other_args=["-w"],
     ),

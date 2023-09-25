@@ -215,14 +215,23 @@ static int ExecuteFilesOnyByOne(int argc, char **argv) {
   {                                                                            \
     char *ARG_NAME = getenv(#ENV_NAME);                                        \
     if (ARG_NAME) {                                                            \
-      static char arg_##ARG_NAME[256];                                         \
-      memset(arg_##ARG_NAME, 0, 256);                                          \
+      static char arg_##ARG_NAME[64];                                          \
+      memset(arg_##ARG_NAME, 0, 64);                                           \
       sprintf(arg_##ARG_NAME, "-m%s=%s", #ARG_NAME, ARG_NAME);                 \
       Printf("%s: %s\n", #ENV_NAME, arg_##ARG_NAME);                           \
       ARGV.push_back(arg_##ARG_NAME);                                          \
     } else {                                                                   \
       Printf("%s not found, abort.\n", #ENV_NAME);                             \
       exit(1);                                                                 \
+    }                                                                          \
+  }
+#define GET_OPT_INFO_FROM_ENV(ARGV)                                            \
+  {                                                                            \
+    char *ARG_NAME = getenv("OPT_LEVEL");                                      \
+    if (ARG_NAME) {                                                            \
+      ARGV.push_back(ARG_NAME);                                                \
+    } else {                                                                   \
+      Printf("%s not found.\n", "OPT_LEVEL");                                  \
     }                                                                          \
   }
 
@@ -255,6 +264,8 @@ int main(int argc, char **argv) {
     GET_TARGET_INFO_FROM_ENV_OR_EXIT(TRIPLE, triple, Argv);
     GET_TARGET_INFO_FROM_ENV_OR_EXIT(CPU, cpu, Argv);
     GET_TARGET_INFO_FROM_ENV_OR_EXIT(ATTR, attr, Argv);
+
+    GET_OPT_INFO_FROM_ENV(Argv);
 
     char *tbl_size = getenv("MATCHER_TABLE_SIZE");
     if (tbl_size) {

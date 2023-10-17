@@ -74,10 +74,12 @@ int main(int argc, char **argv) {
     size_t newSize =
         LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, MAX_SIZE, Seed);
     if (!validateMode) {
-      std::ofstream outbc =
-          std::ofstream("out.bc", std::ios::out | std::ios::binary);
+      std::ofstream outbc = std::ofstream("out.bc",
+                                          std::ios::out | std::ios::binary);
       outbc.write(buffer.data(), newSize);
       outbc.close();
+      infile.close();
+      return 0;
     }
     llvm::LLVMContext Context;
     std::unique_ptr<llvm::Module> M =
@@ -86,11 +88,9 @@ int main(int argc, char **argv) {
     if (!validateMode)
       M->dump();
 #endif
-    /*
     std::error_code EC;
-    llvm::raw_fd_ostream outll("out.ll", EC);
+    llvm::raw_fd_ostream outll(std::to_string(Seed) + ".ll", EC);
     M->print(outll, nullptr);
-    */
     // llvm::errs() << "Verifing Module...";
     if (verifyModule(*M, &llvm::errs(), nullptr)) {
       llvm::errs() << "Verifier failed. Seed: " << Seed << "\n";

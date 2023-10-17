@@ -39,6 +39,22 @@ using namespace llvm;
 
 static std::unique_ptr<IRMutator> Mutator;
 
+//std::vector<TypeGetter> getV16S32TypeGetter() {
+//  std::vector<TypeGetter> Types;
+//  TypeGetter ScalarTypes[] = {Type::getInt32Ty};
+//  int VectorLength[] = {16};
+//
+//  for (auto typeGetter : ScalarTypes) {
+//    for (int length : VectorLength) {
+//      Types.push_back([typeGetter, length](LLVMContext &C) {
+//        return VectorType::get(typeGetter(C), length, false);
+//      });
+//    }
+//  }
+//
+//  return Types;
+//}
+
 extern "C" {
 
 void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
@@ -65,9 +81,9 @@ void createISelMutator() {
   Strategies.push_back(std::make_unique<InjectorIRStrategy>(
       InjectorIRStrategy::getDefaultOps()));
   Strategies.push_back(std::make_unique<InstModificationIRStrategy>());
-  Strategies.push_back(std::make_unique<InsertFunctionStrategy>());
-  Strategies.push_back(std::make_unique<InsertCFGStrategy>());
-  Strategies.push_back(std::make_unique<InsertPHIStrategy>());
+  //Strategies.push_back(std::make_unique<InsertFunctionStrategy>());
+  //Strategies.push_back(std::make_unique<InsertCFGStrategy>());
+  //Strategies.push_back(std::make_unique<InsertPHIStrategy>());
   Strategies.push_back(std::make_unique<SinkInstructionStrategy>());
   Strategies.push_back(std::make_unique<ShuffleBlockStrategy>());
   if (getenv("INTRINSIC_FEEDBACK")) {
@@ -82,7 +98,8 @@ void createISelMutator() {
   }
   Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
 
-  Mutator = std::make_unique<IRMutator>(
+  //Mutator = std::make_unique<IRMutator>(std::move(getV16S32TypeGetter()), std::move(Strategies));
+    Mutator = std::make_unique<IRMutator>(
       std::move(IRMutator::getDefaultAllowedTypes()), std::move(Strategies));
 }
 
@@ -116,11 +133,12 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
 #ifdef DEBUG
   try {
 #endif
-    srand(Seed);
-    Seed = rand();
-    // for (int i = 0; i < 4; i++) {
-    Mutator->mutateModule(*M, Seed, MaxSize);
-    // }
+    char *NumMutateStr = getenv("NUM_MUTATE");
+    int NumMutate = (NumMutateStr) ? atoi(NumMutateStr) : 1;
+    for (int i = 0; i < NumMutate; i++) {
+      Seed = rand();
+      Mutator->mutateModule(*M, Seed, MaxSize);
+    }
 #ifdef DEBUG
   } catch (...) {
     dumpOnFailure(Seed, Data, Size, MaxSize);

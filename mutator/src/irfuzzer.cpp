@@ -39,21 +39,37 @@ using namespace llvm;
 
 static std::unique_ptr<IRMutator> Mutator;
 
-//std::vector<TypeGetter> getV16S32TypeGetter() {
-//  std::vector<TypeGetter> Types;
-//  TypeGetter ScalarTypes[] = {Type::getInt32Ty};
-//  int VectorLength[] = {16};
-//
-//  for (auto typeGetter : ScalarTypes) {
-//    for (int length : VectorLength) {
-//      Types.push_back([typeGetter, length](LLVMContext &C) {
-//        return VectorType::get(typeGetter(C), length, false);
-//      });
-//    }
-//  }
-//
-//  return Types;
-//}
+std::vector<TypeGetter> getV16S32TypeGetter() {
+  std::vector<TypeGetter> Types;
+  TypeGetter ScalarTypes[] = {Type::getInt32Ty};
+  int VectorLength[] = {16};
+
+  for (auto typeGetter : ScalarTypes) {
+    for (int length : VectorLength) {
+      Types.push_back([typeGetter, length](LLVMContext &C) {
+        return VectorType::get(typeGetter(C), length, false);
+      });
+    }
+  }
+
+  return Types;
+}
+
+/// TODO:
+/// Type* getStructType(Context& C);
+
+std::vector<fuzzerop::OpDescriptor> getDefaultOps() {
+  std::vector<fuzzerop::OpDescriptor> Ops;
+  describeFuzzerIntOps(Ops);
+  // describeFuzzerFloatOps(Ops);
+  // describeFuzzerUnaryOperations(Ops);
+  // describeFuzzerControlFlowOps(Ops);
+  // describeFuzzerOtherOps(Ops);
+  // describeFuzzerPointerOps(Ops);
+  // describeFuzzerAggregateOps(Ops);
+  // describeFuzzerVectorOps(Ops);
+  return Ops;
+}
 
 extern "C" {
 
@@ -98,9 +114,9 @@ void createISelMutator() {
   }
   Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
 
-  //Mutator = std::make_unique<IRMutator>(std::move(getV16S32TypeGetter()), std::move(Strategies));
-    Mutator = std::make_unique<IRMutator>(
-      std::move(IRMutator::getDefaultAllowedTypes()), std::move(Strategies));
+  Mutator = std::make_unique<IRMutator>(std::move(getV16S32TypeGetter()), std::move(Strategies));
+  //Mutator = std::make_unique<IRMutator>(
+  //  std::move(IRMutator::getDefaultAllowedTypes()), std::move(Strategies));
 }
 
 size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,

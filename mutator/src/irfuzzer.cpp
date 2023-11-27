@@ -9,6 +9,7 @@
 #include "llvm/FuzzMutate/FuzzerCLI.h"
 #include "llvm/FuzzMutate/IRMutator.h"
 #include "llvm/FuzzMutate/Operations.h"
+#include "llvm/FuzzMutate/RandomIRBuilder.h"
 #include "llvm/IR/Constants.h"
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/LLVMContext.h"
@@ -39,21 +40,21 @@ using namespace llvm;
 
 static std::unique_ptr<IRMutator> Mutator;
 
-//std::vector<TypeGetter> getV16S32TypeGetter() {
-//  std::vector<TypeGetter> Types;
-//  TypeGetter ScalarTypes[] = {Type::getInt32Ty};
-//  int VectorLength[] = {16};
+// std::vector<TypeGetter> getV16S32TypeGetter() {
+//   std::vector<TypeGetter> Types;
+//   TypeGetter ScalarTypes[] = {Type::getInt32Ty};
+//   int VectorLength[] = {16};
 //
-//  for (auto typeGetter : ScalarTypes) {
-//    for (int length : VectorLength) {
-//      Types.push_back([typeGetter, length](LLVMContext &C) {
-//        return VectorType::get(typeGetter(C), length, false);
-//      });
-//    }
-//  }
+//   for (auto typeGetter : ScalarTypes) {
+//     for (int length : VectorLength) {
+//       Types.push_back([typeGetter, length](LLVMContext &C) {
+//         return VectorType::get(typeGetter(C), length, false);
+//       });
+//     }
+//   }
 //
-//  return Types;
-//}
+//   return Types;
+// }
 
 extern "C" {
 
@@ -78,12 +79,13 @@ void createISelMutator() {
   std::vector<std::unique_ptr<IRMutationStrategy>> Strategies;
   std::vector<fuzzerop::OpDescriptor> Ops = InjectorIRStrategy::getDefaultOps();
 
+  Strategies.push_back(std::make_unique<InsertEMIBlockStrategy>());
   Strategies.push_back(std::make_unique<InjectorIRStrategy>(
       InjectorIRStrategy::getDefaultOps()));
   Strategies.push_back(std::make_unique<InstModificationIRStrategy>());
-  //Strategies.push_back(std::make_unique<InsertFunctionStrategy>());
-  //Strategies.push_back(std::make_unique<InsertCFGStrategy>());
-  //Strategies.push_back(std::make_unique<InsertPHIStrategy>());
+  Strategies.push_back(std::make_unique<InsertFunctionStrategy>());
+  Strategies.push_back(std::make_unique<InsertCFGStrategy>());
+  Strategies.push_back(std::make_unique<InsertPHIStrategy>());
   Strategies.push_back(std::make_unique<SinkInstructionStrategy>());
   Strategies.push_back(std::make_unique<ShuffleBlockStrategy>());
   if (getenv("INTRINSIC_FEEDBACK")) {
@@ -96,11 +98,22 @@ void createISelMutator() {
     Strategies.push_back(std::make_unique<InsertIntrinsicStrategy>(
         table, workdir, std::stoi(threshold)));
   }
-  Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
+  // NOTE: Disable deleter for now lest it deletes non-EMI code.
+  // Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
 
-  //Mutator = std::make_unique<IRMutator>(std::move(getV16S32TypeGetter()), std::move(Strategies));
-    Mutator = std::make_unique<IRMutator>(
+  Mutator = std::make_unique<IRMutator>(
       std::move(IRMutator::getDefaultAllowedTypes()), std::move(Strategies));
+}
+
+void prepareEMIModule(Module &M) {
+  InsertEMIBlockStrategy EMIStrategy;
+  std::vector<Type *> Types;
+  for (const auto &Getter : IRMutator::getDefaultAllowedTypes())
+    Types.push_back(Getter(M.getContext()));
+  RandomIRBuilder IB(rand(), Types, true);
+  for (Function &F : M.getFunctionList()) {
+    EMIStrategy.mutate(F, IB);
+  }
 }
 
 size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
@@ -135,6 +148,8 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
 #endif
     char *NumMutateStr = getenv("NUM_MUTATE");
     int NumMutate = (NumMutateStr) ? atoi(NumMutateStr) : 1;
+    if (NumMutate != 0)
+      prepareEMIModule(*M);
     for (int i = 0; i < NumMutate; i++) {
       Seed = rand();
       Mutator->mutateModule(*M, Seed, MaxSize);

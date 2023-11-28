@@ -51,56 +51,58 @@ unsigned long mix(unsigned long a, unsigned long b, unsigned long c) {
 }
 int main(int argc, char **argv) {
   if (argc < 2) {
-    fprintf(stderr, "I need a file to mutate on");
-    exit(1);
+    llvm::errs() << "I need a file to mutate on.\n";
+    return 1;
   }
   std::ifstream infile(argv[1], std::ios::binary | std::ios::ate);
   std::streamsize size = infile.tellg();
   infile.seekg(0, std::ios::beg);
 
   std::vector<char> buffer(MAX_SIZE);
-  if (infile.read(buffer.data(), size)) {
-    srand(mix(clock(), time(NULL), getpid()));
-    createISelMutator();
-    unsigned int Seed = rand();
-    if (argc > 2) {
-      Seed = atoi(argv[2]);
-    }
-    llvm::errs() << Seed << "\n";
-    bool validateMode = false;
-    if (argc > 3 && argv[3][1] == 'v') {
-      validateMode = true;
-    }
-    size_t newSize =
-        LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, MAX_SIZE, Seed);
-    if (!validateMode) {
-      std::ofstream outbc = std::ofstream("out.bc",
-                                          std::ios::out | std::ios::binary);
-      outbc.write(buffer.data(), newSize);
-      outbc.close();
-      infile.close();
-      return 0;
-    }
-    llvm::LLVMContext Context;
-    std::unique_ptr<llvm::Module> M =
-        llvm::parseModule((uint8_t *)buffer.data(), newSize, Context);
-#ifdef DEBUG
-    if (!validateMode)
-      M->dump();
-#endif
-    std::error_code EC;
-    llvm::raw_fd_ostream outll(std::to_string(Seed) + ".ll", EC);
-    M->print(outll, nullptr);
-    // llvm::errs() << "Verifing Module...";
-    if (verifyModule(*M, &llvm::errs(), nullptr)) {
-      llvm::errs() << "Verifier failed. Seed: " << Seed << "\n";
-      // llvm::errs() << *M << "\n";
-    } else {
-      // llvm::errs() << "Good.\n";
-    }
-  } else {
-    fprintf(stderr, "I can't read the file.");
+  if (!infile.read(buffer.data(), size)) {
+    llvm::errs() << "I can't read the file.\n";
+    return 1;
   }
   infile.close();
+
+  srand(mix(clock(), time(NULL), getpid()));
+  createISelMutator();
+  unsigned int Seed = rand();
+  if (argc > 2) {
+    Seed = atoi(argv[2]);
+  }
+  llvm::errs() << Seed << "\n";
+  bool validateMode = false;
+  if (argc > 3 && argv[3][1] == 'v') {
+    validateMode = true;
+  }
+  size_t newSize =
+      LLVMFuzzerCustomMutator((uint8_t *)buffer.data(), size, MAX_SIZE, Seed);
+  if (!validateMode) {
+    std::ofstream outbc =
+        std::ofstream("out.bc", std::ios::out | std::ios::binary);
+    outbc.write(buffer.data(), newSize);
+    outbc.close();
+    infile.close();
+    return 0;
+  }
+  llvm::LLVMContext Context;
+  std::unique_ptr<llvm::Module> M =
+      llvm::parseModule((uint8_t *)buffer.data(), newSize, Context);
+#ifdef DEBUG
+  if (!validateMode)
+    M->dump();
+#endif
+  std::error_code EC;
+  llvm::raw_fd_ostream outll(std::to_string(Seed) + ".ll", EC);
+  M->print(outll, nullptr);
+  // llvm::errs() << "Verifing Module...";
+  if (verifyModule(*M, &llvm::errs(), nullptr)) {
+    llvm::errs() << "Verifier failed. Seed: " << Seed << "\n";
+    // llvm::errs() << *M << "\n";
+    return 1;
+  } else {
+    // llvm::errs() << "Good.\n";
+  }
   return 0;
 }

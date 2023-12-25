@@ -65,11 +65,14 @@ int main(int argc, char **argv) {
   }
   infile.close();
 
-  srand(mix(clock(), time(NULL), getpid()));
   createISelMutator();
-  unsigned int Seed = rand();
+  unsigned int Seed = 0;
   if (argc > 2) {
     Seed = atoi(argv[2]);
+    srand(Seed);
+  } else {
+    srand(mix(clock(), time(NULL), getpid()));
+    Seed = rand();
   }
   llvm::errs() << Seed << "\n";
   bool validateMode = false;

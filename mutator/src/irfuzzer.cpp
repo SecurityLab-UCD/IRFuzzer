@@ -105,7 +105,9 @@ void createISelMutator() {
       std::move(IRMutator::getDefaultAllowedTypes()), std::move(Strategies));
 }
 
-void prepareEMIModule(Module &M) {
+void prepareEMIModule(Module &M, int &NumMutate) {
+  if (getenv("SKIP_EMI_PREP"))
+    return;
   InsertEMIBlockStrategy EMIStrategy;
   std::vector<Type *> Types;
   for (const auto &Getter : IRMutator::getDefaultAllowedTypes())
@@ -113,6 +115,9 @@ void prepareEMIModule(Module &M) {
   RandomIRBuilder IB(rand(), Types, true);
   for (Function &F : M.getFunctionList()) {
     EMIStrategy.mutate(F, IB);
+    if (--NumMutate == 0) {
+      return;
+    }
   }
 }
 
@@ -149,7 +154,7 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
     char *NumMutateStr = getenv("NUM_MUTATE");
     int NumMutate = (NumMutateStr) ? atoi(NumMutateStr) : 1;
     if (NumMutate != 0)
-      prepareEMIModule(*M);
+      prepareEMIModule(*M, NumMutate);
     for (int i = 0; i < NumMutate; i++) {
       Seed = rand();
       Mutator->mutateModule(*M, Seed, MaxSize);

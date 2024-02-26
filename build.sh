@@ -34,6 +34,7 @@ fi
 export PATH=$PATH:$HOME/clang+llvm/bin
 
 ###### Download submodules
+git submodule init
 git submodule update
 
 ###### Compile AFLplusplus

@@ -24,10 +24,10 @@ then
     rm $CLANG_LLVM.tar.xz
     mv $CLANG_LLVM clang+llvm14
     ln -s clang+llvm14 clang+llvm
-    cd $FUZZING_HOME
 fi
 export PATH=$PATH:$HOME/clang+llvm/bin
 
+cd $FUZZING_HOME
 ###### Download submodules
 git submodule init
 git submodule update

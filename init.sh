@@ -31,3 +31,6 @@ cd $FUZZING_HOME
 ###### Download submodules
 git submodule init
 git submodule update
+
+###### Install python dependencies
+pip3 install -r scripts/requirements.txt

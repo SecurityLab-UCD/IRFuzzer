@@ -1,35 +1,34 @@
-# IR Fuzzer
+# IRFuzzer
 
 # Quick start
 
-## Compile 
+## Build
 
-You should be able to prepare everything by running `./build.sh`. 
-It should compile everything for you.
-If it failed for any reason, please send an issue to this repo.
+### Local build
 
-The script will set some environment variables. 
-You may want to leave these in your `.bashrc` for further fuzzing:
+**Dependencies**
 
 ```sh
-# Path to this directory
-export FUZZING_HOME=$(pwd)
-# The LLVM you want to fuzz
-export LLVM=<Your LLVM>
-export AFL=AFLplusplus
-export PATH=$PATH:$HOME/clang+llvm/bin
-# Tell AFL++ to only use our mutator
-export AFL_CUSTOM_MUTATOR_ONLY=1
-# Tell AFL++ Where our mutator is
-export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so
-# AFL instrumentation method
-export AFL_LLVM_INSTRUMENT=CLASSIC
+apt-get update 
+apt-get -y upgrade
+apt-get install -y -q git build-essential wget zlib1g-dev cmake python3 python3-pip ninja-build ccache 
+apt-get clean
 ```
 
-If you want to use dockerized environment, you can also do
+**Build**
+```sh
+git clone https://github.com/SecurityLab-UCD/IRFuzzer.git -b irfuzzer-0.4 # Clone this branch
+cd IRFuzzer
+./init.sh
+./build.sh
+```
+
+### Docker build
 
 ```sh
-docker build . -t irfuzzer
+git clone https://github.com/SecurityLab-UCD/IRFuzzer.git -b irfuzzer-0.4 # Clone this branch
+cd IRFuzzer
+docker build .
 ```
 
 ## Seed selection
@@ -138,11 +137,11 @@ You would most likely use the `fuzz.py` like this:
 python3.10 scripts/fuzz.py -i seeds -o fuzzing -r 5 --set="  aie" --type=screen --isel=dagisel --fuzzer=irfuzzer --time=1w -j 80 --on_exist=force
 ```
 
-It means: start fuzzing using input from `seeds` (`-i seed`), put the result in `fuzzing` (`-o fuzzing`), repeat the experiment for five times (`-r 5`), test aie without attribute and cpu setting (`--set="  aie"`), use screen to monitor the fuzzing (`--type=screen`), test SelectionDAG (`--isel=dagisel`), use our fuzzer (`--fuzzer=irfuzzer`), test for a week (`--time=1w`), start at most 80 jobs in parallel (`-j 80`) and if the output directory already exists, force remove it (`--on_exist=force`)
+It means: start fuzzing using input from `seeds` (`-i seed`), put the result in `fuzzing` (`-o fuzzing`), repeat the experiment for five times (`-r 5`), test aie without attribute and cpu setting (`--set="  aie"`), use screen to monitor the fuzzing (`--type=screen`), test SelectionDAG (`--isel=dagisel`), use our fuzzer (`--fuzzer=irfuzzer`), test for a week (`--time=1w`), start at most 80 jobs in parallel (`-j 80`), and if the output directory already exists, force remove it (`--on_exist=force`)
 
 # How do we fuzz
 
-See the details in our paper
+See the details in our paper [here](https://arxiv.org/abs/2402.05256)
 
 # Trophies & Findings
 
@@ -168,21 +167,6 @@ One version is built by AFL's compiler, and another is built by LLVM14 and conta
 AFL needs to inject some code to the AIE compiler to keep track of runtime info (Edge coverage, MatcherTable coverage, etc.)
 Besides, the driver also depends on it.
 The other version is the dependency for the mutator. You __can__ use AFL instrumented mutator, but it would slow down mutation speed and thus not recommended.
-
-__Why fuzz a fork of AIE that is not up-to-date?__
-
-Mainly because mutator also needs to understand the architecture we are fuzzing, although it only generates mid-end IR.
-Therefore, until we merge mutator's code into AIE, all you can do is keep merging the code you want to test to mutator branch and compile everything.
-
-__Are we fuzzing AIE2?__
-
-Currently we are only fuzzing AIE1 since it is more complete than AIE2. 
-But you can fuzz AIE2 if you want to. In principle fuzzing AIE1 is no different than AIE2. 
-All you need to do is set `TRIPLE=aie2` and set `MATCHER_TABLE_SIZE` correctly.
-
-__AIE compilation hangs__
-
-It's an known issue that `Target/AIE/MCTargetDesc/AIEMCFormats.cpp` will take a long time (~10 minutes) to compile. A function in it `__cxx_global_var_init()` will cause the optimizer to run for a really long time. It is an interesting bug, but we haven't had time to fix it.
 
 __What is a seed and what to use__
 

@@ -14,7 +14,7 @@ export PATH=$PATH:$HOME/clang+llvm/bin
 cd $FUZZING_HOME/$AFL; make -j; cd $FUZZING_HOME
 export AFL_LLVM_INSTRUMENT=CLASSIC
 
-###### Build LLVM & AIE
+###### Build LLVM
 # Unfortunatelly we have to compile LLVM twice. 
 # `build-afl` is the build to be fuzzed.
 # `build-release` is the dependency of mutator
@@ -65,11 +65,10 @@ then
 fi
 cd $LLVM/build-release; ninja -j $(nproc --all); cd ../..
 
-# Don't build debug build in docker.
-if [ ! -f /.dockerenv ]; then
-    # Mutator depends on `build-release`.
-    # They can't depend on `build-afl` since all AFL compiled code reference to global 
-    # `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
+# Optional debug build. Don't build in docker. 
+# TODO: Use fancy bash tricks to dedup debug and release 
+# build script since they are essentially the same.
+if [ -z $NO_DEBUG_BUILD ]; then
     if [ ! -d $FUZZING_HOME/$LLVM/build-debug ]
     then
         mkdir -p $LLVM/build-debug
@@ -103,16 +102,18 @@ mkdir -p mutator/build
 cd mutator/build
 cmake -GNinja .. && ninja -j $(nproc --all)
 cd $FUZZING_HOME
-mkdir -p mutator/build-debug
-cd mutator/build-debug
-cmake -GNinja .. -DCMAKE_BUILD_TYPE=Debug && ninja -j $(nproc --all)
-cd $FUZZING_HOME
+if [ -z $NO_DEBUG_BUILD ]; then
+    mkdir -p mutator/build-debug
+    cd mutator/build-debug
+    cmake -GNinja .. -DCMAKE_BUILD_TYPE=Debug && ninja -j $(nproc --all)
+    cd $FUZZING_HOME
+fi
 
 ### We are using `scripts/fuzz.py` now.
 # Tell AFL++ to only use our mutator
-# export AFL_CUSTOM_MUTATOR_ONLY=1
+export AFL_CUSTOM_MUTATOR_ONLY=1
 # Tell AFL++ Where our mutator is
-# export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so
+export AFL_CUSTOM_MUTATOR_LIBRARY=$FUZZING_HOME/mutator/build/libAFLCustomIRMutator.so
 
 if [ ! -f $FUZZING_HOME/seeds/*.ll ]
 then
@@ -140,6 +141,7 @@ cd mapper/build
 cmake -GNinja .. && ninja -j 4
 cd $FUZZING_HOME
 
+build_pl(){
 if [ ! -d $FUZZING_HOME/$LLVM/build-pl ]
 then
     ###### Generate all pattern lookup tables (JSONs)
@@ -182,3 +184,6 @@ then
     git reset --hard
     cd $FUZZING_HOME
 fi
+}
+
+# build_pl

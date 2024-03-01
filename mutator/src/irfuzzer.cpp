@@ -1,4 +1,4 @@
-#include "InsertIntrinsicStrategy.h"
+// #include "InsertIntrinsicStrategy.h"
 #include "mutator.h"
 
 #include "llvm/ADT/StringRef.h"
@@ -39,6 +39,33 @@ using namespace llvm;
 
 static std::unique_ptr<IRMutator> Mutator;
 
+std::vector<TypeGetter> getDefaultAllowedTypes() {
+  std::vector<TypeGetter> ScalarTypes{
+      Type::getInt1Ty,  Type::getInt8Ty,  Type::getInt16Ty,  Type::getInt32Ty,
+      Type::getInt64Ty, Type::getFloatTy, Type::getDoubleTy, Type::getHalfTy};
+
+  // Scalar types
+  std::vector<TypeGetter> Types(ScalarTypes);
+
+  // Vector types
+  int VectorLength[] = {1, 2, 4, 8, 16, 32};
+  std::vector<TypeGetter> BasicTypeGetters(Types);
+  for (auto typeGetter : BasicTypeGetters) {
+    for (int length : VectorLength) {
+      Types.push_back([typeGetter, length](LLVMContext &C) {
+        return VectorType::get(typeGetter(C), length, false);
+      });
+    }
+  }
+
+  // Pointers
+  TypeGetter OpaquePtrGetter = [](LLVMContext &C) {
+    return PointerType::get(Type::getInt32Ty(C), 0);
+  };
+  Types.push_back(OpaquePtrGetter);
+  return Types;
+}
+
 extern "C" {
 
 void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
@@ -70,6 +97,7 @@ void createISelMutator() {
   Strategies.push_back(std::make_unique<InsertPHIStrategy>());
   Strategies.push_back(std::make_unique<SinkInstructionStrategy>());
   Strategies.push_back(std::make_unique<ShuffleBlockStrategy>());
+  /*
   if (getenv("INTRINSIC_FEEDBACK")) {
     // Make everything explict.
     char *table = getenv("LOOKUP_TABLE");
@@ -80,10 +108,11 @@ void createISelMutator() {
     Strategies.push_back(std::make_unique<InsertIntrinsicStrategy>(
         table, workdir, std::stoi(threshold)));
   }
+  */
   Strategies.push_back(std::make_unique<InstDeleterIRStrategy>());
 
-  Mutator = std::make_unique<IRMutator>(
-      std::move(IRMutator::getDefaultAllowedTypes()), std::move(Strategies));
+  Mutator = std::make_unique<IRMutator>(std::move(getDefaultAllowedTypes()),
+                                        std::move(Strategies));
 }
 
 size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,

@@ -29,6 +29,12 @@
 #else
 #include "llvm/Support/TargetRegistry.h"
 #endif
+#include "llvm/Bitcode/BitcodeReader.h"
+#include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/CodeGen/CommandFlags.h"
+#include "llvm/IR/Verifier.h"
+#include "llvm/MC/TargetRegistry.h"
+#include "llvm/Passes/PassBuilder.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/DataTypes.h"
 #include "llvm/Support/Debug.h"
@@ -54,9 +60,14 @@ static cl::opt<std::string>
 static std::unique_ptr<TargetMachine> TM;
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
+  assert(TM && "Should have been created during fuzzer initialization");
+
   if (Size <= 1)
     // We get bogus data given an empty corpus - ignore it.
     return 0;
+
+  // Parse module
+  //
 
   LLVMContext Context;
   auto M = parseAndVerify(Data, Size, Context);
@@ -65,17 +76,41 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
     return 0;
   }
 
-  // Set up the module to build for our target.
+  // Set up target dependant options
+  //
+
   M->setTargetTriple(TM->getTargetTriple().normalize());
   M->setDataLayout(TM->createDataLayout());
+  codegen::setFunctionAttributes(TM->getTargetCPU(),
+                                 TM->getTargetFeatureString(), *M);
 
-  // Build up a PM to do instruction selection.
-  legacy::PassManager PM;
-  TargetLibraryInfoImpl TLII(TM->getTargetTriple());
-  PM.add(new TargetLibraryInfoWrapperPass(TLII));
-  raw_null_ostream OS;
-  TM->addPassesToEmitFile(PM, OS, nullptr, CGFT_Null);
-  PM.run(*M);
+  // Create pass pipeline
+  //
+
+  PassBuilder PB(TM.get());
+
+  LoopAnalysisManager LAM;
+  FunctionAnalysisManager FAM;
+  CGSCCAnalysisManager CGAM;
+  ModulePassManager MPM;
+  ModuleAnalysisManager MAM;
+
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
+
+  // Run passes which we need to test
+  //
+
+  MPM.run(*M, MAM);
+
+  // Check that passes resulted in a correct code
+  if (verifyModule(*M, &errs())) {
+    errs() << "Transformation resulted in an invalid module\n";
+    abort();
+  }
 
   return 0;
 }
@@ -113,25 +148,12 @@ extern "C" LLVM_ATTRIBUTE_USED int LLVMFuzzerInitialize(int *argc,
   std::string CPUStr = codegen::getCPUStr(),
               FeaturesStr = codegen::getFeaturesStr();
 
-  CodeGenOpt::Level OLvl = CodeGenOpt::Default;
-  switch (OptLevel) {
-  default:
-    errs() << argv[0] << ": invalid optimization level.\n";
+  CodeGenOptLevel OLvl;
+  if (auto Level = CodeGenOpt::parseLevel(OptLevel)) {
+    OLvl = *Level;
+  } else {
+    errs() << "invalid optimization level.\n";
     return 1;
-  case ' ':
-    break;
-  case '0':
-    OLvl = CodeGenOpt::None;
-    break;
-  case '1':
-    OLvl = CodeGenOpt::Less;
-    break;
-  case '2':
-    OLvl = CodeGenOpt::Default;
-    break;
-  case '3':
-    OLvl = CodeGenOpt::Aggressive;
-    break;
   }
 
   TargetOptions Options = codegen::InitTargetOptionsFromCodeGenFlags(TheTriple);

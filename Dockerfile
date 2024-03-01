@@ -17,4 +17,6 @@ ENV AFL_LLVM_INSTRUMENT=CLASSIC
 
 RUN ./init.sh
 
+# Don't build debug in docker image.
+ENV NO_DEBUG_BUILD=1
 RUN ./build.sh

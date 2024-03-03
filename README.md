@@ -63,7 +63,7 @@ export MATCHER_TABLE_SIZE=13780
 ```sh
 # Required, tell the fuzzer which arch are you fuzzing
 export TRIPLE=aarch64
-# Optional, but can be an empty string
+# Required, but can be an empty string
 export CPU= 
 # Required, but can be an empty string
 export ATTR= 

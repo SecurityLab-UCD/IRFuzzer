@@ -59,7 +59,7 @@ add_definitions(${LLVM_DEFINITIONS})
 add_library(AFLCustomIRMutator SHARED
     src/afl-mutator.c
     src/irfuzzer.cpp
-    src/InsertIntrinsicStrategy.cpp
+    # src/InsertIntrinsicStrategy.cpp
 )
 target_link_libraries(AFLCustomIRMutator
     ${LLVM_LIBS}

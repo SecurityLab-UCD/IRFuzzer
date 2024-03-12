@@ -29,8 +29,7 @@ export PATH=$PATH:$HOME/clang+llvm/bin
 
 cd $FUZZING_HOME
 ###### Download submodules
-git submodule init
-git submodule update
+git submodule update --init --depth=1
 
 ###### Install python dependencies
 pip3 install -r scripts/requirements.txt

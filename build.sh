@@ -68,7 +68,7 @@ fi
 cd $LLVM/build-release; ninja -j $(nproc --all); cd ../..
 
 # Don't build debug build in docker.
-if [ ! -f /.dockerenv ]; then
+if [ -z $NO_DEBUG_BUILD ]; then
     # Mutator depends on `build-release`.
     # They can't depend on `build-afl` since all AFL compiled code reference to global 
     # `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
@@ -106,10 +106,12 @@ mkdir -p mutator/build
 cd mutator/build
 cmake -GNinja .. && ninja -j $(nproc --all)
 cd $FUZZING_HOME
-mkdir -p mutator/build-debug
-cd mutator/build-debug
-cmake -GNinja .. -DCMAKE_BUILD_TYPE=Debug && ninja -j $(nproc --all)
-cd $FUZZING_HOME
+if [ -z $NO_DEBUG_BUILD ]; then
+    mkdir -p mutator/build-debug
+    cd mutator/build-debug
+    cmake -GNinja .. -DCMAKE_BUILD_TYPE=Debug && ninja -j $(nproc --all)
+    cd $FUZZING_HOME
+fi
 
 ### We are using `scripts/fuzz.py` now.
 # Tell AFL++ to only use our mutator

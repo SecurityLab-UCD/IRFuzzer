@@ -10,6 +10,7 @@ ENV FUZZING_HOME=/IRFuzzer
 RUN git clone https://github.com/SecurityLab-UCD/IRFuzzer.git $FUZZING_HOME -b irfuzzer-alive
 WORKDIR $FUZZING_HOME
 
+ENV NO_DEBUG_BUILD=1
 ENV LLVM=llvm-project
 ENV AFL=AFLplusplus
 ENV PATH="${PATH}:/clang+llvm/bin"

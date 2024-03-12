@@ -18,3 +18,7 @@ ENV AFL_LLVM_INSTRUMENT=CLASSIC
 RUN ./init.sh
 
 RUN ./build.sh
+
+ARG IRFUZZER_COMMIT
+RUN git fetch origin && git checkout $IRFUZZER_COMMIT
+RUN ./init.sh && ./build.sh

@@ -35,6 +35,8 @@ docker build . --no-cache
 
 You can put optional arguments `--build-arg IRFUZZER_COMMIT=<latest-commit>` to download the latest version.
 
+You can find an image [here](https://hub.docker.com/layers/datacorrupted/irfuzzer/alive/images/sha256-01662c3f45cc5a51432cc63f0be3212447aa10e3a012e57c649be66904d35a21?context=repo)
+
 ## Seed selection
 
 Seed is the initial input we give fuzzers, they have a directly impact on fuzzing performance.

@@ -15,10 +15,9 @@ ENV AFL=AFLplusplus
 ENV PATH="${PATH}:/clang+llvm/bin"
 ENV AFL_LLVM_INSTRUMENT=CLASSIC
 
-RUN ./init.sh
+RUN ./init.sh && ./build.sh
 
-RUN ./build.sh
-
+## Rebuild latest commit based on previous cache so we don't have to start over again.
 ARG IRFUZZER_COMMIT
 RUN git fetch origin && git checkout $IRFUZZER_COMMIT
-RUN ./init.sh && ./build.sh
+RUN ./build.sh

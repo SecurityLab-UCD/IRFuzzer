@@ -29,8 +29,11 @@ export AFL_LLVM_INSTRUMENT=CLASSIC
 If you want to use dockerized environment, you can also do
 
 ```sh
-docker build . -t irfuzzer
+# No cache is required to make sure you are using the latest version if you don't have a clean build yet.
+docker build . --no-cache
 ```
+
+You can put optional arguments `--build-arg IRFUZZER_COMMIT=<latest-commit>` to download the latest version.
 
 ## Seed selection
 

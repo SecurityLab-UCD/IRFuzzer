@@ -58,7 +58,7 @@ then
             -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_TARGETS_TO_BUILD="AArch64" \
-            -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_BUILD_TOOLS=ON \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \

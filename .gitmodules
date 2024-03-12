@@ -1,8 +1,10 @@
 [submodule "llvm-project"]
 	path = llvm-project
-	url = https://github.com/SecurityLab-UCD/llvm-project.git
-	branch = irfuzzer-0.3
+	url = https://github.com/llvm/llvm-project.git
+	branch = main
+	shallow = true
 [submodule "AFLplusplus"]
 	path = AFLplusplus
 	url = https://github.com/SecurityLab-UCD/AFLplusplus.git
-	branch = irfuzzer-0.3
+	branch = irfuzzer-0.4
+	shallow = true

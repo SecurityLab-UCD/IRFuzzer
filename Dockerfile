@@ -7,7 +7,7 @@ RUN apt-get update && \
     apt-get clean
 
 ENV FUZZING_HOME=/IRFuzzer
-RUN git clone https://github.com/SecurityLab-UCD/IRFuzzer.git $FUZZING_HOME -b irfuzzer-0.3
+RUN git clone https://github.com/SecurityLab-UCD/IRFuzzer.git $FUZZING_HOME -b irfuzzer-alive
 WORKDIR $FUZZING_HOME
 
 ENV LLVM=llvm-project

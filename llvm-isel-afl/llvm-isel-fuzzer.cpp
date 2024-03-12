@@ -74,7 +74,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *Data, size_t Size) {
   TargetLibraryInfoImpl TLII(TM->getTargetTriple());
   PM.add(new TargetLibraryInfoWrapperPass(TLII));
   raw_null_ostream OS;
-  TM->addPassesToEmitFile(PM, OS, nullptr, CGFT_Null);
+  TM->addPassesToEmitFile(PM, OS, nullptr, CodeGenFileType::Null);
   PM.run(*M);
 
   return 0;
@@ -113,25 +113,12 @@ extern "C" LLVM_ATTRIBUTE_USED int LLVMFuzzerInitialize(int *argc,
   std::string CPUStr = codegen::getCPUStr(),
               FeaturesStr = codegen::getFeaturesStr();
 
-  CodeGenOpt::Level OLvl = CodeGenOpt::Default;
-  switch (OptLevel) {
-  default:
+  CodeGenOptLevel OLvl;
+  if (auto Level = CodeGenOpt::parseLevel(OptLevel)) {
+    OLvl = *Level;
+  } else {
     errs() << argv[0] << ": invalid optimization level.\n";
     return 1;
-  case ' ':
-    break;
-  case '0':
-    OLvl = CodeGenOpt::None;
-    break;
-  case '1':
-    OLvl = CodeGenOpt::Less;
-    break;
-  case '2':
-    OLvl = CodeGenOpt::Default;
-    break;
-  case '3':
-    OLvl = CodeGenOpt::Aggressive;
-    break;
   }
 
   TargetOptions Options = codegen::InitTargetOptionsFromCodeGenFlags(TheTriple);

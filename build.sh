@@ -32,6 +32,7 @@ then
             -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_CCACHE_BUILD=OFF \
             -DLLVM_TARGETS_TO_BUILD="AArch64" \
+            -DLLVM_BUILD_TOOLS=OFF \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -57,6 +58,7 @@ then
             -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_TARGETS_TO_BUILD="AArch64" \
+            -DLLVM_BUILD_TOOLS=ON \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -78,6 +80,7 @@ if [ ! -f /.dockerenv ]; then
                 -DBUILD_SHARED_LIBS=ON \
                 -DLLVM_CCACHE_BUILD=ON \
                 -DLLVM_TARGETS_TO_BUILD="AArch64" \
+                -DLLVM_BUILD_TOOLS=ON \
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DCMAKE_BUILD_TYPE=Debug \
@@ -156,6 +159,7 @@ then
             -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_TARGETS_TO_BUILD="AArch64" \
+            -DLLVM_BUILD_TOOLS=OFF \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \

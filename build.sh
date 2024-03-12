@@ -58,7 +58,7 @@ then
             -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
             -DLLVM_TARGETS_TO_BUILD="AArch64" \
-            -DLLVM_BUILD_TOOLS=ON \
+            -DLLVM_BUILD_TOOLS=OFF \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -143,6 +143,7 @@ cd mapper/build
 cmake -GNinja .. && ninja -j 4
 cd $FUZZING_HOME
 
+build_pl(){
 if [ ! -d $FUZZING_HOME/$LLVM/build-pl ]
 then
     ###### Generate all pattern lookup tables (JSONs)
@@ -186,3 +187,6 @@ then
     git reset --hard
     cd $FUZZING_HOME
 fi
+}
+
+# build_pl

@@ -108,6 +108,10 @@ cd mutator/build-debug
 cmake -GNinja .. -DCMAKE_BUILD_TYPE=Debug && ninja -j $(nproc --all)
 cd $FUZZING_HOME
 
+# Collect matcher table size on this build.
+echo "Preparing matcher table size..."
+python3 scripts/collect_matcher_table_size.py 
+
 ### We are using `scripts/fuzz.py` now.
 # Tell AFL++ to only use our mutator
 # export AFL_CUSTOM_MUTATOR_ONLY=1

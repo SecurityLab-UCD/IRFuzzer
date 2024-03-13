@@ -6,6 +6,7 @@ import subprocess
 
 FUZZING_HOME = os.getenv(key="FUZZING_HOME")
 LLVM = os.getenv(key="LLVM", default="llvm-project")
+AFL = os.getenv(key="AFL")
 
 LLVM_BIN_PATH = Path(LLVM, "build-release/bin")
 LLVM_LOOKUP_TABLE_DIR = Path(LLVM, "build-pl", "pattern-lookup")
@@ -20,6 +21,16 @@ def __verify_working_dir():
     if FUZZING_HOME is None:
         logging.error(
             "$FUZZING_HOME not set, why am I running? Did you install correctly?"
+        )
+        exit(1)
+    if LLVM is None:
+        logging.error(
+            "$LLVM not set, why am I running? Did you install correctly?"
+        )
+        exit(1)
+    if AFL is None:
+        logging.error(
+            "$AFL not set, why am I running? Did you install correctly?"
         )
         exit(1)
 
@@ -44,4 +55,4 @@ def __verify_llvm_version():
 
 
 __verify_working_dir()
-__verify_llvm_version()
+# __verify_llvm_version()

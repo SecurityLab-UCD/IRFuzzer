@@ -20,3 +20,4 @@ docker*
 output
 archive*
 */*.test-*
+matcher_table_sizes.py

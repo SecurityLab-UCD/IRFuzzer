@@ -113,6 +113,10 @@ if [ -z $NO_DEBUG_BUILD ]; then
     cd $FUZZING_HOME
 fi
 
+# Collect matcher table size on this build.
+echo "Preparing matcher table size..."
+python3 scripts/collect_matcher_table_size.py 
+
 ### We are using `scripts/fuzz.py` now.
 # Tell AFL++ to only use our mutator
 # export AFL_CUSTOM_MUTATOR_ONLY=1

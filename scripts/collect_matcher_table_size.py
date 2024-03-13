@@ -8,6 +8,7 @@ from typing import Optional
 from tap import Tap
 from lib import LLVM
 from lib.fs import subdirs_of
+import os
 
 
 LLVM_AFL_BUILD_PATH = Path(LLVM, "build-afl")
@@ -102,6 +103,9 @@ def dump_py(
 
 
 def main() -> None:
+    # Make sure we use our path to do instrumentation.
+    os.environ["AFL_LLVM_INSTRUMENT"] = "CLASSIC"
+    
     args = Args().parse_args()
 
     remove_matcher_table_build_files(global_isel=False)

@@ -21,4 +21,5 @@ RUN ./init.sh && ./build.sh
 ## Rebuild latest commit based on previous cache so we don't have to start over again.
 ARG IRFUZZER_COMMIT
 RUN git fetch origin && git checkout $IRFUZZER_COMMIT
+RUN git submodule update
 RUN ./build.sh

@@ -29,10 +29,9 @@ then
     cd $LLVM/build-afl
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=OFF \
-            -DLLVM_BUILD_TOOLS=ON \
             -DLLVM_CCACHE_BUILD=OFF \
-            -DLLVM_TARGETS_TO_BUILD="AArch64" \
             -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
             -DCMAKE_C_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast \
             -DCMAKE_CXX_COMPILER=$FUZZING_HOME/$AFL/afl-clang-fast++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -47,6 +46,28 @@ then
 fi
 cd $LLVM/build-afl; ninja -j $(nproc --all); cd ../..
 
+if [ ! -d $FUZZING_HOME/$LLVM/build-cov ]
+then
+    mkdir -p $LLVM/build-cov
+    cd $LLVM/build-cov
+    cmake  -GNinja \
+            -DBUILD_SHARED_LIBS=ON \
+            -DLLVM_BUILD_TOOLS=ON \
+            -DLLVM_CCACHE_BUILD=ON \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DLLVM_APPEND_VC_REV=OFF \
+            -DLLVM_BUILD_EXAMPLES=OFF \
+            -DLLVM_BUILD_RUNTIME=OFF \
+            -DLLVM_INCLUDE_EXAMPLES=OFF \
+            -DLLVM_BUILD_INSTRUMENTED_COVERAGE=OFF \
+        ../llvm
+    cd $FUZZING_HOME
+fi
+cd $LLVM/build-cov; ninja -j $(nproc --all); cd ../..
+
 # Mutator depends on `build-release`.
 # They can't depend on `build-afl` since all AFL compiled code reference to global 
 # `__afl_area_ptr`(branch counting table) and `__afl_prev_loc`(edge hash)
@@ -57,8 +78,8 @@ then
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_TARGETS_TO_BUILD="AArch64" \
             -DLLVM_BUILD_TOOLS=ON \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \
@@ -79,8 +100,8 @@ if [ -z $NO_DEBUG_BUILD ]; then
         cmake  -GNinja \
                 -DBUILD_SHARED_LIBS=ON \
                 -DLLVM_CCACHE_BUILD=ON \
-                -DLLVM_TARGETS_TO_BUILD="AArch64" \
                 -DLLVM_BUILD_TOOLS=ON \
+                -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
                 -DCMAKE_C_COMPILER=clang \
                 -DCMAKE_CXX_COMPILER=clang++ \
                 -DCMAKE_BUILD_TYPE=Debug \
@@ -165,8 +186,8 @@ then
     cmake  -GNinja \
             -DBUILD_SHARED_LIBS=ON \
             -DLLVM_CCACHE_BUILD=ON \
-            -DLLVM_TARGETS_TO_BUILD="AArch64" \
             -DLLVM_BUILD_TOOLS=OFF \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;LoongArch;M68k" \
             -DCMAKE_C_COMPILER=clang \
             -DCMAKE_CXX_COMPILER=clang++ \
             -DCMAKE_BUILD_TYPE=Release \

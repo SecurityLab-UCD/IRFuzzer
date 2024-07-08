@@ -70,6 +70,9 @@ void createISelMutator() {
   Strategies.push_back(std::make_unique<InsertPHIStrategy>());
   Strategies.push_back(std::make_unique<SinkInstructionStrategy>());
   Strategies.push_back(std::make_unique<ShuffleBlockStrategy>());
+  if (getenv("MUTATE_ATTRIBUTE")) {
+    Strategies.push_back(std::make_unique<MutateAttributeStrategy>());
+  }
   if (getenv("INTRINSIC_FEEDBACK")) {
     // Make everything explict.
     char *table = getenv("LOOKUP_TABLE");

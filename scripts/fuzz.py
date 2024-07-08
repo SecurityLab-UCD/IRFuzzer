@@ -39,7 +39,6 @@ class FuzzerConfig(NamedTuple):
             extra_args=other_args,
         )
 
-
 Fuzzer = Literal[
     "aflplusplus",
     "aflplusplus-seeds-dry-run",
@@ -50,6 +49,9 @@ Fuzzer = Literal[
     "irfuzzer-O3",
     "irfuzzer",
     "ir-intrinsic-wo-feedback",
+    "irfuzzer-attr",
+    "irfuzzer-attr-O3",
+    "irfuzzer-attr-bare",
 ]
 ISel = Literal["dagisel", "gisel"]
 ClutserType = Literal["screen", "docker", "stdout"]
@@ -97,6 +99,29 @@ FUZZER_CONFIGS: dict[Fuzzer, FuzzerConfig] = {
     ),
     "ir-intrinsic-wo-feedback": FuzzerConfig.getIRFuzzer(
         other_env={"INTRINSIC_FEEDBACK": "1", "THRESHOLD": "86400"},
+        other_args=["-w"],
+    ),
+    "irfuzzer-attr": FuzzerConfig.getIRFuzzer(
+        other_env={
+            "INTRINSIC_FEEDBACK": "1",
+            "THRESHOLD": "10",
+            "MUTATE_ATTRIBUTE": "1",
+        },
+        other_args=["-w"],
+    ),
+    "irfuzzer-attr-O3": FuzzerConfig.getIRFuzzer(
+        other_env={
+            "OPT_LEVEL": "-O3",
+            "INTRINSIC_FEEDBACK": "1",
+            "THRESHOLD": "10",
+            "MUTATE_ATTRIBUTE": "1",
+        },
+        other_args=["-w"],
+    ),
+    "irfuzzer-attr-bare": FuzzerConfig.getIRFuzzer(
+        other_env={
+            "MUTATE_ATTRIBUTE": "1",
+        },
         other_args=["-w"],
     ),
 }

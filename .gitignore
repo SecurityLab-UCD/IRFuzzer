@@ -21,3 +21,6 @@ output
 archive*
 */*.test-*
 matcher_table_sizes.py
+*.c
+*.s 
+*.o

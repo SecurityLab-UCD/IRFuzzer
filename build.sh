@@ -65,6 +65,24 @@ then
 fi
 cd $LLVM/build-release; ninja -j $(nproc --all); cd ../..
 
+# coverage instrumentated release build to collect line coverage from after experiments
+if [ ! -d $FUZZING_HOME/$LLVM/build-release-cov ]
+then
+    mkdir -p $LLVM/build-release-cov
+    cd $LLVM/build-release-cov
+    cmake  -GNinja \
+            -DBUILD_SHARED_LIBS=ON \
+            -DLLVM_CCACHE_BUILD=ON \
+            -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="ARC;CSKY;M68k" \
+            -DCMAKE_C_COMPILER=clang \
+            -DCMAKE_CXX_COMPILER=clang++ \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCOVERAGE=ON \
+        ../llvm
+    cd $FUZZING_HOME
+fi
+cd $LLVM/build-release-cov; ninja -j $(nproc --all); cd ../..
+
 # Don't build debug build in docker.
 if [ ! -f /.dockerenv ]; then
     # Mutator depends on `build-release`.

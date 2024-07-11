@@ -5,7 +5,6 @@ TARGET_LISTS: dict[str, list[Target]] = {
         Target("aarch64"),
         Target("arm"),
         Target("x86_64"),
-        Target("wasm32"),
     ],
     "1": [
         Target("arm"),

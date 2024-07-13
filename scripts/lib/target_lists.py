@@ -82,6 +82,8 @@ TARGET_LISTS: dict[str, list[Target]] = {
         # AMDGCN
         Target("amdgcn", "gfx1100"),
         Target("amdgcn", "gfx1036"),
+        # ARM
+        Target("arm", "generic"),
         # Hexagon
         Target("hexagon", "hexagonv71t"),
         Target("hexagon", "hexagonv73"),

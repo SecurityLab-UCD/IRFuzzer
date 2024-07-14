@@ -1,3 +1,4 @@
+#include "BootstrapFiles.h"
 #include "InsertIntrinsicStrategy.h"
 #include "mutator.h"
 
@@ -38,9 +39,11 @@
 using namespace llvm;
 
 static std::unique_ptr<IRMutator> Mutator;
+static BootstrapFiles BF(atoi(getenv("BOOT_TIME")));
 
 extern "C" {
 
+#ifdef DEBUG
 void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
                    size_t MaxSize) {
   time_t seconds = time(NULL);
@@ -53,6 +56,7 @@ void dumpOnFailure(unsigned int Seed, uint8_t *Data, size_t Size,
   oldoutfile.write((char *)Data, Size);
   oldoutfile.close();
 }
+#endif
 
 /// TODO:
 /// Type* getStructType(Context& C);
@@ -93,11 +97,12 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
                                unsigned int Seed) {
   LLVMContext Context;
   std::unique_ptr<Module> M;
-  if (Size <= 1)
-    // We get bogus data given an empty corpus - just create a new module.
-    M.reset(new Module("M", Context));
-  else
+  if (BF.bootstraping()) {
+    auto file = BF.pop();
+    M = parseModule((uint8_t *)file.data(), file.size(), Context);
+  } else {
     M = parseModule(Data, Size, Context);
+  }
   if (!M) {
     errs() << "Parse module error. No mutation is done. Data size: " << Size
            << ". Given data wrote to err.bc\n";

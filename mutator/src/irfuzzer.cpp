@@ -126,9 +126,9 @@ size_t LLVMFuzzerCustomMutator(uint8_t *Data, size_t Size, size_t MaxSize,
 #endif
     srand(Seed);
     Seed = rand();
-    // for (int i = 0; i < 4; i++) {
-    Mutator->mutateModule(*M, Seed, MaxSize);
-    // }
+    for (int i = 0; i < 16; i++) {
+      Mutator->mutateModule(*M, Seed, MaxSize);
+    }
 #ifdef DEBUG
   } catch (...) {
     dumpOnFailure(Seed, Data, Size, MaxSize);

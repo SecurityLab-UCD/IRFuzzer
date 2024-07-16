@@ -39,7 +39,9 @@
 using namespace llvm;
 
 static std::unique_ptr<IRMutator> Mutator;
-static BootstrapFiles BF(atoi(getenv("BOOT_TIME")));
+static unsigned BootTime =
+    (!!getenv("BOOT_TIME")) ? atoi(getenv("BOOT_TIME")) : 30;
+static BootstrapFiles BF(BootTime);
 
 extern "C" {
 

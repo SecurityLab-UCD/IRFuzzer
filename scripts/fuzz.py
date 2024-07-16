@@ -109,7 +109,7 @@ FUZZER_CONFIGS: dict[Fuzzer, FuzzerConfig] = {
             "BOOT_DIR": "cseed",
             "BOOT_TIME": "30",
         },
-        other_args=["-w","-t", "32"],
+        other_args=["-w","-t", "150"],
     ),
     "irfuzzer-attr-O3": FuzzerConfig.getIRFuzzer(
         other_env={
@@ -120,7 +120,7 @@ FUZZER_CONFIGS: dict[Fuzzer, FuzzerConfig] = {
             "BOOT_DIR": "cseed",
             "BOOT_TIME": "30",
         },
-        other_args=["-w", "-t", "32"],
+        other_args=["-w", "-t", "150"],
     ),
     "irfuzzer-attr-bare": FuzzerConfig.getIRFuzzer(
         other_env={
@@ -128,7 +128,7 @@ FUZZER_CONFIGS: dict[Fuzzer, FuzzerConfig] = {
             "BOOT_DIR": "cseed",
             "BOOT_TIME": "30",
         },
-        other_args=["-w", "-t", "32"],
+        other_args=["-w", "-t", "150"],
     ),
 }
 

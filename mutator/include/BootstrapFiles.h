@@ -24,6 +24,8 @@ struct BootstrapFiles {
   }
   bool empty() const { return (idx >= files.size()); }
   bool bootstraping() {
+    if (empty())
+      return false;
     end = std::chrono::steady_clock::now();
     // Calculate the elapsed time
     std::chrono::duration<double> elapsed = end - begin;

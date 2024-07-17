@@ -51,7 +51,7 @@ class Args(Tap):
 def main():
     args = Args(underscores_to_dashes=True).parse_args()
 
-    print("Step 1/3: Profiling `llc` for each input...")
+    print("Step 1/4: Profiling `llc` for each input...")
 
     base_dir = Path(FUZZING_HOME or ".")
 
@@ -65,7 +65,7 @@ def main():
         )
 
     print(
-        f"Step 2/3: Creating {'copies' if args.copy else 'hardlinks'} of *.o, *.inc, *.gcno files..."
+        f"Step 2/4: Creating {'copies' if args.copy else 'hardlinks'} of *.o, *.inc, *.gcno files..."
     )
 
     lib_dir = LLVM_COV_BUILD_DIR.joinpath("lib")
@@ -89,7 +89,7 @@ def main():
         else:
             link_path.hardlink_to(target)  # `llvm-cov gcov` does not support symlinks
 
-    print("Step 3/3: Capturing raw coverage data into `cov.info` using `lcov`...")
+    print("Step 3/4: Capturing raw coverage data into `cov.info` using `lcov`...")
 
     subprocess.run(
         [
@@ -103,6 +103,19 @@ def main():
             str(args.out_dir.joinpath("cov.info")),
         ],
         check=True,
+    )
+
+    print("Step 4/4: Generating HTML report...")
+
+    subprocess.run(
+        [
+            "genhtml",
+            "cov.info",
+            "--output-directory",
+            "html",
+        ],
+        check=True,
+        cwd=args.out_dir,
     )
 
 

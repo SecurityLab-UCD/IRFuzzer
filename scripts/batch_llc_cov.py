@@ -107,6 +107,8 @@ def main():
             base_dir.joinpath("llvm-gcov.sh"),
             "--output",
             str(args.out_dir.joinpath("cov.info")),
+            "--rc",
+            "lcov_branch_coverage=1",
         ],
         check=True,
     )
@@ -119,6 +121,8 @@ def main():
             "cov.info",
             "--output-directory",
             "html",
+            "--rc",
+            "genhtml_branch_coverage=1"
         ],
         check=True,
         cwd=args.out_dir,

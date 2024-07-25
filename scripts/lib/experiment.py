@@ -64,6 +64,10 @@ class Experiment(NamedTuple):
     @property
     def shadow_map_path(self) -> Path:
         return self.path / "default" / "fuzz_shadowmap"
+    
+    @property
+    def queue_path(self) -> Path:
+        return self.path / "default" / "queue"
 
     @property
     def intial_bitmap(self) -> bitarray:

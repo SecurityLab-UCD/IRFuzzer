@@ -43,7 +43,7 @@ def run_with_coverage(
             "GCOV_PREFIX_STRIP": str(len(cwd.parts) - 1),
             "GCOV_PREFIX": str(cwd.joinpath(cov_out_dir)),
         },
-        check=True,
+        check=False,
         stdout=stdout,
         cwd=cwd,
     )

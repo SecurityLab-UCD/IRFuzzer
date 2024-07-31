@@ -83,6 +83,7 @@ then
 fi
 cd $LLVM/build-release-cov; ninja -j $(nproc --all); cd ../..
 
+
 # Don't build debug build in docker.
 if [ ! -f /.dockerenv ]; then
     # Mutator depends on `build-release`.

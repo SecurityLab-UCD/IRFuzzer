@@ -1,5 +1,9 @@
 # IR Fuzzer
 
+You can find the camera ready paper [here](https://github.com/user-attachments/files/19461085/IRFuzzer.pdf)
+
+This repo hasn't been actively maintained, but I will review and accept any PR if that helps.
+
 # Quick start
 
 ## Compile 
